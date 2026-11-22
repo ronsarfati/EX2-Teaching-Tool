@@ -78,7 +78,7 @@ part (D1). F4 is designed but its implementation is deferred until F1-F3 are don
 
 - **Back end and UI** (D2): Python 3.11+, Flask, server-rendered mobile-first HTML, small vanilla JavaScript.
 - **Storage** (D3): SQLite (standard library `sqlite3`), one local file, git-ignored.
-- **Real time** (D4): short polling every 2-3 s (also refreshes the projector QR and code); no WebSockets.
+- **Real time** (D4): short polling every 2-3 s on student and lecturer pages, every 1 s on the projector page (QR and code, D31); no WebSockets.
 - **Attendance** (D30): rotating signed QR tokens (stdlib `hmac`), QR images generated server-side with `qrcode`;
   no QR-decoding library in the app (the phone's native camera scans); campus allow-list matched with stdlib
   `ipaddress`, client IP read from `CF-Connecting-IP` behind the tunnel.
@@ -97,15 +97,15 @@ Coming with the demo app (To Do 10).
 | To Do | Deliverable | Location | Status |
 |---|---|---|---|
 | — | Requirements R1-R37 | [docs/requirements.md](docs/requirements.md) | Done |
-| — | Validated decisions D1-D30 | [docs/decisions.md](docs/decisions.md) | Done |
+| — | Validated decisions D1-D31 | [docs/decisions.md](docs/decisions.md) | Done |
 | 1 | Repository, problem and scope | this README | Done |
 | 2 | Repository link submitted via the course form | (by the student) | Planned |
 | 3 | Tools report, every tool tested for real | [docs/tools_report.md](docs/tools_report.md) | Done |
 | 4 | Statement of Work | [docs/sow.md](docs/sow.md) | Done |
 | 5 | Software Requirements Specification | [docs/srs.md](docs/srs.md) | Done |
 | 6 | Use cases (client stories) | [docs/use_cases.md](docs/use_cases.md) | Done |
-| 7 | Main software components | [docs/design.md](docs/design.md) | Planned |
-| 8 | Class and sequence diagrams | [docs/design.md](docs/design.md) | Planned |
+| 7 | Main software components | [docs/design.md](docs/design.md) (sections 1-2) | Done |
+| 8 | Class and sequence diagrams | [docs/design.md](docs/design.md) (sections 3-5) | Done |
 | 9 | Test strategy (per class) | [docs/test_strategy.md](docs/test_strategy.md) | Planned |
 | 10 | Demo KISS web application | [app/](app/), [tests/](tests/) | Planned |
 | 11 | Live demo in class | demo script (with plan B) | Planned |
