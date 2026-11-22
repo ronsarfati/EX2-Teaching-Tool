@@ -1,0 +1,125 @@
+# Statement of Work (To Do 4)
+
+Covers R26. Requirements are cited as R1-R37 ([requirements.md](requirements.md)), validated decisions as D1-D25
+([decisions.md](decisions.md)).
+
+## 1. Purpose and background
+
+Current online teaching tools are heavy and not "LLM-ready" (R11). This project designs, end to end, a KISS web
+application for teaching in one real class, used by students from their smartphone browser with no installation
+(R12-R14), and demonstrates it live in class (R13, R19, R34). The assignment is a **design challenge**: the
+implementation is secondary and composes existing tools rather than coding from scratch (R17, R18, R33).
+
+## 2. Objectives
+
+| # | Objective | R / D |
+|---|---|---|
+| O1 | Attendance (main feature): chain-of-trust check-in from the phone, automatic photo head count with a consistency alert, online table + offline CSV/XLSX | R1-R4, D5-D8 |
+| O2 | Comments and suggestions, real time and asynchronous | R5, D4, D8 |
+| O3 | On-the-spot KISS polls | R6, D9 |
+| O4 | ML summary of a recorded class video, better than the Zoom automatic summary | R7, R8, D10 |
+| O5 | LLM homework review with anonymised comparison to other submissions | R9, R10, D11 |
+| O6 | Complete design documentation (tools report, SoW, SRS, use cases, components, class and sequence diagrams, test strategy) | R24-R32, D14 |
+| O7 | A 10-minute live demo in class and a short results description | R19, R34, R35, D17 |
+
+## 3. Scope
+
+**In scope** (D1): all five features designed and implemented in one Flask app (D2) with SQLite storage (D3); F1
+first and most robust. Attendance follows D5: at the end of class the lecturer projects a root QR (first 5 scans
+only); checked-in students then sponsor classmates with their own QR (3 by default, 1-5 per session); students scan
+with the phone's native camera; every QR regenerates every 10 s and is accepted if at most 15 s old on arrival,
+followed by a 2-minute claim to confirm; the sponsor tree is stored; a lecturer phone QR is the fallback. Identity
+is a nickname plus a random device token (D6); lecturer pages are protected by a single PIN (D22). F4 is designed
+and planned last; its implementation details are deferred until F1-F3 are done (D10).
+
+**Out of scope:** Moodle, Zoom, Meet or Google Classroom integration (R15); personal data of any kind, including
+real names, IDs, e-mails, face recognition and location (R16, D6, D21); user accounts (D6, D22); native mobile app
+(R14); late-arrival handling (D5); network-offline mode (PWA) and Google Sheets sync (D8); pre-computed ML/LLM
+outputs (D1, D10, D11); typed attendance codes (D5); manual correction of the head count (D7).
+
+## 4. Deliverables
+
+| To Do | Deliverable | Location (D14) | R |
+|---|---|---|---|
+| 1 | Repository; problem and scope in the README | `README.md` | R20-R22 |
+| 2 | Repository link submitted via the course form (by the student only) | — | R23, D18 |
+| 3 | Tools report, every suggested tool tested for real | `docs/tools_report.md` | R24, R25, D15 |
+| 4 | Statement of Work | `docs/sow.md` (this file) | R26 |
+| 5 | Software Requirements Specification | `docs/srs.md` | R27 |
+| 6 | Use cases (client stories) | `docs/use_cases.md` | R28 |
+| 7 | Main software components | `docs/design.md` | R29 |
+| 8 | Class and sequence diagrams (Mermaid) | `docs/design.md` | R30, R31 |
+| 9 | Test strategy per class/component | `docs/test_strategy.md` | R32, D25 |
+| 10 | Demo KISS web application with tests | `app/`, `tests/`, `demo_data/`, `requirements.txt`, `.env.example` | R33 |
+| 11 | Live 10-minute demo in class, with plan B | demo script | R19, R34, D13 |
+| 12 | Short description of the results | `docs/results.md` | R35, D17 |
+
+## 5. Approach
+
+- **Design first:** requirements (R1-R37) and validated decisions (D1-D25) precede SRS, use cases and design; code
+  only implements what is designed (R17).
+- **Compose existing tools:** Flask, `qrcode`, OpenCV YuNet, faster-whisper, Anthropic SDK, `openpyxl`,
+  `cloudflared`, each tested for real in the tools report before adoption (R18, R25, D15).
+- **AI-assisted, student-validated:** AI agents (Claude Code) draft documents, code and tests; the student defines
+  the key design choices (e.g. D5) and validates every decision and deliverable. AI use is disclosed in the README.
+- **Incremental delivery:** feature order F1 > F3 > F2 > F5 > F4 (D1); each task is coded, then tested with pytest
+  and the Flask test client (D25); frequent small commits (D24).
+
+## 6. Schedule (22/11 - 30/11/2026, D16, D17)
+
+| Date | Milestone |
+|---|---|
+| 22/11 | Requirements, decisions, README (To Do 1), tools report (To Do 3) — done |
+| 23/11 | SoW, SRS, use cases (To Do 4-6) |
+| 24/11 | Components, class and sequence diagrams, test strategy (To Do 7-9) |
+| 25-26/11 | F1 attendance: check-in chain, head count and consistency alert, spreadsheet (To Do 10) |
+| 26/11 | F2 comments, F3 polls |
+| 27/11 | F5 homework review, then F4 video summary (after the D10 revisit) |
+| 28/11 | Quality review, fixes, tests on real phones through the tunnel |
+| 29/11 | Demo data and script with plan B, full rehearsal, results description, final verification (To Do 11-12) |
+| 30/11 | Margin; the student submits the repository link (To Do 2) |
+
+## 7. Roles
+
+| Role | Responsibility |
+|---|---|
+| Student (owner) | Decision maker: validates every decision and deliverable, runs the manual phone tests, publishes the repository, submits the form, performs the demo (D18, D20, D24) |
+| AI agents | Draft documents, code and tests under the student's direction; never push or submit (D24) |
+| Lecturer (client, evaluator) | Defines the needs (assignment statement), gives feedback (e.g. on D5), evaluates the deliverables and the demo |
+
+## 8. Assumptions and constraints
+
+- No personal data in the repository, its history or the demo; provided course files are used locally only and
+  only aggregate numbers are reported (R16, D21).
+- KISS smartphone web app, few taps, no installation (R14); only implementable designs (R17).
+- Demo hosted on the student's laptop, exposed by a Cloudflare quick tunnel (D13).
+- An Anthropic API key is available for F4/F5; without it F1-F3 still run and F4/F5 show a plain error (D12, D23).
+- Individual work (D20); deadline 30/11/2026 (D16); the class demo date is still to be confirmed (D17).
+
+## 9. Risks and mitigations
+
+| Risk | Mitigation | D |
+|---|---|---|
+| A phone cannot scan the QR (camera, old OS) | Native camera only, no in-page scanner or permission prompt; lecturer phone QR as fallback; tested on real phones before the demo | D5 |
+| Classroom network or tunnel fails | Plan B: phone hotspot / LAN over HTTP (works, no in-page camera needed); plan C: recorded rehearsal; QR codes encode the configured base URL | D13 |
+| Chain check-in takes too long or distracts the class (lecturer's concern) | Done at the end of class; one click for the lecturer; 5 projector roots in parallel (about 65 students in 3 waves); 2-minute claim; target < 2 min, measured live and reported | D5, D17 |
+| Head count misses hidden faces | Measured recall ~94 %, precision ~96 % on 4 provided photos (tools report 2.5); asymmetric consistency alert; advice to shoot when students look up; limit stated (fraud under ~7 absent check-ins for N ≈ 45 stays in the noise) | D7 |
+| LLM API unavailable, slow or costly | Short capped inputs; one call per request; plain error message, no canned output; model configurable by env var | D11, D12, D23 |
+| F4 too slow live | Deferred decision; candidate: 2-3 min clip with faster-whisper `base`/`small` (measured real-time factor 0.06 / 0.17, tools report 2.6) plus one LLM call | D10 |
+
+## 10. Acceptance criteria
+
+| # | Criterion | R |
+|---|---|---|
+| A1 | A student checks in from a phone browser (native camera, no install) and appears in the lecturer's live list and sponsor tree | R1, R14, D5 |
+| A2 | A class photo returns a head count and a consistent/anomaly status next to the number of check-ins; the photo is not stored | R2, R16, D7 |
+| A3 | The lecturer sees the attendance table online and downloads it as CSV/XLSX | R3, D8 |
+| A4 | A comment posted from a phone appears on the lecturer page within 5 s; a comment posted outside a session is visible later | R5, D4, D8 |
+| A5 | The lecturer creates a poll, students vote from phones, live results are shown | R6, D9 |
+| A6 | A video file produces a structured summary, compared with the Zoom example in the results | R7, R8, D10 |
+| A7 | A public repository URL produces an LLM review with an anonymised comparison to at least one other submission | R9, R10, D11 |
+| A8 | Every document of To Do 3-9 and 12 exists in `docs/` and is linked from the README | R24-R32, R35, D14 |
+| A9 | The app runs from a fresh clone following the README; the pytest suite passes | R33, R37, D25 |
+| A10 | The live demo shows F1 first and fits in 10 minutes, with a plan B | R4, R19, R34, D13 |
+| A11 | No personal data or secret in the repository or its history | R16, D21, D24 |
+| A12 | Everything committed and the link submitted by 30/11/2026 | R23, R36, R37, D16 |
