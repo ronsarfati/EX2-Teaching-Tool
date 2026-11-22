@@ -19,7 +19,7 @@ Legend: **[ASK]** = still worth confirming with the lecturer/TA.
 | D2 | Tech stack | Python 3.11+ / Flask, server-rendered mobile-first HTML + small vanilla JS | VALIDATED |
 | D3 | Storage | SQLite (stdlib `sqlite3`), one local file, git-ignored | VALIDATED |
 | D4 | Real time | Short polling (2-3 s); no websockets | VALIDATED |
-| D5 | Attendance mechanism (OQ2) | Chain-of-trust check-in at end of class: rotating (10 s) phone-to-phone QR codes, max 3 sponsored per student, sponsor tree stored; lecturer starts several branches in parallel; camera failure -> lecturer scans directly; no typed code | VALIDATED — lecturer consulted (concern: time/attention), in-class test planned |
+| D5 | Attendance mechanism (OQ2) | Chain-of-trust check-in at end of class: projector root QR (first 5 scans only), then student-to-student QR sponsoring (3 by default, configurable 1-5); scanned with the phone's native camera; QR regenerates every 10 s, accepted if <= 15 s old on arrival, then 2-min claim to confirm; sponsor tree stored; lecturer phone QR as fallback; no typed code | VALIDATED — lecturer consulted (concern: time/attention), measured during the live class demo |
 | D6 | Student identity (OQ4) | Nickname entered once, remembered by a random device token (cookie/localStorage); automatic recognition afterwards | VALIDATED |
 | D7 | Photo head count (OQ3) | YuNet, whole image, score threshold 0.4 (recall ~94 %, precision ~96 %); no manual correction; automatic consistency alert (asymmetric tolerance); photo discarded after counting | VALIDATED |
 | D8 | Spreadsheet online/offline; offline comments (OQ5) | Live in-app table + CSV/XLSX download; F2 offline = asynchronous | VALIDATED |
@@ -27,7 +27,7 @@ Legend: **[ASK]** = still worth confirming with the lecturer/TA.
 | D10 | Video summary F4 (OQ6) | No pre-computed summary; to revisit after F1-F3; candidate: live demo on a short 2-3 min clip (faster-whisper + Claude) | DEFERRED |
 | D11 | Homework review F5 (OQ6) | Public repo URL -> capped text extract -> Claude review + anonymised comparison with 1-2 other repos; runs live, no pre-computed fallback | VALIDATED |
 | D12 | LLM provider and secrets | Anthropic (Claude); model from `ANTHROPIC_MODEL`, default `claude-sonnet-5-5` (to confirm by a real call); key in `.env` | VALIDATED |
-| D13 | Demo hosting (OQ7) | Laptop + Cloudflare quick tunnel; plan B hotspot/LAN; plan C recorded run | VALIDATED |
+| D13 | Demo hosting (OQ7) | Laptop + Cloudflare quick tunnel; plan B hotspot/LAN over plain HTTP (works: no in-page camera); plan C recorded run | VALIDATED |
 | D14 | Documents format and layout (OQ11) | Markdown in `docs/`, one file per deliverable, Mermaid, README links all | VALIDATED |
 | D15 | Tools report (OQ12) | Every tool we suggest, tested for real with command, input, result, date, version | VALIDATED |
 | D16 | Deadline (OQ8) | Extended by the lecturer: submission by 30/11/2026 | VALIDATED |
@@ -99,30 +99,36 @@ student — 2026-11-22".
 **Question.** How can a student mark attendance "automatically (or as simple as possible)" from a phone, without personal data, while making it hard to mark an absent friend?
 
 **DECISION (student's own design): chain-of-trust check-in, done at the END of the class.**
-1. The lecturer opens the check-in session; the lecturer's phone shows a QR code.
-2. The lecturer shows it to **3-4 students in different rows** at once (several branches started in parallel); each scans it -> attendance recorded.
-3. Each checked-in student's phone then shows **their own** QR code and can sponsor **up to 3** classmates sitting nearby; each of them can sponsor 3 more, and so on (parallel tree propagation). Sponsoring is optional: the last students simply do nothing more. The lecturer can validate an **unlimited** number of students directly.
-4. **All** QR codes (lecturer and students) regenerate **every 10 s**; the server rejects expired codes, so a forwarded photo or screenshot is useless.
-5. Scans are phone-to-phone at a few centimetres -> physical presence is required.
-6. The app stores **who validated whom** (sponsor tree) -> an accomplice is identifiable too (deterrence).
-7. The lecturer sees the live list (and tree) and closes the session.
+1. **Root QR on the projector.** The lecturer clicks "Attendance": the projector shows a **root QR** that regenerates every 10 s. It accepts only the **first 5 scans** (5 roots, ideally spread across the room), then closes automatically. The lecturer does not move from the desk.
+2. **Native camera, no in-page scanner.** Students scan with their phone's **native camera app**. The QR encodes a URL; tapping the camera's link opens the site in the default browser. There is no in-page scanner, no `getUserMedia`, and no camera permission prompt in the browser.
+3. **Timing rule.** Every QR (root, student, lecturer) regenerates every **10 s**. The server accepts a QR if it is **<= 15 s old when the request arrives at the server** (checked before the page is sent), then issues a **2-minute claim bound to that browser** (D6 token). Slow page loading or slow nickname typing therefore does not matter: the student taps **"Confirm my presence"** within 2 minutes.
+4. **Identity.** First visit: the student types a nickname once (remembered by the browser via a random token, D6). Later visits: recognised automatically, no typing.
+5. **Sponsoring.** After confirming, the student's page shows **their own rotating QR** (same 10 s / 15 s rule) that nearby classmates scan with their native camera. Each student can sponsor **up to 3 classmates by default**; the lecturer can configure this limit **per session (1-5)**. Sponsoring is optional: the last students simply do nothing more.
+6. **Sponsor tree.** The app stores **who validated whom** (including "root via projector" and "lecturer") and shows the tree to the lecturer, together with the live list; an accomplice is therefore identifiable too (deterrence). The lecturer closes the session.
+7. **Fallback when a student cannot scan.** The lecturer shows a **personal lecturer QR on their own phone** (unlimited sponsorships, same 10 s / 15 s rule) up close to that student.
+8. **Parallelism and time.** 5 roots x 3 sponsors -> 5 + 15 + 45 = **~65 students in 3 waves**. **Target: whole class checked in in < 2 min.** No class test is possible before the demo: the duration is **measured live during the class demo** (and reported in `docs/results.md`, TD12); beforehand the flow is rehearsed at home with several browser tabs/phones.
+9. **Plan B without HTTPS** (hotspot/LAN, D13) works, since no in-page camera access is needed. The QR codes must encode the URL actually reachable by the phones (configurable public base URL).
 
-Identity of each node = the nickname and device token of D6 (no personal data). The 3-sponsor limit and the code expiry are enforced server-side.
+Identity of each node = the nickname and device token of D6 (no personal data). The root limit (5), the sponsoring limit (1-5, default 3), the 15 s acceptance window, the 2-minute claim and the "one check-in per token per session" rule are all enforced server-side.
 
-**Lecturer feedback (received 2026-11-22).** The lecturer found the idea interesting but raised a concern: the process takes time and attention and could disrupt class management. The lecturer leaves the choice to the student and recommends a quick real test in class. **The student keeps the chain of trust** (precision and accountability), with these mitigations:
+**Lecturer feedback (received 2026-11-22).** The lecturer found the idea interesting but raised a concern: the process takes time and attention and could disrupt class management. The lecturer leaves the choice to the student. **The student keeps the chain of trust** (precision and accountability), with these mitigations:
 - **Timing:** done at the end of class, so it does not interrupt teaching.
-- **Parallel start:** the lecturer starts several branches at once (step 2), so propagation runs in parallel across the room.
-- **Measured, not assumed:** the real duration is measured in an in-class test with the prototype. **Target: whole class checked in in < 2 min.** The measured duration (and number of failed scans) is reported in `docs/results.md` (TD12).
+- **Lecturer effort:** one click and a projected QR; the lecturer stays at the desk; the root QR closes by itself after 5 scans.
+- **Parallel start:** 5 roots spread across the room, so propagation runs in parallel (3 waves for ~65 students).
+- **Low friction:** native camera (no permission prompt, no in-page scanner), nickname typed only once, a generous 2-minute claim to confirm.
+- **Measured, not assumed:** the real duration (and number of failed scans) is measured during the live class demo and reported in `docs/results.md` (TD12).
 
-**Camera failure fallback.** If a student's camera (or scan) fails, the student goes to the lecturer, who scans them directly (the lecturer has no sponsoring limit).
+**Explicitly rejected: a short typed code under the QR** (suggested as a scanning fallback in the tools report, 2.4). A typed code can be forwarded by message to an absent friend within the validity window, which defeats the physical-presence guarantee. The lecturer-phone QR fallback (step 7) is used instead.
 
-**Explicitly rejected: a short typed code under the QR** (suggested as a scanning fallback in the tools report, 2.4). A typed code can be forwarded by message to an absent friend within the 10 s window, which defeats the physical-presence guarantee. The camera fallback above is used instead.
-
-**Residual risk (documented honestly).** An accomplice could relay a QR code in real time via a video call. Mitigation: traceability (the relaying sponsor is recorded) + the automatic consistency alert of the photo head count (D7) as a global check (number of check-ins vs number of faces detected).
+**Residual risk (documented honestly).** An accomplice could relay a QR code in real time via a video call (the root QR on the projector is also visible to anyone in the room during its first 5 scans). Mitigation: traceability (the relaying sponsor, or the root slot used, is recorded in the tree) + the automatic consistency alert of the photo head count (D7) as a global check (number of check-ins vs number of faces detected).
 
 **Alternatives considered and rejected.**
 - Static QR on the projector: can be forwarded to absent friends.
-- Rotating QR on the projector: no per-person accountability (anyone in view, or a remote viewer, can scan).
+- Rotating projector QR for the whole class: no per-person accountability (anyone in view, or a remote viewer, can scan); kept only as a **root** limited to the first 5 scans.
+- Lecturer walking around with a phone to start the branches: disrupts the lecturer and takes longer (replaced by the projector root QR).
+- In-page QR scanner (jsQR + `getUserMedia`): requires HTTPS and a browser camera permission prompt, extra code and failure modes; **rejected in favour of the phone's native camera**.
+- Fixed "open the app" QR (non-rotating entry point): **rejected by the student** (forwardable, adds a step).
+- 5 sponsors per student by default: **rejected in favour of 3, configurable per session (1-5)**.
 - Short typed code under each QR: forwardable by message (see above).
 - Ultrasound code: unreliable on iPhone/laptop speakers, relayable by phone call.
 - AirDrop/Bluetooth: not available to web pages on iOS; Apple-only.
@@ -135,15 +141,15 @@ Identity of each node = the nickname and device token of D6 (no personal data). 
 
 **Justification.** F1 "automatically (or as simple as possible)"; G1/QA6 no personal data; the statement's own control "shooting a photo [and] performing an automatic student count" (D7) is kept as the global check.
 
-**Impact.** Use cases: Open check-in session, Check in by scanning, Sponsor a classmate, Check in directly with the lecturer (camera fallback), View live list/tree, Close session. Classes for sessions, rotating signed codes, check-ins with sponsor link. QR generated with the `qrcode` library, scanned with jsQR (tools report). No typed-code input anywhere in the UI. Tests: expiry at 10 s, 4th sponsorship rejected, double check-in rejected, lecturer unlimited, scan after close rejected. Results: in-class timing measurement (target < 2 min).
+**Impact.** Use cases: Open check-in session (projector root QR), Configure sponsoring limit, Check in by scanning (native camera -> claim -> confirm), Sponsor a classmate, Check in via the lecturer's phone QR (fallback), View live list/tree, Close session. Classes for sessions, rotating signed codes (issue time, kind: root/student/lecturer), time-limited claims bound to a device token, check-ins with sponsor link. QR images generated server-side with the `qrcode` library and refreshed by polling (D4); **no QR-decoding library in the app**. No typed-code input anywhere in the UI. Tests (injectable clock, D25): code accepted at 15 s and rejected just after; claim accepted within 2 min and rejected after; 6th root scan rejected (root closes after 5); sponsoring limit enforced for the default 3 and for configured values 1 and 5 (out-of-range values 0 and 6 rejected); lecturer QR unlimited; double check-in rejected; scan or confirm after close rejected. Results: live timing measurement during the class demo (target < 2 min).
 
-**Status:** VALIDATED by the student — lecturer consulted (concern: time/attention), in-class test planned — 2026-11-22
+**Status:** VALIDATED by the student — 2026-11-22 (lecturer consulted: concern about time/attention; addressed above; measured during the live class demo)
 
 ## D6 — Student identity without personal data (OQ4; R16, R3)
 
 **Options.** 1. *Self-chosen nickname + random device token.* 2. *Anonymous token only* (sheet unreadable). 3. *Pick a name from the course list* (personal data; violates G1, QA6).
 
-**DECISION: option 1, "Moodle-like" simplicity without accounts.** The student enters a self-chosen nickname **once** (first use); the phone remembers a random token (cookie + localStorage). At every later check-in the student is recognised automatically, with no typing. The UI warns "do not use your real name or ID". No name/ID/e-mail field anywhere. Spreadsheet columns: session date, nickname, check-in time, sponsor nickname (or "lecturer"); per-session summary: check-ins, faces detected, consistency status (D7).
+**DECISION: option 1, "Moodle-like" simplicity without accounts.** The student enters a self-chosen nickname **once** (first use); the phone remembers a random token (cookie + localStorage). At every later check-in the student is recognised automatically, with no typing. The UI warns "do not use your real name or ID". No name/ID/e-mail field anywhere. Spreadsheet columns: session date, nickname, check-in time, sponsor nickname (or "root via projector" / "lecturer"); per-session summary: check-ins, faces detected, consistency status (D7).
 
 **Justification.** G1 "No need integrate with ... מידע אישי"; QA6 the lecturer removed IDs from the list.
 
@@ -213,9 +219,9 @@ Identity of each node = the nickname and device token of D6 (no personal data). 
 
 ## D13 — Hosting for the live demo (OQ7; R13, R19)
 
-**DECISION:** app on the laptop + Cloudflare quick tunnel (`cloudflared tunnel --url`, no account, public HTTPS URL). **Plan B:** phone hotspot / LAN URL. **Plan C:** screen recording of a full rehearsal + lecturer page with 2-3 simulated phones. Rejected: ngrok (account, interstitial), free cloud hosts (RAM, cold start, deploy effort).
+**DECISION:** app on the laptop + Cloudflare quick tunnel (`cloudflared tunnel --url`, no account, public HTTPS URL). **Plan B:** phone hotspot / LAN URL over plain HTTP; the check-in still works because students scan with the phone's native camera and no in-page camera access is needed (D5); the QR codes encode the configured base URL of the active plan. **Plan C:** screen recording of a full rehearsal + lecturer page with 2-3 simulated phones. Rejected: ngrok (account, interstitial), free cloud hosts (RAM, cold start, deploy effort).
 
-**Impact.** README "Run the demo"; tools report tests cloudflared from a real phone on mobile data. HTTPS also matters for camera access when scanning (D5).
+**Impact.** README "Run the demo" (including how to set the base URL encoded in the QR codes for plans A and B); tools report tests cloudflared from a real phone on mobile data.
 
 **Status:** VALIDATED by the student — 2026-11-22
 
@@ -240,7 +246,7 @@ app/  tests/  demo_data/  .env.example  requirements.txt
 
 ## D15 — Tools report scope and evidence (OQ12; R24, R25)
 
-**DECISION:** every tool we suggest is actually run; each entry: purpose, alternatives, exact command/code, input (no personal content), observed result, date, version, verdict. Tools: Flask, qrcode, a browser QR scanning approach, OpenCV YuNet, Ultralytics YOLO, faster-whisper, Anthropic API, cloudflared, openpyxl.
+**DECISION:** every tool we suggest is actually run; each entry: purpose, alternatives, exact command/code, input (no personal content), observed result, date, version, verdict. Tools: Flask, qrcode, QR scanning with the phone's native camera app (adopted in D5; the in-page scanner approach tested earlier is documented as rejected), OpenCV YuNet, Ultralytics YOLO, faster-whisper, Anthropic API, cloudflared, openpyxl.
 
 **Status:** VALIDATED by the student — 2026-11-22
 
@@ -252,7 +258,7 @@ app/  tests/  demo_data/  .env.example  requirements.txt
 
 ## D17 — Demo date and results description (OQ9; R34, R35)
 
-**DECISION:** demo-ready by 29/11/2026. `docs/results.md` written from the full rehearsal (what worked, head-count accuracy and consistency alert, chain-of-trust check-in duration from the in-class test of D5, timings, limits), with a section to update after the class demo if allowed. **[ASK]** date of the class demo and whether TD12 must include it.
+**DECISION:** demo-ready by 29/11/2026. `docs/results.md` written from the full rehearsal (what worked, head-count accuracy and consistency alert, chain-of-trust rehearsal with several tabs/phones, timings, limits), with a section to update after the class demo, where the whole-class check-in duration of D5 is measured live, if allowed. **[ASK]** date of the class demo and whether TD12 must include it.
 
 **Status:** VALIDATED by the student — 2026-11-22
 
@@ -305,7 +311,7 @@ app/  tests/  demo_data/  .env.example  requirements.txt
 
 ## D25 — Test tooling (R32)
 
-**DECISION:** `pytest` + Flask test client; unit tests per class from `docs/design.md`; `LLMClient` and `Transcriber` replaced by fakes (no network, no key); `HeadCounter` tested on non-personal images with a tolerance (e.g. ±20 %), plus the local-only accuracy measurement on the provided photos (reported, not automated); the D7 consistency rule tested exhaustively at its boundaries (pure function). Time-dependent logic (10 s QR expiry, D5) tested with an injectable clock. Manual end-to-end check with 2-3 phones before the demo.
+**DECISION:** `pytest` + Flask test client; unit tests per class from `docs/design.md`; `LLMClient` and `Transcriber` replaced by fakes (no network, no key); `HeadCounter` tested on non-personal images with a tolerance (e.g. ±20 %), plus the local-only accuracy measurement on the provided photos (reported, not automated); the D7 consistency rule tested exhaustively at its boundaries (pure function). Time-dependent logic of D5 (10 s QR regeneration, 15 s acceptance window checked on request arrival, 2-minute claim) tested with an injectable clock. Manual end-to-end rehearsal with several browser tabs and 2-3 phones before the demo.
 
 **Status:** VALIDATED by the student — 2026-11-22
 
@@ -313,7 +319,7 @@ app/  tests/  demo_data/  .env.example  requirements.txt
 
 ## Questions still worth asking the lecturer/TA
 
-1. ~~Is the chain-of-trust check-in acceptable (D5)?~~ Answered 2026-11-22: the lecturer leaves the choice to the student, with a concern about time/attention and a recommendation to test in class. Remaining: when can the quick in-class test be run?
+1. ~~Is the chain-of-trust check-in acceptable (D5)?~~ Answered 2026-11-22: the lecturer leaves the choice to the student, with a concern about time/attention. No class test is possible before the demo: the duration is measured live during the class demo (D5, D17).
 2. Date of the class demo; must the results description include it (D17)?
 3. Is there a Moodle upload in addition to the Form (D18)?
 4. Optional: is a nickname-based attendance sheet acceptable under "no personal information" (D6), and may anonymised comparisons with other students' repos be shown in class (D11)?
