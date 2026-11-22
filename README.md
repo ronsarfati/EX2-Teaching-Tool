@@ -89,7 +89,7 @@ Coming with the demo app (To Do 10).
 | — | Validated decisions D1-D25 | [docs/decisions.md](docs/decisions.md) | Done |
 | 1 | Repository, problem and scope | this README | Done |
 | 2 | Repository link submitted via the course form | (by the student) | Planned |
-| 3 | Tools report, every tool tested for real | [docs/tools_report.md](docs/tools_report.md) | Planned |
+| 3 | Tools report, every tool tested for real | [docs/tools_report.md](docs/tools_report.md) | Done |
 | 4 | Statement of Work | [docs/sow.md](docs/sow.md) | Planned |
 | 5 | Software Requirements Specification | [docs/srs.md](docs/srs.md) | Planned |
 | 6 | Use cases (client stories) | [docs/use_cases.md](docs/use_cases.md) | Planned |
