@@ -53,8 +53,8 @@ Other building blocks that need no separate test: SQLite (Python stdlib `sqlite3
 **Rule validated in D30** (first set in D5, kept): the server generates a new projector QR token every **10 s**; a
 scanned token is accepted if it is **<= 15 s old when the request arrives at the server** (age measured with the
 server clock only, so phone clocks do not matter). An accepted scan opens a **1-minute check-in window** during
-which the student types the 3-digit code shown under the QR (regenerated every 5 s) and a nickname (first visit
-only). The tests below used a **10 s** acceptance window; the window is a single constant of the same code (`TTL` in
+which the student types a nickname (first visit only), then the 3-digit code shown under the QR (regenerated every
+5 s), and taps "Confirm". The tests below used a **10 s** acceptance window; the window is a single constant of the same code (`TTL` in
 the script, `max_age` for itsdangerous), so 15 s and the 1-minute window use the same mechanism without new code.
 The 3-digit code needs no extra tool (Python stdlib); its 5 s rotation and its tolerance (current or previous code)
 are to be tested with an injected clock in the app tests (D25), not in this report.

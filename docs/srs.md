@@ -154,8 +154,8 @@ P: MUST-MAIN. Trace: R1, D30, tools report 2.2. AC (injected clock): accepted at
 tampered token is rejected.
 
 **FR-1.7 Check-in window.** On a valid scan, the system shall open a 1-minute check-in window bound to the
-browser's device token and show the check-in page with a numeric code field (`inputmode="numeric"`) and, on first
-use only, a nickname field (FR-1.10).
+browser's device token and show the check-in page with, on first use only, a nickname field (FR-1.10), followed by a
+numeric code field (`inputmode="numeric"`) and a "Confirm" button.
 P: MUST-MAIN. Trace: R1, R14, D6, D30. AC (injected clock): a code submitted at 1 min is accepted, just after 1 min
 rejected; a submission from another device token is rejected.
 
@@ -170,8 +170,8 @@ P: MUST-MAIN. Trace: R1, D30 (P2). AC: 5 wrong attempts are answered with the wr
 rejected with the too-many-attempts message, even if the code is correct.
 
 **FR-1.10 Nickname once.** If the device token has no nickname, the check-in page shall ask for one (non-empty),
-with the warning "Do not use your real name or ID"; on later visits the student shall be recognised with no
-nickname typing (the check-in code is still typed). The nickname is used for attendance only (not for comments
+with the warning "Do not use your real name or ID"; the nickname is typed before the check-in code. On later visits the student shall be
+recognised with no nickname typing (only the check-in code is typed). The nickname is used for attendance only (not for comments
 or votes, D28, D29).
 P: MUST-MAIN. Trace: R1, R16, D6. AC: first visit shows the nickname field and the warning; a second scan from
 the same device shows the nickname and no nickname field; an empty nickname is rejected.
@@ -324,7 +324,7 @@ P: MUST. Trace: R13, D13, D30. AC: see FR-1.5.
 
 | ID | Category | Requirement | Trace | Verification |
 |---|---|---|---|---|
-| NFR-1 | Usability | A returning student checks in in 4 phone actions: scan with the native camera, tap the link, type the 3-digit code, tap the check-in button; a first-time student also types a nickname once. No install, no account. | R1, R14, D6, D30 | Manual test on iPhone and Android (tools report section 3, tests 1-2) |
+| NFR-1 | Usability | A returning student checks in in 4 phone actions: scan with the native camera, tap the link (the page opens), type the 3-digit code, tap "Confirm"; a first-time student types a nickname once, after the page opens and before the code. No install, no account. | R1, R14, D6, D30 | Manual test on iPhone and Android (tools report section 3, tests 1-2) |
 | NFR-2 | Performance (real time) | Check-ins, comments and votes are visible on the lecturer page within 5 s (polling every 2-3 s). | R5, R6, D4 | Integration test with polling interval; manual rehearsal |
 | NFR-3 | Performance (head count) | Head count takes < 1 s per photo on the demo laptop (measured median 86 ms at 2000x1500 px, threshold 0.4, tools report 2.5.2). | R2, D7 | Timed unit test on a non-personal image |
 | NFR-4 | Performance (check-in) | Each scan / code submission is handled by the server in < 1 s on the demo laptop, so that network delay dominates the 15 s QR window and the 5 s code rotation. | R1, D30 | Timed test with the Flask test client; manual test 3 (tools report section 3) |
