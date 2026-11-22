@@ -64,7 +64,7 @@ Priority of F2..F5 vs. demo scope is an open question (OQ1); the values below re
 
 | ID | Type | Priority | Requirement | Source | Acceptance criterion |
 |---|---|---|---|---|---|
-| R36 | SUBMIT | MUST | Statement deadline: 25/11/2026 ("updated in Moodle soon"). The student has decided to submit on 26/11/2026 (decision of 22/11); the team aims to finish before that. | QA3: "25/11/2026 - updated in Moodle soon, see Ex2 submission link" | All repo deliverables committed before the student's submission date. |
+| R36 | SUBMIT | MUST | Statement deadline: 25/11/2026 ("updated in Moodle soon"). The lecturer has since extended the deadline: submission is allowed until 30/11/2026 (D16); the team aims to finish before that. | QA3: "25/11/2026 - updated in Moodle soon, see Ex2 submission link"; lecturer extension (D16) | All repo deliverables committed and submitted no later than 30/11/2026. |
 | R37 | SUBMIT | MUST | The deliverables are in the submitted repository (committed, reachable from the link given in the form). | TD1, TD2 | A fresh clone of the repo contains all documents and the app. |
 
 ## 2. Grading priorities
@@ -110,8 +110,8 @@ Priority of F2..F5 vs. demo scope is an open question (OQ1); the values below re
 - **TD2**: the form asks for the student's e-mail and ID; only the student fills it. The repo must be public (or
   accessible) when the link is submitted. The form links to the live Google Doc of the statement, whose Q&A may be
   newer than the PDF — re-check before submitting.
-- **Deadline**: the statement says 25/11/2026 "updated in Moodle soon"; the student's plan is 26/11/2026 — the risk
-  of a late submission is the student's decision (see OQ8).
+- **Deadline**: the statement says 25/11/2026 "updated in Moodle soon"; the lecturer has extended it to 30/11/2026
+  (D16). Do not miss the extended date (see OQ8).
 - **Demo**: 10 minutes, live, in class, on classmates' phones; the network in the room, the hosting and a fallback
   plan matter. The main feature must be shown first.
 - **"Offline"** appears twice (F1 spreadsheet, F2 comments) — easy to forget.
@@ -145,8 +145,8 @@ Priority of F2..F5 vs. demo scope is an open question (OQ1); the values below re
 - **OQ6** ML/LLM services (F4, F5): which provider (local model vs. API with key), cost, and whether sending video
   transcripts or student repos to an external API is acceptable under G1.
 - **OQ7** Hosting for the live demo (Req1): public cloud host vs. laptop on the class network; tunnel; fallback plan.
-- **OQ8** Deadline: statement says 25/11/2026 ("updated in Moodle soon"); student plans 26/11/2026 — confirm the
-  actual Moodle deadline and late-submission policy.
+- **OQ8** Deadline: statement says 25/11/2026 ("updated in Moodle soon"); extended by the lecturer to 30/11/2026
+  (resolved by D16) — confirm the Moodle deadline shows the extended date.
 - **OQ9** Date of the in-class demo (TD11): not stated; is it before or after the submission deadline? Does the TD12
   results description have to include the demo outcome?
 - **OQ10** QA3 "see Ex2 submission link": is it the same Google Form as TD2 or a Moodle assignment? Is a Moodle upload
