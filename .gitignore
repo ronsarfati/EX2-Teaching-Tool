@@ -1,0 +1,50 @@
+# --- Secrets ---
+.env
+.env.*
+!.env.example
+
+# --- Python virtual environments ---
+.venv/
+venv/
+env/
+
+# --- Python caches and build output ---
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# --- Flask runtime data (local database, uploaded files) ---
+instance/
+uploads/
+*.db
+*.sqlite
+*.sqlite3
+
+# --- ML models and caches (downloaded at runtime, too large for git) ---
+*.onnx
+*.pt
+*.pth
+*.bin
+*.safetensors
+models/
+model_cache/
+.cache/
+.huggingface/
+
+# --- Media (class photos and videos must never be committed) ---
+*.mp4
+*.mov
+
+# --- OS / editor files ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
