@@ -1,6 +1,6 @@
 # Statement of Work (To Do 4)
 
-Covers R26. Requirements are cited as R1-R37 ([requirements.md](requirements.md)), validated decisions as D1-D30
+Covers R26. Requirements are cited as R1-R37 ([requirements.md](requirements.md)), validated decisions as D1-D31
 ([decisions.md](decisions.md); D5 and D26 are superseded by D30).
 
 ## 1. Purpose and background
@@ -60,7 +60,7 @@ head count (D7).
 
 ## 5. Approach
 
-- **Design first:** requirements (R1-R37) and validated decisions (D1-D30) precede SRS, use cases and design; code
+- **Design first:** requirements (R1-R37) and validated decisions (D1-D31) precede SRS, use cases and design; code
   only implements what is designed (R17).
 - **Compose existing tools:** Flask, `qrcode`, OpenCV YuNet, faster-whisper, Anthropic SDK, `openpyxl`,
   `cloudflared`, each tested for real in the tools report before adoption (R18, R25, D15).
@@ -125,7 +125,7 @@ head count (D7).
 | A4 | A comment posted from a phone appears on the lecturer page within 5 s; a comment posted outside a session is visible later | R5, D4, D8 |
 | A5 | The lecturer creates a poll, students vote from phones, live results are shown | R6, D9 |
 | A6 | A video file produces a structured summary, compared with the Zoom example in the results | R7, R8, D10 |
-| A7 | A public repository URL produces an LLM review with an anonymised comparison to at least one other submission | R9, R10, D11 |
+| A7 | A public repository URL produces an LLM review with an anonymised comparison to at least one other submission when one is available (otherwise the review says so, D31) | R9, R10, D11, D31 |
 | A8 | Every document of To Do 3-9 and 12 exists in `docs/` and is linked from the README | R24-R32, R35, D14 |
 | A9 | The app runs from a fresh clone following the README; the pytest suite passes | R33, R37, D25 |
 | A10 | The live demo shows F1 first and fits in 10 minutes, with a plan B | R4, R19, R34, D13 |

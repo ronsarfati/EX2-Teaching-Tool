@@ -1,8 +1,8 @@
 # Software Requirements Specification (To Do 5)
 
 Covers R27. IEEE-830-inspired, kept short. Requirements are cited as R1-R37
-([requirements.md](requirements.md)), validated decisions as D1-D30 ([decisions.md](decisions.md); D5 and D26
-are superseded by D30), measured figures as sections of the [tools report](tools_report.md). Scope and schedule: [sow.md](sow.md).
+([requirements.md](requirements.md)), validated decisions as D1-D31 ([decisions.md](decisions.md); D5 and D26
+are superseded by D30; D31 records the design-level choices validated on 23/11), measured figures as sections of the [tools report](tools_report.md). Scope and schedule: [sow.md](sow.md).
 
 ## 1. Introduction
 
@@ -45,7 +45,7 @@ rejected (D30).
 | N | Number of check-ins in the session (D7). |
 | Consistency alert | Automatic status "consistent" or "anomaly" computed from N and D (D7). |
 | Nickname | Self-chosen display name entered once per device; never a real name or ID (D6). |
-| Device token | Random value stored in the browser (cookie + localStorage) that identifies a device without personal data; binds the check-in window and limits check-in to one per device per session (D6, D30). |
+| Device token | Random value stored in a server-set browser cookie only (D31, OI-4) that identifies a device without personal data; binds the check-in window and limits check-in to one per device per session (D6, D30). |
 | Lecturer PIN | Single secret from an environment variable that unlocks lecturer pages (D22). |
 | Base URL | The public URL reachable by the phones (tunnel or LAN), encoded in the projector QR (D13, D30). |
 
@@ -110,7 +110,10 @@ accepted only from the campus allow-list; the tunnel passes the phone's address 
 - A4 Check-in happens at the end of class; late arrivals are not handled (D5; timing unchanged by D30).
 - A5 The YuNet model file is downloaded locally (not committed) before the demo (D21).
 - A6 Students in the room can join the university Wi-Fi; the university has no VPN; the campus public IP range(s)
-  are measured on site on 23/11 and placeholders are used until then (D30, OI-3).
+  are data entered by the lecturer via UC-6 (FR-1.4, no code change); the real value is pending the student's on-site
+  measurement and placeholders are used until then (D30, D31, OI-3).
+- A7 Restarting the quick tunnel changes its host name, so the device-token cookie is lost and phones are treated as
+  first-time (nickname typed again) (D31, OI-4).
 
 ## 3. Functional requirements
 
@@ -126,9 +129,11 @@ session while one is open is rejected with the message of section 5.
 
 **FR-1.2 Campus network check.** The system shall accept a check-in request (QR scan and code submission) only if
 the client IP (FR-1.3) belongs to a range of the campus allow-list (IPv4 and IPv6, CIDR notation, matched with
-stdlib `ipaddress`); otherwise it shall refuse it with the off-campus message of section 5.
+stdlib `ipaddress`); otherwise it shall refuse it with the off-campus message of section 5. An empty allow-list
+refuses everyone (D31).
 P: MUST-MAIN. Trace: R1, R13, D30. AC (injected client IP): an IPv4 and an IPv6 address inside the list are
-accepted; an IPv4 and an IPv6 address outside it are refused with the message and create no window and no record.
+accepted; an IPv4 and an IPv6 address outside it are refused with the message and create no window and no record; with an empty list every address is
+refused.
 
 **FR-1.3 Client IP resolution.** The system shall take the client IP from the `CF-Connecting-IP` header only when
 the socket peer is localhost (request coming through the local tunnel, plan A); otherwise it shall use the socket
@@ -140,10 +145,12 @@ any other peer (spoofing attempt); no table or export has an IP column.
 range shall be rejected with a plain message. For plan B the LAN / hotspot range is added the same way.
 P: MUST-MAIN. Trace: R13, D13, D22, D30. AC: without the PIN the editor is not reachable; a valid IPv4 and IPv6 CIDR
 are saved and used by FR-1.2 at once; an invalid entry is rejected and the list is unchanged.
-**OPEN:** the real campus ranges (section 7, OI-3).
+The ranges are runtime data entered here, nothing is hard-coded (D31, OI-3); the real campus value is pending the
+student's on-site measurement.
 
 **FR-1.5 Projector QR.** While a session is open, the projector page shall show a QR encoding a URL built from the
-configured base URL, with a token HMAC-signed with its creation time, regenerated every 10 s. The application
+configured base URL, with a token HMAC-signed with its creation time (the start of its 10 s slice, D31), regenerated every 10 s; the
+projector page polls every 1 s (D4 amended by D31, OI-8). The application
 shall contain no in-page camera scanner.
 P: MUST-MAIN. Trace: R1, R13, R14, D4, D13, D30. AC: with an injected clock, the token at t and at t + 10 s differ;
 with the base URL set to a LAN address the decoded URL starts with it; no page requests camera access.
@@ -165,18 +172,21 @@ P: MUST-MAIN. Trace: R1, D4, D30 (P1). AC (injected clock): the current code and
 the code before the previous one and a wrong code are rejected.
 
 **FR-1.9 Attempt limit.** The system shall accept at most 5 code attempts per check-in window; after that the
-window is closed and the student must scan the QR again.
+window is closed and the student must scan the QR again. A new scan opens a new 1-minute window with 0 attempts
+(D31, OI-7). A rejected empty or invalid nickname does not count as an attempt (D31).
 P: MUST-MAIN. Trace: R1, D30 (P2). AC: 5 wrong attempts are answered with the wrong-code message; the 6th attempt is
-rejected with the too-many-attempts message, even if the code is correct.
+rejected with the too-many-attempts message, even if the code is correct; after a new scan, a correct code is
+accepted.
 
-**FR-1.10 Nickname once.** If the device token has no nickname, the check-in page shall ask for one (non-empty),
+**FR-1.10 Nickname once.** If the device token has no nickname, the check-in page shall ask for one (1-30 characters after
+trimming; not unique, the device token is the identity, D31, OI-2),
 with the warning "Do not use your real name or ID"; the nickname is typed before the check-in code. On later visits the student shall be
 recognised with no nickname typing (only the check-in code is typed). The nickname is used for attendance only (not for comments
 or votes, D28, D29).
 P: MUST-MAIN. Trace: R1, R16, D6. AC: first visit shows the nickname field and the warning; a second scan from
-the same device shows the nickname and no nickname field; an empty nickname is rejected.
-**OPEN — to be decided by the student:** nickname uniqueness (within a session or globally) and maximum length
-(see section 7, OI-2).
+the same device shows the nickname and no nickname field; an empty nickname and a 31-character nickname are rejected,
+a 30-character one is accepted; two devices may use the same nickname. The nickname is stored at the first
+successful check-in (D31).
 
 **FR-1.11 Record check-in.** On a correct code within an open window (FR-1.6-FR-1.9), the system shall record one
 check-in with session, nickname and time, and close the window.
@@ -198,10 +208,11 @@ P: MUST-MAIN. Trace: R3, D4, D8. AC: a new check-in appears within 5 s without r
 without a correct code does not change the table or N.
 
 **FR-1.15 Photo head count.** The lecturer shall upload or shoot a class photo for a session; the system shall
-count faces with YuNet on the whole image, score threshold 0.4 (configurable), and store D with the session; the
+count faces with YuNet on the whole image, score threshold 0.4 (configurable), and store D with the session (a new
+photo for the same session replaces D, D31, OI-5); the
 page shall advise taking the photo when students look up.
 P: MUST-MAIN. Trace: R2, D7, tools report 2.5. AC: on a non-personal test image with a known number of faces, D
-is within the tolerance of D25; the threshold default is 0.4.
+is within the tolerance of D25; the threshold default is 0.4; a second photo replaces the first D.
 
 **FR-1.16 Consistency alert.** The system shall display "checked in N / detected D / consistent|anomaly", where
 "consistent" holds if `N - max(7, ceil(0.15 * N)) <= D <= N + max(4, ceil(0.10 * N))`, otherwise "anomaly".
@@ -216,10 +227,11 @@ only the number; no edit-count route exists.
 
 **FR-1.18 Export (offline spreadsheet).** The lecturer shall download the attendance as CSV and as XLSX, one row
 per check-in with the columns session date, nickname, check-in time (no IP); plus a per-session summary: check-ins
-(N), faces detected (D), consistency status. The app has no other check-in route: a student whose camera cannot
+(N), faces detected (D), consistency status. One export covers all sessions: XLSX with two sheets "Check-ins" and
+"Summary"; CSV as two files `checkins.csv` and `summary.csv` (D31, OI-6). The app has no other check-in route: a student whose camera cannot
 scan the QR is added by the lecturer after class in the exported spreadsheet.
 P: MUST-MAIN. Trace: R3, D6, D8, D21, D30 (P3), tools report 2.8. AC: the files open in a spreadsheet tool and
-their rows equal the live table; the summary values equal those on the lecturer page; no route creates a check-in
+their rows equal the live table; the XLSX has the two sheets; the summary values equal those on the lecturer page; no route creates a check-in
 without a valid QR scan and code.
 
 ### 3.2 F2 Comments and suggestions
@@ -239,8 +251,10 @@ no nickname.
 class, remain available on the lecturer page later.
 P: MUST. Trace: R5, D8, D29. AC: after restarting the server, earlier comments are still listed.
 
-**FR-2.4 Empty comment.** The system shall reject an empty comment with a plain message.
-P: MUST. Trace: R5, D23. AC: posting whitespace only returns the message of section 5 and stores nothing.
+**FR-2.4 Empty or too long comment.** The system shall reject an empty comment and a comment longer than 500
+characters (after trimming) with a plain message.
+P: MUST. Trace: R5, D23, D29, D31 (OI-11). AC: posting whitespace only, or 501 characters, returns the matching
+message of section 5 and stores nothing; 500 characters are accepted.
 
 ### 3.3 F3 Polls
 
@@ -300,15 +314,25 @@ section 5 is shown.
 **FR-5.4 Anonymised comparison.** The review shall include a comparison with 1-2 other submissions of the same
 assignment, labelled anonymously ("Submission B", "Submission C"), plus deterministic metrics (file and line
 counts).
-P: MUST. Trace: R10, R16, D11. AC: the output contains the comparison section and the metrics, and no URL or
-owner name of the other submissions.
-**OPEN — to be decided by the student:** where the other submissions come from (candidate: the lecturer pastes a
-list of public repository URLs per assignment); see section 7, OI-1.
+The other submissions are the first 2 of a list of public repository URLs pasted by the lecturer on the
+PIN-protected page `/lecturer/peers` (stored in the local SQLite database), excluding the reviewed repository (D31,
+OI-1). Owner and repository names of these submissions are masked in the prompt and the output; reviews are never
+stored (D31, OI-9). If no other submission can be fetched, the review is shown with the sentence "No other
+submission was available for comparison." (D31, OI-12). The review page itself needs no PIN (accepted for the
+demo, D31, OI-10).
+P: MUST. Trace: R10, R16, D11, D31. AC: the output contains the comparison section and the metrics, and no URL,
+owner or repository name of the other submissions; the reviewed repository is never its own peer; with an empty or
+unreachable peer list the review is shown with the sentence above; no review is written to the database.
+
+**FR-5.5 Peer list.** The lecturer (PIN) shall view and edit the list of comparison repositories on
+`/lecturer/peers`.
+P: MUST. Trace: R10, D22, D31 (OI-1). AC: without the PIN the page is not reachable; a saved list is used by the
+next review.
 
 ### 3.6 Lecturer access and configuration
 
 **FR-6.1 Lecturer PIN.** Lecturer pages (sessions, projector QR and code, allow-list editor, table, photo, export,
-polls, comments view, video summary) shall require the lecturer PIN read from an environment variable, kept in the session cookie.
+polls, comments view, video summary, F5 peer list) shall require the lecturer PIN read from an environment variable, kept in the session cookie.
 P: MUST. Trace: R16, D22. AC: without the PIN these pages redirect to the PIN page; a wrong PIN is refused with
 a plain message.
 
@@ -325,7 +349,7 @@ P: MUST. Trace: R13, D13, D30. AC: see FR-1.5.
 | ID | Category | Requirement | Trace | Verification |
 |---|---|---|---|---|
 | NFR-1 | Usability | A returning student checks in in 4 phone actions: scan with the native camera, tap the link (the page opens), type the 3-digit code, tap "Confirm"; a first-time student types a nickname once, after the page opens and before the code. No install, no account. | R1, R14, D6, D30 | Manual test on iPhone and Android (tools report section 3, tests 1-2) |
-| NFR-2 | Performance (real time) | Check-ins, comments and votes are visible on the lecturer page within 5 s (polling every 2-3 s). | R5, R6, D4 | Integration test with polling interval; manual rehearsal |
+| NFR-2 | Performance (real time) | Check-ins, comments and votes are visible on the lecturer page within 5 s (polling every 2-3 s; the projector page every 1 s, D31). | R5, R6, D4, D31 | Integration test with polling interval; manual rehearsal |
 | NFR-3 | Performance (head count) | Head count takes < 1 s per photo on the demo laptop (measured median 86 ms at 2000x1500 px, threshold 0.4, tools report 2.5.2). | R2, D7 | Timed unit test on a non-personal image |
 | NFR-4 | Performance (check-in) | Each scan / code submission is handled by the server in < 1 s on the demo laptop, so that network delay dominates the 15 s QR window and the 5 s code rotation. | R1, D30 | Timed test with the Flask test client; manual test 3 (tools report section 3) |
 | NFR-5 | Capacity | One class (up to 52 faces detected on a provided class photo, tools report 2.5.2) with polling every 2-3 s stays under the quick tunnel limit of 200 in-flight requests (tools report 2.9). | R13, D13, D30 | Rehearsal with several tabs and phones |
@@ -352,11 +376,13 @@ Every case is covered by a test (D23). Messages are indicative wording.
 | Session closed (scan or code submission) | "Attendance for this class is closed." |
 | No open session | "There is no attendance check-in right now." |
 | Opening a session while one is open (D27) | "A session is already open. Close it first." |
-| Empty nickname | "Please choose a nickname (not your real name or ID)." |
+| Empty nickname, or longer than 30 characters (FR-1.10) | "Please choose a nickname (not your real name or ID)." |
+| `/checkin` opened without a QR token while a session is open (FR-1.7, D31) | "Scan the QR code on the projector." |
 | Invalid range in the allow-list editor (lecturer) | "This is not a valid network range (e.g. 192.0.2.0/24)." |
 | Photo missing or not a readable image | "We could not read this photo. Please try another one." |
 | Face detector model not available | "Head count is not available right now." |
 | Empty comment | "Please write something before sending." |
+| Comment longer than 500 characters (FR-2.4, D31) | "Please keep your comment under 500 characters." |
 | Poll with an empty question or not 2-4 options | "A poll needs a question and 2 to 4 options." |
 | Creating a poll while one is open (D28) | "A poll is already open. Close it first." |
 | Second vote, or vote on a closed poll | "You have already voted." / "This poll is closed." |
@@ -381,7 +407,7 @@ Every case is covered by a test (D23). Messages are indicative wording.
 | R7 | FR-4.1-FR-4.4 (deferred, D10) |
 | R8 | FR-4.3 |
 | R9 | FR-5.1-FR-5.3 |
-| R10 | FR-5.4 |
+| R10 | FR-5.4, FR-5.5 |
 | R11 | FR-4.3, FR-5.3, NFR-12 (`LLMClient` interface) |
 | R12 | Sections 2-3 (end-to-end, phone to lecturer output, every feature) |
 | R13 | FR-1.2-FR-1.5, FR-6.3, NFR-5, NFR-9, C5, C7 |
@@ -401,10 +427,10 @@ Every case is covered by a test (D23). Messages are indicative wording.
 
 ## 7. Open items
 
-Not decided yet; they are **OPEN — to be decided by the student** and nothing in this document assumes an answer.
+All closed by D31 (validated by the student on 23/11).
 
-| ID | Topic | Affects | Candidate (not validated) |
-|---|---|---|---|
-| OI-1 | Source of the 1-2 other submissions used for the F5 comparison | FR-5.4, R10, D11 | The lecturer pastes a list of public repository URLs per assignment |
-| OI-2 | Nickname rules: uniqueness (per session or global) and maximum length | FR-1.10, FR-1.14, FR-1.18, D6 | None proposed |
-| OI-3 | Real campus public IPv4/IPv6 range(s) for the allow-list | FR-1.2, FR-1.4, D30 | Measured on site by the student on 23/11; placeholders (and the student's home IP for testing) until then |
+| ID | Topic | Resolution |
+|---|---|---|
+| OI-1 | Source of the 1-2 other submissions used for the F5 comparison | CLOSED: list pasted by the lecturer on `/lecturer/peers` (FR-5.4, FR-5.5) |
+| OI-2 | Nickname rules | CLOSED: 1-30 characters after trimming, not unique (FR-1.10) |
+| OI-3 | Campus public IPv4/IPv6 range(s) | CLOSED for the design: data entered via UC-6 (FR-1.4), no code change; the value itself is pending the student's on-site measurement (placeholders until then, A6) |

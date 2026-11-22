@@ -32,7 +32,7 @@ parameters change (see 2.2).
 | 11 | Campus network filter (R1, R13, D30) | stdlib `ipaddress` (CIDR match) + `CF-Connecting-IP` header behind cloudflared | Python stdlib / cloudflared 2026.11.1 | **not tested yet** (PLANNED, 2.11 and Section 3 tests 5-7) | PLANNED |
 
 Other building blocks that need no separate test: SQLite (Python stdlib `sqlite3`, D3), short polling with
-`fetch()` every 2-3 s (D4; also compatible with the quick tunnel, which does not support Server-Sent Events).
+`fetch()` every 2-3 s (1 s on the projector page, D31) (D4; also compatible with the quick tunnel, which does not support Server-Sent Events).
 
 ## 2. Details per capability
 

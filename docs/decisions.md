@@ -1,7 +1,7 @@
 # Decisions — Ex2 "Web-based Teaching Tool"
 
 Resolutions of the open questions (OQ1-OQ14 in `docs/requirements.md`) and of the technical choices left open by
-the statement. Proposed by the ambiguity analysis, **validated by the student on 2026-11-22**.
+the statement. Proposed by the ambiguity analysis, **validated by the student on 2026-11-22** (D31: 2026-11-23).
 Requirements are cited as R<n>, statement locators as F/Req/G/TD/QA (see `docs/requirements.md`).
 
 Guiding rule: the **simplest option that fully satisfies the requirements** (KISS, Req2), that can really be
@@ -19,14 +19,14 @@ old text is kept below for history only and must not be used for design.
 | D1 | Demo scope (OQ1) | All 5 features fully implemented and working live (no pre-computed outputs); F1 first and most robust; F4 deferred (D10) | VALIDATED |
 | D2 | Tech stack | Python 3.11+ / Flask, server-rendered mobile-first HTML + small vanilla JS | VALIDATED |
 | D3 | Storage | SQLite (stdlib `sqlite3`), one local file, git-ignored | VALIDATED |
-| D4 | Real time | Short polling (2-3 s); no websockets | VALIDATED |
+| D4 | Real time | Short polling (2-3 s; projector 1 s, D31); no websockets | VALIDATED (amended by D31) |
 | D5 | Attendance mechanism (OQ2) | ~~Chain-of-trust check-in (root QR, sponsors, sponsor tree, lecturer phone QR)~~ | SUPERSEDED by D30 (22/11) |
-| D6 | Student identity (OQ4) | Nickname entered once, remembered by a random device token (cookie/localStorage); automatic recognition afterwards | VALIDATED |
-| D7 | Photo head count (OQ3) | YuNet, whole image, score threshold 0.4 (recall ~94 %, precision ~96 %); no manual correction; automatic consistency alert (asymmetric tolerance); photo discarded after counting | VALIDATED |
-| D8 | Spreadsheet online/offline; offline comments (OQ5) | Live in-app table + CSV/XLSX download; F2 offline = asynchronous | VALIDATED |
+| D6 | Student identity (OQ4) | Nickname entered once, remembered by a random device token (cookie only, D31); automatic recognition afterwards; nickname 1-30 chars, not unique (D31) | VALIDATED (amended by D31) |
+| D7 | Photo head count (OQ3) | YuNet, whole image, score threshold 0.4 (recall ~94 %, precision ~96 %); no manual correction; automatic consistency alert (asymmetric tolerance); photo discarded after counting; a new photo replaces D (D31) | VALIDATED (amended by D31) |
+| D8 | Spreadsheet online/offline; offline comments (OQ5) | Live in-app table + CSV/XLSX download (format: D31); F2 offline = asynchronous | VALIDATED (amended by D31) |
 | D9 | Polls (F3) | One question, 2-4 options, one vote per token, live results | VALIDATED |
 | D10 | Video summary F4 (OQ6) | No pre-computed summary; to revisit after F1-F3; candidate: live demo on a short 2-3 min clip (faster-whisper + Claude) | DEFERRED |
-| D11 | Homework review F5 (OQ6) | Public repo URL -> capped text extract -> Claude review + anonymised comparison with 1-2 other repos; runs live, no pre-computed fallback | VALIDATED |
+| D11 | Homework review F5 (OQ6) | Public repo URL -> capped text extract -> Claude review + anonymised comparison with 1-2 other repos (source, masking: D31); runs live, no pre-computed fallback | VALIDATED (amended by D31) |
 | D12 | LLM provider and secrets | Anthropic (Claude); model from `ANTHROPIC_MODEL`, default `claude-sonnet-5-5` (to confirm by a real call); key in `.env` | VALIDATED |
 | D13 | Demo hosting (OQ7) | Laptop + Cloudflare quick tunnel; plan B hotspot/LAN over plain HTTP (works: no in-page camera); plan C recorded run | VALIDATED |
 | D14 | Documents format and layout (OQ11) | Markdown in `docs/`, one file per deliverable, Mermaid, README links all | VALIDATED |
@@ -44,8 +44,9 @@ old text is kept below for history only and must not be used for design.
 | D26 | Slot accounting (root 5, sponsor quota) | ~~Scan reserves a slot; confirmation consumes it; expiry frees it~~ | SUPERSEDED by D30 (22/11) |
 | D27 | Attendance sessions | One session open at a time (sponsor-limit part SUPERSEDED by D30) | VALIDATED (partly superseded) |
 | D28 | Polls: concurrency and voting | One poll open at a time; one vote per device token per poll; no nickname needed | VALIDATED |
-| D29 | Comments anonymity and timing (F2) | Anonymous (text + time only, no nickname); live (D4) and after class | VALIDATED |
-| D30 | Attendance check-in flow (replaces D5 chain and D26) | Campus-network IP allow-list + projector QR (10 s, accepted <= 15 s old) + 3-digit code (5 s) typed in a 1-min window + one check-in per device per session; D7 photo alert as safety net | VALIDATED |
+| D29 | Comments anonymity and timing (F2) | Anonymous (text + time only, no nickname); live (D4) and after class; max 500 chars (D31) | VALIDATED (amended by D31) |
+| D30 | Attendance check-in flow (replaces D5 chain and D26) | Campus-network IP allow-list + projector QR (10 s, accepted <= 15 s old) + 3-digit code (5 s) typed in a 1-min window + one check-in per device per session; D7 photo alert as safety net | VALIDATED (details: D31) |
+| D31 | Design-level choices validated with `design.md` (OI-1-OI-13) | F5 peer list page, nickname rules, cookie-only token, export format, polling 1 s on projector, etc. | VALIDATED (23/11) |
 
 "VALIDATED" = "VALIDATED by the student — 2026-11-22" unless stated otherwise. "DEFERRED" = "DEFERRED by the
 student — 2026-11-22".
@@ -97,6 +98,8 @@ student — 2026-11-22".
 **DECISION:** short polling every 2-3 s (fetch JSON). Rejected: SSE (flaky through tunnels), WebSockets (extra dependency, more failure modes live). "Real time" = visible within a few seconds. Also used to refresh the projector QR (10 s) and the 3-digit code (5 s) of D30 (originally: the rotating QR codes of D5, superseded).
 
 **Impact.** Sequence diagrams show a polling loop; SRS NFR "update visible within 5 s".
+
+**Amended by D31 (OI-8, 23/11):** the projector page polls every 1 s (local, one client); other pages stay at 2-3 s.
 
 **Status:** VALIDATED by the student — 2026-11-22
 
@@ -169,6 +172,8 @@ Identity of each node = the nickname and device token of D6 (no personal data). 
 
 **Impact.** Data model; README scope; tests for first-use and returning-device flows.
 
+**Amended by D31 (23/11):** the device token is kept in a server-set cookie only, no localStorage copy (OI-4); nickname 1-30 characters after trimming, not unique (OI-2); stored at the first successful check-in.
+
 **Status:** VALIDATED by the student — 2026-11-22 (spreadsheet "sponsor" column superseded by D30, 22/11)
 
 ## D7 — Photo-based head count (OQ3; R2, R16, R25)
@@ -189,6 +194,8 @@ Identity of each node = the nickname and device token of D6 (no personal data). 
 
 **Impact.** `HeadCounter` behind an interface (YuNet implementation, threshold configurable, default 0.4); a separate `ConsistencyCheck` (pure function of N and D) shown as "checked in N / detected D / consistent|anomaly"; no "edit count" use case. Tests: alert rule at its boundaries (e.g. N = 45: D = 37/38/50/51), small-N cases where the `max(7, ...)`/`max(4, ...)` floors apply; detector on non-personal images (D25). Tools report table with file names only.
 
+**Amended by D31 (OI-5, 23/11):** a new photo for the same session replaces D (re-shooting is not a manual correction).
+
 **Status:** VALIDATED by the student — 2026-11-22 (unchanged by D30, which keeps it as the safety net)
 
 ## D8 — Online/offline spreadsheet; offline comments (OQ5; R3, R5)
@@ -196,6 +203,8 @@ Identity of each node = the nickname and device token of D6 (no personal data). 
 **DECISION:** online = live table in the lecturer page; offline = CSV download (+ XLSX via `openpyxl`). F2 "offline" = asynchronous: comments can be posted at any time, also outside a live session, and read later. Rejected: Google Sheets API sync (OAuth, network), PWA offline queue (extra code). Google Sheets import listed as extension.
 
 **Impact.** SRS defines online/offline explicitly; use cases "Download attendance sheet", "Post comment outside class".
+
+**Amended by D31 (OI-6, 23/11):** one export covers all sessions; XLSX with two sheets "Check-ins" and "Summary"; CSV as two files `checkins.csv` and `summary.csv`.
 
 **Status:** VALIDATED by the student — 2026-11-22
 
@@ -222,6 +231,8 @@ Identity of each node = the nickname and device token of D6 (no personal data). 
 **DECISION:** public repo URL -> download archive (no token) -> README + main source files capped (~40-60 KB text) -> Claude review against a short rubric -> comparison with 1-2 other repos of the same assignment, shown anonymised ("Submission B, C"), plus simple deterministic metrics (file/line counts). **Runs live; no pre-computed fallback** (same principle as D10: it must work on demo day). If the API or network fails, the user sees a plain error message (D23). Generated reviews of other students' work are not committed. Rejected: static analysis only (not an LLM review), embeddings over the whole list (over-design).
 
 **Impact.** Classes `RepoFetcher`, `HomeworkReviewer`, `LLMClient`.
+
+**Amended by D31 (OI-1, OI-9, OI-10, OI-12, 23/11):** the comparison repos come from a list pasted by the lecturer on the PIN-protected page `/lecturer/peers` (local SQLite); owner and repository names of peers are masked and reviews are never stored; the review page stays open without PIN for the demo; if no peer can be fetched, the review is shown with a sentence saying so.
 
 **Status:** VALIDATED by the student — 2026-11-22
 
@@ -382,6 +393,8 @@ app/  tests/  demo_data/  .env.example  requirements.txt
 
 **Impact.** Comment data model has no nickname/token column shown to the lecturer; lecturer page polls for new comments (D4). Tests: comment appears without nickname; posting outside a live session works.
 
+**Amended by D31 (OI-11, 23/11):** a comment has at most 500 characters (message "Please keep your comment under 500 characters.").
+
 **Status:** VALIDATED by the student — 2026-11-22
 
 ## D30 — Attendance check-in flow (replaces D5 chain and D26) (OQ2; R1, R13, R14, R16)
@@ -420,7 +433,42 @@ All rules are enforced server-side. The QR and the code are refreshed on the pro
 - *Hosting (D13):* allow-list must include the LAN range for plan B.
 - *Results (D17):* measure live the whole-class check-in duration and the number of refusals (off-campus, expired, wrong code).
 
+**Details fixed by D31 (23/11):** the allow-list is runtime data entered by the lecturer (UC-6), nothing hard-coded, and an empty list refuses everyone (OI-3); a new scan opens a new 1-minute window and resets the attempts to 0 (OI-7); an empty-nickname rejection is not counted as an attempt; the QR creation time is the start of its 10 s slice; `CF-Connecting-IP` is trusted only from a loopback peer.
+
 **Status:** VALIDATED by the student — 2026-11-22 (points 1-5 and P1-P3).
+
+## D31 — Design-level choices validated with design.md (23/11)
+
+**Question.** The open points OI-1-OI-13 of `docs/design.md` section 9 and the architect's detailed choices.
+
+**DECISION:** all accepted as proposed by the architect.
+
+| Item | Choice | Amends |
+|---|---|---|
+| OI-1 | F5 comparison source: list of public repo URLs pasted by the lecturer on `/lecturer/peers` (PIN), stored in local SQLite; first 2, excluding the reviewed repo | D11 |
+| OI-2 | Nickname 1-30 characters after trimming; not unique (the device token is the identity) | D6 |
+| OI-3 | Campus IP ranges = data entered by the lecturer via UC-6; no code change; value pending the on-site measurement | D30 |
+| OI-4 | Device token in a server-set cookie only (HttpOnly, 1 year), no localStorage. Known limit: restarting the quick tunnel changes the host name, so phones are treated as first-time (nickname typed again) | D6 |
+| OI-5 | A new photo replaces D for the session | D7 |
+| OI-6 | Export covers all sessions; XLSX with sheets "Check-ins" and "Summary"; CSV as `checkins.csv` + `summary.csv` | D8 |
+| OI-7 | A new scan opens a new 1-minute window and resets attempts to 0 | D30 P2 |
+| OI-8 | Projector page polls every 1 s; other pages 2-3 s | D4 |
+| OI-9 | F5 masks owner and repository names of peer repos; reviews never stored | D11, D21 |
+| OI-10 | F5 page open without PIN, accepted for the demo; mitigation: spending limit on the Anthropic account, URL known only in class | D11, D22 |
+| OI-11 | Comment max 500 characters; message "Please keep your comment under 500 characters." | D29 |
+| OI-12 | No fetchable comparison repo -> the review is shown with "No other submission was available for comparison." | D11 |
+| OI-13 | GitHub archive download tested for real in task T16 and recorded in the tools report | D15 |
+| Design | QR creation time = start of its 10 s slice | D30 |
+| Design | `CF-Connecting-IP` trusted only from a loopback peer | D30 |
+| Design | Empty allow-list refuses everyone | D30 |
+| Design | Empty-nickname rejection does not count as an attempt | D30 P2 |
+| Design | Nickname stored at the first successful check-in | D6 |
+| Design | One `SECRET_KEY` with domain prefixes (`qr`, `code`) | D30 |
+| Design | `GET /checkin` without token while a session is open -> "Scan the QR code on the projector." | D23 |
+
+**Impact.** `docs/design.md` section 9 marked VALIDATED; SRS FR/NFR and error table, use cases aligned.
+
+**Status:** VALIDATED by the student — 2026-11-23
 
 ---
 
@@ -434,6 +482,6 @@ All rules are enforced server-side. The QR and the code are refreshed on the pro
 
 ## Items still OPEN — to be decided by the student
 
-6. **OPEN — F5 comparison source (D11).** Where do the 1-2 repos to compare with come from? Recommended: the lecturer pastes a list of public repo URLs per assignment.
-7. **OPEN — Nickname rules (D6).** Must nicknames be unique (per session or globally), and what is the maximum length?
-8. **OPEN — Campus IP allow-list (D30).** The student supplies the campus public IPv4/IPv6 range(s), measured on site on 23/11; placeholders until then.
+6. ~~OPEN — F5 comparison source (D11).~~ **CLOSED by D31 (23/11):** list pasted by the lecturer on `/lecturer/peers`.
+7. ~~OPEN — Nickname rules (D6).~~ **CLOSED by D31 (23/11):** 1-30 characters, not unique.
+8. **OPEN (value only) — Campus IP allow-list (D30).** Mechanism closed by D31 (data entered via UC-6). The student supplies the campus public IPv4/IPv6 range(s), measured on site; placeholders until then.

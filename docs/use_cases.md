@@ -2,7 +2,7 @@
 
 Covers R28 ("Define the main use cases (client stories)"). Built from the [SRS](srs.md) (FR-x.y, NFR-n, error
 messages of section 5), the requirements R1-R37 ([requirements.md](requirements.md)) and the validated decisions
-D1-D30 ([decisions.md](decisions.md)). The attendance check-in follows **D30**; D5 and D26 are superseded and not
+D1-D31 ([decisions.md](decisions.md); D31 = design-level choices validated on 23/11). The attendance check-in follows **D30**; D5 and D26 are superseded and not
 used here. F1 Attendance is the main feature (R4) and comes first.
 
 ## 1. Actors
@@ -98,7 +98,7 @@ Priority from the SRS: **MUST-MAIN** (F1), **MUST**, **MUST, deferred** (F4, D10
 | UC-10 | Vote in the open poll | Student | F3 | MUST | FR-3.2, FR-6.2; R6; D9, D28 |
 | UC-11 | Follow live results and close the poll | Lecturer | F3 | MUST | FR-3.3, FR-3.4, NFR-2; R6; D4, D9 |
 | UC-12 | Summarise a class video | Lecturer | F4 | MUST, deferred | FR-4.1-FR-4.4; R7, R8, R15; D10, D12 |
-| UC-13 | Review a homework with comparison | Student or Lecturer | F5 | MUST | FR-5.1-FR-5.4, FR-6.2; R9, R10, R16; D11, D12 |
+| UC-13 | Review a homework with comparison | Student or Lecturer | F5 | MUST | FR-5.1-FR-5.5, FR-6.2; R9, R10, R16; D11, D12, D31 |
 | UC-14 | Unlock lecturer pages | Lecturer | Access | MUST | FR-6.1; R16; D22 |
 
 ## 4. Detailed use cases (F1 Attendance)
@@ -118,7 +118,8 @@ that the whole class can check in without me leaving the desk.
   1. The lecturer clicks "Open session" on the lecturer page.
   2. The system creates the session and marks it open (FR-1.1).
   3. The projector page shows a QR encoding the base URL with an HMAC-signed token, regenerated every 10 s
-     (FR-1.5), and under it a 3-digit code regenerated every 5 s (FR-1.8); both are refreshed by polling (D4).
+     (FR-1.5), and under it a 3-digit code regenerated every 5 s (FR-1.8); both are refreshed by polling,
+     every 1 s on the projector page (D4 amended by D31).
   4. The lecturer page shows the live attendance table with N = 0 (UC-5).
 - **Alternative / exception flows:**
   - 1a. A session is already open: "A session is already open. Close it first." No new session (FR-1.1).
@@ -146,9 +147,9 @@ name, so that my attendance is recorded.
   4. The system opens a 1-minute check-in window bound to the browser's device token (FR-1.7) and returns the
      check-in page: first a nickname field with the warning "Do not use your real name or ID", only if the device
      has no nickname yet (FR-1.10, D6), then a numeric code field.
-  5. First check-in on this device: the student types a nickname, then the 3-digit code shown under the QR, and
-     taps "Confirm". Later check-ins (device token remembered): the student types only the 3-digit code and taps
-     "Confirm".
+  5. First check-in on this device: the student types a nickname (1-30 characters, not necessarily unique, D31),
+     then the 3-digit code shown under the QR, and taps "Confirm". Later check-ins (device token remembered): the
+     student types only the 3-digit code and taps "Confirm".
   6. The system checks again the client IP (FR-1.2), that the window is at most 1 minute old and belongs to this
      device token (FR-1.7), that fewer than 5 attempts were used (FR-1.9), and that the code is the current one or
      the immediately previous one (FR-1.8, P1).
@@ -169,7 +170,13 @@ name, so that my attendance is recorded.
     from step 5.
   - 6c. 6th attempt in the same window, even with a correct code: "Too many tries. Scan the QR code again." The
     window is closed (FR-1.9, P2).
-  - 6e. Empty nickname on first use: "Please choose a nickname (not your real name or ID)."
+  - 6e. Empty nickname, or longer than 30 characters, on first use: "Please choose a nickname (not your real name or
+    ID)." Not counted as an attempt (D31).
+  - 6f. After 6a or 6c the student scans again: a new 1-minute window opens with 0 attempts (FR-1.9, D31).
+  - 1b. The student opens `/checkin` directly (e.g. from the menu) while a session is open: "Scan the QR code on the
+    projector." (D31).
+  - 1c. The quick tunnel was restarted (new host name): the device cookie is lost, so the device is treated as
+    first-time and the nickname is typed again (A7, D31).
   - 1a. The phone's camera cannot scan the QR: no in-app fallback; the lecturer adds the student after class in the
     exported spreadsheet (UC-5, D30 P3).
 Student-side order of actions (validated by the student, 23/11):
@@ -219,7 +226,8 @@ so that I know automatically whether the attendance list is credible.
   2. The lecturer uploads or shoots a class photo.
   3. The system processes the image in memory and counts faces with YuNet on the whole image, score threshold 0.4
      (configurable) (FR-1.15).
-  4. The system stores only D with the session and discards the photo (FR-1.17, D21).
+  4. The system stores only D with the session (a new photo replaces the previous D, D31) and discards the photo
+     (FR-1.17, D21).
   5. The system computes the status: "consistent" if `N - max(7, ceil(0.15 * N)) <= D <= N + max(4, ceil(0.10 * N))`,
      otherwise "anomaly" (FR-1.16).
   6. The page shows "checked in N / detected D / consistent|anomaly".
@@ -246,8 +254,9 @@ attendance during class and keep the records afterwards.
   1. The lecturer opens the attendance page; it shows the session's check-ins (nickname, check-in time) and N,
      refreshed by polling (FR-1.14, D4).
   2. New check-ins (UC-2) appear within 5 s without reload (NFR-2).
-  3. The lecturer downloads the attendance as CSV or XLSX (FR-1.18).
-  4. The file contains one row per check-in (session date, nickname, check-in time; no IP) and a per-session summary:
+  3. The lecturer downloads the attendance of all sessions as XLSX (sheets "Check-ins" and "Summary") or as CSV
+     (`checkins.csv` and `summary.csv`) (FR-1.18, D31).
+  4. The export contains one row per check-in (session date, nickname, check-in time; no IP) and a per-session summary:
      check-ins (N), faces detected (D, from UC-4), consistency status.
   5. The lecturer opens the file in a spreadsheet tool.
 - **Alternative flows:**
@@ -264,8 +273,8 @@ Wi-Fi can check in.
 
 - **Goal:** maintain the IPv4/IPv6 ranges used by the check-in network filter (D30 point 1).
 - **Primary actor:** Lecturer.
-- **Preconditions:** lecturer pages unlocked (UC-14); the campus public ranges are known (measured on site, SRS
-  OI-3).
+- **Preconditions:** lecturer pages unlocked (UC-14); the campus public ranges are known (runtime data entered here,
+  no code change; value pending the on-site measurement, D31, SRS OI-3). An empty list refuses everyone (FR-1.2).
 - **Main success scenario:**
   1. The lecturer opens the allow-list editor; the current ranges are listed.
   2. The lecturer adds or removes a range in CIDR notation (IPv4 or IPv6).
@@ -286,9 +295,10 @@ Wi-Fi can check in.
 *Story:* As a student, I want to send an anonymous comment or suggestion during or after class, so that the
 lecturer gets honest feedback.
 
-- **Main steps:** 1. The student opens the comments page (no login, FR-6.2). 2. Types a short text and sends it.
+- **Main steps:** 1. The student opens the comments page (no login, FR-6.2). 2. Types a short text (at most 500 characters) and sends it.
   3. The system stores the text and time only, with no nickname, inside or outside a session (FR-2.1, FR-2.3, D29).
-- **Exceptions:** empty or whitespace-only text: "Please write something before sending." Nothing stored (FR-2.4).
+- **Exceptions:** empty or whitespace-only text: "Please write something before sending."; more than 500 characters:
+  "Please keep your comment under 500 characters." Nothing stored (FR-2.4, D31).
 - **Trace:** FR-2.1, FR-2.3, FR-2.4, FR-6.2; R5, R16; D8, D29.
 
 ### UC-8 Read comments, live and later (F2)
@@ -358,13 +368,17 @@ submissions, so that I see its strengths and weaknesses before (or while) gradin
   downloads the archive from GitHub without a token and extracts the README and main source files, capped at about
   40-60 KB of text (FR-5.2). 3. The system sends the extract to the Anthropic API and gets a review against a short
   rubric, live (FR-5.3). 4. The output includes a comparison with 1-2 other submissions of the same assignment,
-  labelled "Submission B", "Submission C", plus file and line counts, with no URL or owner name of the others
-  (FR-5.4).
+  labelled "Submission B", "Submission C", plus file and line counts, with no URL, owner or repository name of the
+  others (FR-5.4). The review is not stored (D31).
 - **Exceptions:** malformed URL: "Please enter a public GitHub repository link."; private or missing repository:
   "We could not download this repository. Is it public?"; no LLM key, API failure or timeout: "The review service
   is unavailable right now. Please try again later."
-- **Open item:** where the 1-2 other submissions come from is not decided yet (SRS OI-1).
-- **Trace:** FR-5.1-FR-5.4, NFR-7; R9, R10, R11, R16; D11, D12.
+- **Precondition (comparison source, D31):** the lecturer has pasted public repository URLs of the same assignment
+  on the PIN-protected page `/lecturer/peers` (UC-14, FR-5.5); the first 2, excluding the reviewed repository, are
+  used. The review page itself needs no PIN (accepted for the demo, D31).
+- **Alternative:** no other submission can be fetched: the review is shown with "No other submission was available
+  for comparison." (D31).
+- **Trace:** FR-5.1-FR-5.5, NFR-7; R9, R10, R11, R16; D11, D12, D31.
 
 ### UC-14 Unlock lecturer pages (access)
 
@@ -387,7 +401,7 @@ submissions, so that I see its strengths and weaknesses before (or while) gradin
 | F2 Comments | FR-2.1-FR-2.4 | UC-7, UC-8 |
 | F3 Polls | FR-3.1-FR-3.4 | UC-9, UC-10, UC-11 |
 | F4 Video summary (deferred) | FR-4.1-FR-4.4 | UC-12 |
-| F5 Homework review | FR-5.1-FR-5.4 | UC-13 |
+| F5 Homework review | FR-5.1-FR-5.5 | UC-13 |
 | Access and configuration | FR-6.1, FR-6.2, FR-6.3 | UC-14; UC-2, UC-7, UC-10, UC-13; UC-1 |
 | Non-functional | NFR-1, NFR-4 / NFR-2 / NFR-3 / NFR-7, NFR-8 | UC-2 / UC-5, UC-8, UC-11 / UC-4 / UC-2, UC-4, UC-6, UC-14 |
 
