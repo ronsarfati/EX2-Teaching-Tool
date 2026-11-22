@@ -34,8 +34,8 @@ part (D1). F4 is designed but its implementation is deferred until F1-F3 are don
     regenerated **every 10 s** and, under it, a **3-digit code** regenerated **every 5 s**. Students scan the QR with
     the phone's **native camera**, which opens the check-in URL in the browser (no app, no in-page scanner). The QR
     is accepted only if it is **<= 15 s old when the request reaches the server**; the student then has a
-    **1-minute window** to type the 3-digit code (the current or the previous one, at most 5 attempts) and, the
-    first time only, a nickname (D6). Check-in is accepted only from the **campus network**: the client IP must be
+    **1-minute window** to type, the first time only, a nickname (D6), then the 3-digit code (the current or the
+    previous one, at most 5 attempts), and tap "Confirm". Check-in is accepted only from the **campus network**: the client IP must be
     in an allow-list of IP ranges edited by the lecturer (students on 4G/5G are asked to join the university Wi-Fi).
     One check-in per device per session. A student whose camera cannot scan is added manually by the lecturer after
     class in the exported spreadsheet. A chain-of-trust design (students validating each other) and a local Wi-Fi
@@ -103,7 +103,7 @@ Coming with the demo app (To Do 10).
 | 3 | Tools report, every tool tested for real | [docs/tools_report.md](docs/tools_report.md) | Done |
 | 4 | Statement of Work | [docs/sow.md](docs/sow.md) | Done |
 | 5 | Software Requirements Specification | [docs/srs.md](docs/srs.md) | Done |
-| 6 | Use cases (client stories) | [docs/use_cases.md](docs/use_cases.md) | Planned |
+| 6 | Use cases (client stories) | [docs/use_cases.md](docs/use_cases.md) | Done |
 | 7 | Main software components | [docs/design.md](docs/design.md) | Planned |
 | 8 | Class and sequence diagrams | [docs/design.md](docs/design.md) | Planned |
 | 9 | Test strategy (per class) | [docs/test_strategy.md](docs/test_strategy.md) | Planned |
