@@ -20,7 +20,7 @@ D7 (photo head count), D8 (spreadsheet), D10 (video summary), D11/D12 (LLM), D13
 | 2 | 10 s rotating attendance tokens (R1, D5) | stdlib `hmac` (+ `itsdangerous` as alternative) | Python 3.13 stdlib / itsdangerous 2.2.0 | fresh token accepted; tampered and 11 s old tokens rejected (real 11 s wait) | ADOPT stdlib `hmac` |
 | 3 | QR generation (server) (R1, D5) | `qrcode` | 8.2 | 3/3 QR codes decoded back identically (OpenCV) | ADOPT |
 | 4 | QR scanning in the phone browser (R1, D5) | jsQR (+ own `getUserMedia` loop) | 1.4.0 | 3/3 clean + 5/5 degraded QR images decoded under Node | ADOPT, phone test pending (manual) |
-| 5 | Photo head count (R2, D7) | OpenCV YuNet face detector | OpenCV 5.1.0.95, model 2023mar | 589 faces found vs ~691 people (85 %), mean error 6.4 people/photo, ~50-170 ms/photo | ADOPT YuNet; YOLO rejected |
+| 5 | Photo head count (R2, D7) | OpenCV YuNet face detector, full image, threshold 0.4 | OpenCV 5.1.0.95, model 2023mar | on 4 photos checked box by box: recall 94 %, precision 96 %, mean count error 2.5 people, < 0.1 s/photo; tiling tested and rejected | ADOPT YuNet + alert tolerance (2.5.3); YOLO rejected |
 | 6 | Video transcription (R7, D10) | faster-whisper (`small` for Hebrew, `base` for speed) | 1.2.1 (CTranslate2 4.9.1) | m21.mp4: Hebrew detected (p=0.94-0.96); 150 s English test audio: WER 1.5 % (`small`), 25 s | ADOPT (pin `av<17`) |
 | 7 | LLM summary / homework review (R7-R10, D12) | Anthropic Python SDK + Claude | anthropic 2.12.0 | 1 real call: 3.5 s, 107 in / 92 out tokens | ADOPT |
 | 8 | Offline spreadsheet (R3, D8) | `openpyxl` (XLSX) + stdlib `csv` | 3.1.5 | XLSX and CSV written and read back identically | ADOPT |
@@ -107,45 +107,117 @@ Other building blocks that need no separate test: SQLite (Python stdlib `sqlite3
 |---|---|---|---|
 | **OpenCV YuNet** (`face_detection_yunet_2023mar.onnx`, opencv_zoo) | OpenCV Apache-2.0, model MIT | 0.23 MB model, no torch | Face detector, CPU, built into `cv2.FaceDetectorYN`. |
 | Ultralytics YOLO11n / YOLOv8n (person class) | **AGPL-3.0** | 5-6 MB model + PyTorch (hundreds of MB) | Body detector; licence imposes AGPL obligations; heavy install (torch download took tens of minutes here). |
+| InsightFace SCRFD (stronger face detector) | code MIT, **pretrained models non-commercial research only** | 15-300 MB model packs | **Not tested** (skipped on purpose): licence restriction, and the analysis below shows that the remaining misses are people whose face is not visible, which no face detector can find. |
 | Cloud vision APIs (Google, AWS) | proprietary | paid, account | Rejected: sends class photos to a third party (R16). Not tested. |
 
-- **Input:** the provided class photos `p1.jpeg, p2.jpeg, p3.jpeg, p11-p15.jpeg, p21-p24.jpeg, p31-p34.jpeg`
-  (2000 x 1500 px). The folder has **16** JPEG files (not 17), and **p15.jpeg is a byte-identical copy of p12.jpeg**
-  (same MD5), so there are 15 distinct photos.
-- **Manual reference:** counted by looking at each photo (reduced resolution). Back rows are small and partly
-  hidden, so the reference is **approximate (about +/- 3 people)**.
-- **Command:** `python tools_tests/head_count.py <yunet.onnx> <yolo11n.pt|yolov8n.pt|none> <photos...>`
-  (YuNet: score threshold 0.6, NMS 0.3; YOLO: class person, conf 0.25, image size 640 and 1280).
-- **Result** (error = detected - manual; runtimes are per photo, after model warm-up):
+**Input.** The provided class photos `p1.jpeg, p2.jpeg, p3.jpeg, p11-p15.jpeg, p21-p24.jpeg, p31-p34.jpeg`
+(2000 x 1500 px, four lecture sessions: p1-p3, p11-p15, p21-p24, p31-p34). The folder has **16** JPEG files
+(not 17), and **p15.jpeg is a byte-identical copy of p12.jpeg** (same MD5).
 
-  | Photo | Manual (approx.) | YuNet | YuNet error | YOLO11n @1280 | YOLO11n error | YOLO11n @640 |
-  |---|---|---|---|---|---|---|
-  | p1.jpeg | 40 | 32 | -8 | 26 | -14 | 10 |
-  | p2.jpeg | 44 | 38 | -6 | 29 | -15 | 15 |
-  | p3.jpeg | 28 | 23 | -5 | 24 | -4 | 12 |
-  | p11.jpeg | 45 | 44 | -1 | 38 | -7 | 17 |
-  | p12.jpeg | 33 | 28 | -5 | 27 | -6 | 14 |
-  | p13.jpeg | 32 | 27 | -5 | 26 | -6 | 11 |
-  | p14.jpeg | 44 | 40 | -4 | 33 | -11 | 13 |
-  | p15.jpeg (= p12) | 33 | 28 | -5 | 27 | -6 | 14 |
-  | p21.jpeg | 46 | 40 | -6 | 36 | -10 | 14 |
-  | p22.jpeg | 46 | 38 | -8 | 31 | -15 | 13 |
-  | p23.jpeg | 46 | 36 | -10 | 35 | -11 | 12 |
-  | p24.jpeg | 46 | 35 | -11 | 24 | -22 | 13 |
-  | p31.jpeg | 52 | 44 | -8 | 32 | -20 | 14 |
-  | p32.jpeg | 52 | 43 | -9 | 33 | -19 | 13 |
-  | p33.jpeg | 52 | 48 | -4 | 31 | -21 | 13 |
-  | p34.jpeg | 52 | 45 | -7 | 32 | -20 | 13 |
-  | **Total / mean abs. error** | **691** | **589 (85 %)** | **6.4** | **484 (70 %)** | **12.9** | 211 (31 %), 30.0 |
+#### 2.5.1 Reference counts
 
-  - Runtime: YuNet 48-129 ms/photo (OpenCV-only venv) and ~170 ms/photo (venv with torch loaded);
-    YOLO11n 35-38 ms @640 and 125-134 ms @1280 (first call 9.6 s including model load).
-    YOLOv8n gave similar or lower counts (12-14 @640, 22-32 @1280).
-  - YuNet parameter sweep (upscale x1.5 / x2, threshold 0.5): at most +3 faces on a photo, 3-6 x slower. Not worth it.
-  - Main error source for both: students looking down at laptops, partly hidden faces/bodies in back rows.
-- **Verdict:** ADOPT **YuNet** (closest to the manual count on 15 of 16 photos, tiny, permissive licence, no torch).
-  Show the number as an **estimate** ("about N faces seen") next to the number of attendance marks, since it
-  undercounts by about 15 % on these photos. Fallback: YOLO11n @1280 (only if AGPL and torch are acceptable).
+- **Refined reference (4 photos, one per session: p1, p11, p22, p32).** For these photos the detections were drawn on
+  temporary 2x zoomed crops of the back rows and inspected one by one (temporary files outside the repo, deleted
+  right after review). Every person was classified as detected / missed, and every extra box as a real person /
+  false positive. Uncertainty: about +/- 1 person per photo (people almost fully hidden behind others).
+- **Rough reference (other 12 photos):** counted on the whole photo at reduced resolution (about +/- 3). It turned out
+  to be too high: on the 4 refined photos the rough count was 1-6 people too high (p22: 46 -> 42, p32: 52 -> 46).
+  The first version of this report (85 % recall) used only rough counts and **underestimated** the detector.
+
+| Photo | Rough count | **Refined count** | Missed by YuNet (t=0.6), with reason |
+|---|---|---|---|
+| p1.jpeg | 40 | **39** | 7: asleep head on desk, head down (2), hand over face, standing with back turned, cut by the photo edge, almost hidden |
+| p11.jpeg | 45 | **46** | 2: head down at laptop, face in shadow |
+| p22.jpeg | 46 | **42** | 4: head down, hand over face, 2 almost hidden behind others |
+| p32.jpeg | 52 | **46** | 3: head down (2), head resting on desk |
+| **Total** | 183 | **173** | **16 missed, none of them with a clearly visible face** |
+
+#### 2.5.2 Improvements tested (A: tiling, lower threshold, larger input; B: two photos)
+
+- **Command:** `python tools_tests/head_count_tiled.py <yunet.onnx> <photos...>` (in-memory only, prints counts and
+  runtime). Tiling: overlapping grid (20 % overlap), each tile upscaled (u2 = x2, u3 = x3), detections merged
+  by score-ordered NMS (IoU > 0.3, or > 60 % of a box inside a kept box, to remove faces cut by tile borders).
+- **B, two photos:** none of the provided series is a front-rows / back-rows pair. All 16 photos are wide shots of
+  the whole room taken from the lectern; photos of the same session are repeats at different moments and angles.
+  So two-photo counting is **SIMULATED** on single photos (`detect_two_bands`): the top 60 % of the image (back rows)
+  is processed as a second, zoomed photo (upscaled x2 or x3), the bottom part at normal size. To avoid double
+  counting, each face is assigned to exactly one band by the y coordinate of its centre (a rule a real two-photo
+  protocol would apply with a row boundary, e.g. "photo 2 = rows 5 and above"). Limit of the simulation: an
+  upscaled crop adds no real detail, unlike a real zoomed photo.
+
+Count error (detected - refined count) on the 4 refined photos, and median runtime per photo over all 16 photos
+(Apple M3 CPU):
+
+| Configuration | p1 (39) | p11 (46) | p22 (42) | p32 (46) | Total (173) | Mean abs. error | Median runtime |
+|---|---|---|---|---|---|---|---|
+| Baseline: full image, threshold 0.6 | -7 | -2 | -4 | -3 | 157 (-16) | 4.0 | 73 ms |
+| Full image, threshold 0.5 | -7 | -1 | -1 | -1 | 163 (-10) | 2.5 | 103 ms |
+| **Full image, threshold 0.4** | -6 | 0 | -1 | +3 | 169 (-4) | 2.5 | 86 ms |
+| Full image, threshold 0.3 | -4 | +1 | +2 | +6 | 178 (+5) | 3.25 | 99 ms |
+| Tiles 2x2, x2, threshold 0.4 | -2 | +1 | +1 | +4 | 177 (+4) | 2.0 | 469 ms |
+| Tiles 3x3, x2, threshold 0.4 | -2 | +1 | +4 | +5 | 181 (+8) | 3.0 | 505 ms |
+| Tiles 3x3, x3, threshold 0.5 | -1 | +2 | -1 | +4 | 177 (+4) | 2.0 | 1,163 ms |
+| Tiles 4x4, x3, threshold 0.5 | -3 | +2 | +1 | +6 | 179 (+6) | 3.0 | 1,200 ms |
+| SIMULATED 2 photos, back x2, threshold 0.4 | -3 | -1 | +3 | +3 | 175 (+2) | 2.5 | 321 ms |
+| SIMULATED 2 photos, back x3, threshold 0.5 | -3 | -1 | +2 | +1 | 174 (+1) | 1.75 | 631 ms |
+
+Precision / recall checked box by box (all extra boxes inspected visually) for two configurations:
+
+| Configuration | True detections (recall) | False positives (precision) |
+|---|---|---|
+| Baseline, threshold 0.6 | 157 / 173 (**90.8 %**) | 0 seen (one possible double box) (~100 %) |
+| **Full image, threshold 0.4** | 163 / 173 (**94.2 %**) | 6 (96.4 %): clasped hands, a hair bun from behind, double box on a face |
+| Tiles 3x3, x3, threshold 0.5 | 164 / 173 (94.8 %) | 13 (92.7 %): clasped hands (6), cup, laptop, T-shirt print, floor, double boxes; also lost 1 baseline face |
+
+The full table for all 16 photos (12 configurations) is printed by the script. With threshold 0.4 the counts of the
+other photos are: p2 42, p3 25, p12 30, p13 27, p14 43, p15 30, p21 40, p23 39, p24 36, p31 48, p33 52, p34 49.
+
+**Findings.**
+1. The real recall of the baseline is about **91 %**, not 85 %. The 16 missed people have no visible face (head down,
+   asleep, hand over face, back turned, cut by the edge, hidden). Detail and resolution are not the problem.
+2. Tiling and upscaling only add +1 real person over a plain threshold of 0.4, while doubling the false positives
+   (mostly clasped hands) and costing 5-15 x more time. The count looks better only because false positives cancel
+   misses. Not worth it.
+3. The simulated two-photo variant gives the smallest count error (1.75) but is simulated, needs two shots and a
+   row boundary, and its gain is within the uncertainty of the reference. A real test would need two real photos.
+4. Lowering the threshold from 0.6 to 0.4 is the only cheap gain: recall 90.8 % -> 94.2 %, precision 96.4 %,
+   mean absolute count error 4.0 -> 2.5 people, same speed (< 0.1 s per photo).
+
+#### 2.5.3 Tolerance for the automatic consistency alert
+
+The app compares N = number of attendance check-ins with D = number of faces detected on the lecturer's photo.
+Measured error of the recommended configuration (full image, threshold 0.4) on the refined photos: D - true count
+from **-6 to +3** (from -15 % to +7 %). The detector undercounts more than it overcounts (hidden faces), so the
+tolerance is asymmetric.
+
+- **Recommended rule:** "consistent" if `N - max(7, ceil(0.15 * N)) <= D <= N + max(4, ceil(0.10 * N))`, otherwise
+  "anomaly". Example: N = 45 gives consistent for D from 38 to 50.
+- **False alerts on the provided photos** (assuming N = true number present): **0 of 4** refined photos, with
+  threshold 0.4 and also with the baseline 0.6 (worst case p1: -7, exactly at the limit). The safety margin is 1
+  person below the worst observed error. On the other 12 photos no exact reference exists, so no false alert rate
+  is claimed. As a cross-check, photos taken minutes apart in the same session differ by up to 4-5 detections
+  (p21-p24: 36-41; p31-p34: 48-52), so a tighter tolerance would fire on normal variation.
+- **What the alert can and cannot catch:** about 7 or more check-ins for absent people (for N about 45) trigger
+  it. Fewer extra check-ins stay inside the measurement noise. This limit must be stated in the design.
+- Taking the photo when students look up (e.g. "look at the camera") lowers the misses, since all measured misses
+  were faces not visible.
+
+**Verdict:** ADOPT **YuNet on the full image, score threshold 0.4** (recall 94 %, precision 96 %, < 0.1 s per photo,
+0.23 MB model, permissive licence) together with the tolerance rule above. Tiling: rejected (cost and false
+positives). Two photos: only if a real test with two real photos shows a gain (not possible with the provided
+photos). YOLO: rejected (worse counts: 70 % at 1280 px, AGPL, torch). First comparison, kept for traceability
+(rough reference, YuNet threshold 0.6 vs YOLO11n):
+
+| Photo | Rough count | YuNet t=0.6 | YOLO11n @1280 | YOLO11n @640 |
+|---|---|---|---|---|
+| p1 / p2 / p3 | 40 / 44 / 28 | 32 / 38 / 23 | 26 / 29 / 24 | 10 / 15 / 12 |
+| p11 / p12 / p13 / p14 / p15 | 45 / 33 / 32 / 44 / 33 | 44 / 28 / 27 / 40 / 28 | 38 / 27 / 26 / 33 / 27 | 17 / 14 / 11 / 13 / 14 |
+| p21 / p22 / p23 / p24 | 46 / 46 / 46 / 46 | 40 / 38 / 36 / 35 | 36 / 31 / 35 / 24 | 14 / 13 / 12 / 13 |
+| p31 / p32 / p33 / p34 | 52 / 52 / 52 / 52 | 44 / 43 / 48 / 45 | 32 / 33 / 31 / 32 | 14 / 13 / 13 / 13 |
+| Total | 691 | 589 | 484 | 211 |
+
+Command: `python tools_tests/head_count.py <yunet.onnx> <yolo11n.pt|yolov8n.pt|none> <photos...>`. YOLO11n runtime
+35-38 ms @640 and 125-134 ms @1280 (first call 9.6 s with model load); YOLOv8n gave similar or lower counts.
 
 ### 2.6 Video transcription - faster-whisper (R7, R8, R15, D10)
 
