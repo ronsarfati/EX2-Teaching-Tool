@@ -40,6 +40,10 @@ Legend: **[ASK]** = still worth confirming with the lecturer/TA.
 | D23 | Error messages | Plain user messages, no internal identifiers/stack traces; details in server log | VALIDATED |
 | D24 | Git practice | Frequent small commits until submission, conventional messages, no `Co-Authored-By` trailer, agents never push | VALIDATED |
 | D25 | Test tooling | pytest + Flask test client; ML/LLM mocked; detector tested on non-personal images | VALIDATED |
+| D26 | Slot accounting (root 5, sponsor quota) | Scan reserves a slot (claim); confirmation within 2 min consumes it; expired unconfirmed claim frees it; table/export show confirmed only | VALIDATED |
+| D27 | Attendance sessions | One session open at a time; sponsor limit fixed when the session is opened | VALIDATED |
+| D28 | Polls: concurrency and voting | One poll open at a time; one vote per device token per poll; no nickname needed | VALIDATED |
+| D29 | Comments anonymity and timing (F2) | Anonymous (text + time only, no nickname); live (D4) and after class | VALIDATED |
 
 "VALIDATED" = "VALIDATED by the student — 2026-11-22" unless stated otherwise. "DEFERRED" = "DEFERRED by the
 student — 2026-11-22".
@@ -315,6 +319,56 @@ app/  tests/  demo_data/  .env.example  requirements.txt
 
 **Status:** VALIDATED by the student — 2026-11-22
 
+## D26 — Slot accounting for root QR and sponsor quota (R1; refines D5)
+
+**Question.** When is a limited slot (the 5 root slots of the projector QR, a student's sponsor quota of 3 by default, configurable 1-5) used up: at scan time or at confirmation?
+
+**Options.** 1. *Consume at scan.* 2. *Consume only at confirmation.* 3. *Reserve at scan, consume at confirmation, free on expiry.*
+
+**DECISION: option 3.** A valid scan **reserves** a slot (the 2-minute claim of D5); confirmation within the claim **consumes** it; if the claim expires unconfirmed, the slot is **freed automatically**. The attendance table and the CSV/XLSX export show **only confirmed check-ins and confirmed sponsorships**.
+
+**Rejected.** Option 1: an abandoned scan wastes a slot, and the sponsor count in the table would differ from the confirmed sponsorships. Option 2: more than 5 roots (or more sponsored classmates than the quota) could claim within the 15 s window.
+
+**Impact.** Slot count = confirmed + live (unexpired) claims; expiry checked lazily with the injectable clock (D25). Tests: 6th root claim rejected while 5 claims are live; slot available again after a claim expires; sponsor quota counted the same way; only confirmed rows in table/export.
+
+**Status:** VALIDATED by the student — 2026-11-22
+
+## D27 — Attendance sessions: one at a time, fixed sponsor limit (R1; refines D5)
+
+**Question.** Can several attendance sessions be open at once, and can the sponsor limit change during a session?
+
+**Options.** 1. *One open session at a time, limit fixed at opening.* 2. *Several sessions / limit editable during the session* (extra states and edge cases, KISS).
+
+**DECISION: option 1.** Only one attendance session is open at a time; the sponsor limit (1-5, default 3) is chosen when the session is opened and cannot be changed during the session.
+
+**Impact.** Opening a second session while one is open is rejected with a plain message (D23); no "edit limit" use case. Tests for both rules.
+
+**Status:** VALIDATED by the student — 2026-11-22
+
+## D28 — Polls: one at a time, voting rule (F3, R6; refines D9)
+
+**Question.** How many polls may be open at once, and what identifies a voter?
+
+**Options.** 1. *One open poll; one vote per device token per poll; no nickname.* 2. *Several open polls / nickname required to vote* (more UI, needless identity).
+
+**DECISION: option 1.** Only one poll is open at a time; one vote per device token (D6) per poll; voting does not require a nickname.
+
+**Impact.** Student poll page shows the single open poll; second vote from the same token rejected (D23); opening a second poll while one is open rejected. Tests for each rule.
+
+**Status:** VALIDATED by the student — 2026-11-22
+
+## D29 — Comments anonymity and timing (F2, R5; refines D8)
+
+**Question.** Are comments/suggestions linked to a nickname, and when can they be posted?
+
+**Options.** 1. *Anonymous: text and time only.* 2. *Signed with the nickname* (discourages honest feedback, more identity data).
+
+**DECISION: option 1.** Comments are anonymous: the lecturer sees the text and the time, never a nickname. Usable **during class** (real time, visible within a few seconds, D4) and **after class** (asynchronous, D8).
+
+**Impact.** Comment data model has no nickname/token column shown to the lecturer; lecturer page polls for new comments (D4). Tests: comment appears without nickname; posting outside a live session works.
+
+**Status:** VALIDATED by the student — 2026-11-22
+
 ---
 
 ## Questions still worth asking the lecturer/TA
@@ -323,3 +377,8 @@ app/  tests/  demo_data/  .env.example  requirements.txt
 2. Date of the class demo; must the results description include it (D17)?
 3. Is there a Moodle upload in addition to the Form (D18)?
 4. Optional: is a nickname-based attendance sheet acceptable under "no personal information" (D6), and may anonymised comparisons with other students' repos be shown in class (D11)?
+
+## Items still OPEN — to be decided by the student
+
+5. **OPEN — F5 comparison source (D11).** Where do the 1-2 repos to compare with come from? Recommended: the lecturer pastes a list of public repo URLs per assignment.
+6. **OPEN — Nickname rules (D6).** Must nicknames be unique (per session or globally), and what is the maximum length?
