@@ -17,9 +17,9 @@ D7 (photo head count), D8 (spreadsheet), D10 (video summary), D11/D12 (LLM), D13
 | # | Need (R / D) | Recommended tool | Version tested | Real test result | Verdict |
 |---|---|---|---|---|---|
 | 1 | Web framework (R14, D2) | Flask | 3.1.3 (Werkzeug 3.1.9) | `/ping` served, `curl` got HTTP 200 in 1.6 ms | ADOPT |
-| 2 | 10 s rotating attendance tokens (R1, D5) | stdlib `hmac` (+ `itsdangerous` as alternative) | Python 3.13 stdlib / itsdangerous 2.2.0 | fresh token accepted; tampered and 11 s old tokens rejected (real 11 s wait) | ADOPT stdlib `hmac` |
+| 2 | Rotating attendance tokens: new QR every 10 s, accepted if <= 15 s old at server arrival (R1, D5) | stdlib `hmac` (+ `itsdangerous` as alternative) | Python 3.13 stdlib / itsdangerous 2.2.0 | tested with a 10 s window: fresh token accepted; tampered and 11 s old tokens rejected (real 11 s wait); window is a parameter | ADOPT stdlib `hmac` |
 | 3 | QR generation (server) (R1, D5) | `qrcode` | 8.2 | 3/3 QR codes decoded back identically (OpenCV) | ADOPT |
-| 4 | QR scanning in the phone browser (R1, D5) | jsQR (+ own `getUserMedia` loop) | 1.4.0 | 3/3 clean + 5/5 degraded QR images decoded under Node | ADOPT, phone test pending (manual) |
+| 4 | QR scanning on the student's phone (R1, D5) | Phone's **native camera app** (QR encodes the check-in URL; no library on the phone) | iOS / Android built-in | not testable by an agent (needs real phones, Section 3); alternative jsQR evaluated: 3/3 clean + 5/5 degraded QR decoded under Node | ADOPT native camera, phone test pending (manual); jsQR not adopted |
 | 5 | Photo head count (R2, D7) | OpenCV YuNet face detector, full image, threshold 0.4 | OpenCV 5.1.0.95, model 2023mar | on 4 photos checked box by box: recall 94 %, precision 96 %, mean count error 2.5 people, < 0.1 s/photo; tiling tested and rejected | ADOPT YuNet + alert tolerance (2.5.3); YOLO rejected |
 | 6 | Video transcription (R7, D10) | faster-whisper (`small` for Hebrew, `base` for speed) | 1.2.1 (CTranslate2 4.9.1) | m21.mp4: Hebrew detected (p=0.94-0.96); 150 s English test audio: WER 1.5 % (`small`), 25 s | ADOPT (pin `av<17`) |
 | 7 | LLM summary / homework review (R7-R10, D12) | Anthropic Python SDK + Claude | anthropic 2.12.0 | 1 real call: 3.5 s, 107 in / 92 out tokens | ADOPT |
@@ -44,7 +44,15 @@ Other building blocks that need no separate test: SQLite (Python stdlib `sqlite3
 - **Result:** `{"app":"tools-test","status":"ok"}` - `HTTP 200 in 0.001644s`.
 - **Verdict:** ADOPT. Fallback: FastAPI.
 
-### 2.2 Rotating signed tokens, 10 s validity (R1, D5)
+### 2.2 Rotating signed tokens (R1, D5)
+
+**Rule validated in D5:** the server generates a new QR token every **10 s**; a scanned token is accepted if it is
+**<= 15 s old when the request arrives at the server** (age measured with the server clock only, so phone clocks do
+not matter). An accepted scan opens a **2-minute claim** during which the student types a nickname (first visit
+only) and taps "Confirm". The projector root QR accepts only the first 5 scans; then sponsors take over (3 sponsors
+per student by default, configurable by the lecturer from 1 to 5). The tests below used a **10 s** acceptance
+window; the window is a single constant of the same code (`TTL` in the script, `max_age` for itsdangerous), so 15 s and the 2-minute claim use the same
+mechanism without new code.
 
 | Candidate | Licence | Notes |
 |---|---|---|
@@ -67,8 +75,10 @@ Other building blocks that need no separate test: SQLite (Python stdlib `sqlite3
   (pytest failed 1 run in 8). Fix: split by the fixed signature length. A regression test now checks 2,000 tokens.
   Lesson for the app: never parse a binary signature with a separator (or use `itsdangerous`, which handles it).
 - **Verdict:** ADOPT stdlib `hmac` (no dependency, explicit). Fallback: `itsdangerous` (equally tested).
-  The secret key must come from an environment variable in the real app. Expiry is checked on the server only;
-  the 10 s window must tolerate the time a student needs to scan (to be confirmed in the manual phone test).
+  The secret key must come from an environment variable in the real app. Expiry is checked on the server only, at
+  request arrival. The 15 s acceptance window (10 s rotation + 5 s margin) must cover the camera app opening the URL
+  and the request reaching the server on slow Wi-Fi; typing the nickname is outside this window (2-minute claim).
+  To be confirmed by manual test 3 (Section 3).
 
 ### 2.3 QR code generation on the server (R1, D5)
 
@@ -83,25 +93,38 @@ Other building blocks that need no separate test: SQLite (Python stdlib `sqlite3
   version 2 (264 px); generation 4-38 ms; decoding 8-15 ms; **round-trip OK 3/3**.
 - **Verdict:** ADOPT. Keep the URL + token short (about 100 chars gives QR version 6, easy to scan from a screen).
 
-### 2.4 QR scanning in the student's phone browser (R1, R14, D5)
+### 2.4 QR scanning on the student's phone (R1, R14, D5)
 
 | Candidate | Licence | Maturity | Notes |
 |---|---|---|---|
-| **jsQR** | Apache-2.0 | v1.4.0, stable, no recent release | Pure JS decoder; we write the camera loop (`getUserMedia` + canvas, ~40 lines). Works on iOS Safari and Android Chrome (no native API needed). |
-| html5-qrcode | Apache-2.0 | v2.3.8 (2023), maintenance slowed | Ready-made camera UI; uses ZXing-js and the native BarcodeDetector when present. Larger bundle. |
-| Native `BarcodeDetector` | browser API | Chrome Android yes, **iOS Safari no** | Zero dependency but would exclude iPhones. Rejected as the only solution. |
+| **Native camera app + URL in the QR** | built into the phone | iOS camera reads QR codes since iOS 11; Android camera or Google Lens | The QR encodes the full check-in URL with the token; the camera app opens it in the default browser. **No library, no JS, no camera permission prompt in the page, no HTTPS needed for the camera.** ADOPTED. |
+| jsQR | Apache-2.0 | v1.4.0, stable, no recent release | Pure JS decoder + own camera loop (`getUserMedia` + canvas, ~40 lines). Evaluated and tested, **not adopted**. |
+| html5-qrcode | Apache-2.0 | v2.3.8 (2023), maintenance slowed | Ready-made camera UI; uses ZXing-js and the native BarcodeDetector when present. Larger bundle. Not adopted. |
+| Native `BarcodeDetector` | browser API | Chrome Android yes, **iOS Safari no** | Would exclude iPhones. Rejected. |
+
+**Recommended approach: native camera app.** The app has no in-page scanner. The server only has to generate QR
+codes whose content is a short URL (tested in 2.3: about 100 chars gives QR version 6, decoded 3/3). The phone side
+cannot be tested by an agent; it is manual tests 1-4 in Section 3. Because the camera is not used by the web page,
+the **HTTPS requirement for camera access disappears**: plan B on a hotspot / LAN with plain HTTP (2.9) also works
+for attendance. Note: the URL opens in the phone's **default** browser, so the nickname cookie lives there (manual
+tests 1-2 check this).
+
+**Evaluated alternative, not adopted: jsQR in the page.**
 
 - **Command:** `NODE_PATH=<tmp>/node_modules node tools_tests/jsqr_decode.js <tmp>/qr_*.png <tmp>/deg_*.png`
   (jsQR 1.4.0 + pngjs 7.0.0 installed in a temporary folder, not in the repo). Degraded images were made with
   `python tools_tests/qr_degrade.py <tmp>/qr_0.png <tmp>` to simulate a phone camera view.
 - **Result:** clean QR codes **3/3 decoded** (3-27 ms). Degraded QR (downscaled to 150 px, Gaussian blur k=5,
   15 degree rotation, low contrast, perspective skew): **5/5 decoded** by jsQR (5-41 ms) and 5/5 by OpenCV.
-- **Not tested here:** live camera access in a phone browser. It needs HTTPS (provided by the tunnel) and a
-  real phone - see Section 3. html5-qrcode was installed (v2.3.8) but needs a DOM and a camera, so it was not run.
-- **Verdict:** ADOPT jsQR with our own small camera loop. Fallback library: html5-qrcode. If a student's camera
-  fails, the fallback is the one validated in D5: **the lecturer scans that student's QR directly** (the lecturer's
-  phone uses the same scanner page). No typed code: it was rejected (D5), because a code can be forwarded by
-  message within the 10 s window.
+- html5-qrcode was installed (v2.3.8) but needs a DOM and a camera, so it was not run.
+- **Why not adopted** (decoding itself works): in-page camera access needs **HTTPS** (so it fails in plan B on a
+  LAN), shows a **camera permission prompt** in the browser, and adds **extra JS** (decoder + camera loop) to write,
+  load and test, while the native camera app does the same job with zero code.
+
+**Verdict:** ADOPT the native camera app + URL in the QR. Fallback if a student cannot scan: the D5
+fallback where **the lecturer shows a personal lecturer QR** on their own phone (unlimited sponsorships, same
+10 s / 15 s rule), which the student scans up close. No typed code: it was rejected (D5), because a code can be
+forwarded by message within the acceptance window.
 
 ### 2.5 Photo head count (R2, D7)
 
@@ -300,10 +323,10 @@ Command: `python tools_tests/head_count.py <yunet.onnx> <yolo11n.pt|yolov8n.pt|n
 
 | Candidate | Account | Notes |
 |---|---|---|
-| **Cloudflare quick tunnel** (`cloudflared`) | none | HTTPS (needed for phone camera access); random hostname each run. |
+| **Cloudflare quick tunnel** (`cloudflared`) | none | Public HTTPS URL reachable from any network; random hostname each run. |
 | ngrok | free account + token | Similar; interstitial page on the free plan. Not tested. |
 | Free PaaS (Render, PythonAnywhere) | account | Deploy step; cold starts; local ML models are heavy. Not tested. |
-| Laptop hotspot / LAN | none | Plain HTTP: phone browsers block the camera without HTTPS. |
+| Laptop hotspot / LAN | none | Plain HTTP, phones must join the same network. Fine for attendance because scanning uses the native camera app (2.4). |
 
 - **Command:** `cloudflared tunnel --no-autoupdate --url http://127.0.0.1:5055` then `curl <public URL>/ping` (3 times).
 - **Result:** cloudflared 2026.11.1 (Homebrew); URL `https://<random>.trycloudflare.com` printed after ~8 s;
@@ -311,10 +334,9 @@ Command: `python tools_tests/head_count.py <yunet.onnx> <yolo11n.pt|yolov8n.pt|n
   Tunnel stopped after ~25 s.
 - **Documented limits** (Cloudflare docs): no uptime guarantee, **200 in-flight requests max** (enough for one class
   with 2-3 s polling), no Server-Sent Events (polling is fine), hostname changes at each start.
-- **Verdict:** ADOPT. Plan B (D13): phone hotspot + LAN URL. Note: without HTTPS, phone browsers block in-page camera
-  access (except on `localhost`), so the in-app scanner does not work in plan B. Because each QR encodes a URL, the
-  phone's **native camera app** could open it instead; this is **not tested** and is listed in Section 3.
-  Plan C: recorded run (D13).
+- **Verdict:** ADOPT. Plan B (D13): phone hotspot + LAN URL over plain HTTP. Since the app has no in-page scanner
+  (2.4), the missing HTTPS does not block attendance: the native camera app opens the `http://<laptop-ip>:<port>/...`
+  URL encoded in the QR. Still to confirm on real phones (Section 3, test 6). Plan C: recorded run (D13).
 
 ### 2.10 Testing (R32, D25)
 
@@ -328,17 +350,22 @@ Command: `python tools_tests/head_count.py <yunet.onnx> <yolo11n.pt|yolov8n.pt|n
 
 These need a real phone, a camera or the classroom, so they could not be run by an agent.
 
-1. **iPhone (Safari) camera scan over HTTPS:** start the app and the tunnel, open the tunnel URL on an iPhone,
-   allow camera access, scan the lecturer QR shown on the laptop screen. Check that the permission prompt appears
-   and the QR is decoded within the 10 s token window.
-2. **Android (Chrome) camera scan:** same test on an Android phone.
-3. **Phone-to-phone scan:** phone A shows its sponsor QR, phone B scans it (screen brightness at maximum).
-   Measure the time from opening the page to "marked", and check that a QR older than 10 s is refused.
+1. **iPhone native camera opens the QR URL:** start the app and the tunnel, point the iPhone's Camera app at the
+   projector root QR, tap the link banner. Check that the check-in page opens in the default browser, the nickname
+   is asked on the first visit only (cookie kept on the second scan), and "Confirm" works.
+2. **Android native camera / Google Lens opens the QR URL:** same test on an Android phone (built-in camera app,
+   and Google Lens if the camera app has no QR reader).
+3. **Time from scan to "Confirmed" on slow Wi-Fi:** on the campus Wi-Fi (or a throttled hotspot), measure the time
+   from pointing the camera to the server accepting the token (must be < 15 s from QR generation) and then to
+   "Confirmed" (must be < 2 min claim). Also check that a QR photographed and opened later than 15 s is refused.
+4. **Phone-to-phone scan of a sponsor QR:** phone A shows its sponsor QR on screen (brightness at maximum), phone B
+   scans it with the native camera. Check decoding distance/angle, reflections, and that the sponsor counter
+   stops at the configured limit (3 by default).
 4. **Classroom network:** check that the university Wi-Fi does not block `*.trycloudflare.com` (open the URL from a
    phone on the campus network once before the demo).
 5. **Head count on a fresh photo** taken with the lecturer's phone in the actual room (count only, photo not stored).
-6. **Plan B without HTTPS (hotspot / LAN):** check whether scanning a QR with the phone's native camera app opens the
-   check-in URL in the browser that holds the student's nickname (iPhone and Android).
+6. **Plan B without HTTPS (hotspot / LAN):** repeat test 1 with an `http://<laptop-ip>` URL in the QR (iPhone and
+   Android) and check that the camera app opens plain-HTTP links without blocking.
 7. **Longer lecture recording:** the provided `m21.mp4` is 5.7 s, which is too short to judge the summary against the
    Zoom example (R8). If a longer recording is available, run `tools_tests/transcribe.py` on it with `small` and
    `language` set, then the LLM summary.
