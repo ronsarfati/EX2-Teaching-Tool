@@ -30,19 +30,21 @@ All five features are designed **and** implemented in the demo app; F1 is built 
 part (D1). F4 is designed but its implementation is deferred until F1-F3 are done (D10).
 
 - **F1 Attendance (main)**
-  - *Chain-of-trust check-in at the end of class* (D5): the lecturer clicks "Attendance" and the projector shows a
-    **root QR** that accepts only the **first 5 scans**, then closes. Students scan with the phone's **native camera**,
-    which opens the check-in URL in the browser (no app, no in-page scanner). Every QR regenerates **every 10 s** and
+  - *Projector check-in* (D30): the lecturer opens a session (one click, PIN) and the projector shows a **QR**
+    regenerated **every 10 s** and, under it, a **3-digit code** regenerated **every 5 s**. Students scan the QR with
+    the phone's **native camera**, which opens the check-in URL in the browser (no app, no in-page scanner). The QR
     is accepted only if it is **<= 15 s old when the request reaches the server**; the student then has a
-    **2-minute claim** to tap "Confirm my presence". The nickname is typed once (D6). Each checked-in student's
-    phone then shows its own rotating QR and can sponsor **up to 3** classmates (lecturer-configurable **1-5** per
-    session). The app stores who validated whom (**sponsor tree**). Fallback: the lecturer's **personal QR** on
-    their phone (unlimited sponsoring). The lecturer closes the session.
+    **1-minute window** to type the 3-digit code (the current or the previous one, at most 5 attempts) and, the
+    first time only, a nickname (D6). Check-in is accepted only from the **campus network**: the client IP must be
+    in an allow-list of IP ranges edited by the lecturer (students on 4G/5G are asked to join the university Wi-Fi).
+    One check-in per device per session. A student whose camera cannot scan is added manually by the lecturer after
+    class in the exported spreadsheet. A chain-of-trust design (students validating each other) and a local Wi-Fi
+    bubble were studied and rejected (D30).
   - *Photo head count as a global check* (D7): the lecturer uploads a class photo; OpenCV **YuNet** counts faces only
     (no identification) and the app shows "checked in N / detected D" with an automatic **consistent / anomaly**
     alert. The photo is processed in memory and **discarded**.
   - *Spreadsheet* (D8): live table on the lecturer page (online) and CSV/XLSX download (offline). Columns: session
-    date, nickname, check-in time, sponsor (D6).
+    date, nickname, check-in time (D6). Client IP addresses are never stored (D21).
 - **F2 Comments** (D8): real time (visible on the lecturer page within a few seconds, D4) and asynchronous (posted
   outside class, read later).
 - **F3 Polls** (D9): one question, 2-4 options, one vote per device, live results, closed by the lecturer.
@@ -59,8 +61,9 @@ part (D1). F4 is designed but its implementation is deferred until F1-F3 are don
 - Personal data: no real names, student IDs, e-mails, face recognition or location; nicknames only (R16, D6, D21).
 - User accounts and sign-up (D6, D22).
 - Native mobile app (R14).
-- Late-arrival handling: check-in happens at the end of class (D5).
-- Typed attendance codes (forwardable) and manual correction of the head count (D5, D7).
+- Late-arrival handling: check-in happens at the end of class (D5; timing unchanged by D30).
+- In-app check-in fallback for a phone that cannot scan (the lecturer adds the student after class, D30) and
+  manual correction of the head count (D7).
 - Network-offline mode (PWA / local queue): "offline" means downloadable spreadsheet and asynchronous comments (D8).
 - Google Sheets synchronisation (listed as a possible extension, D8).
 
@@ -75,14 +78,15 @@ part (D1). F4 is designed but its implementation is deferred until F1-F3 are don
 
 - **Back end and UI** (D2): Python 3.11+, Flask, server-rendered mobile-first HTML, small vanilla JavaScript.
 - **Storage** (D3): SQLite (standard library `sqlite3`), one local file, git-ignored.
-- **Real time** (D4): short polling every 2-3 s (also refreshes the rotating QR codes); no WebSockets.
-- **Attendance** (D5): rotating signed codes (stdlib `hmac`), QR images generated server-side with `qrcode`;
-  no QR-decoding library in the app (the phone's native camera scans).
+- **Real time** (D4): short polling every 2-3 s (also refreshes the projector QR and code); no WebSockets.
+- **Attendance** (D30): rotating signed QR tokens (stdlib `hmac`), QR images generated server-side with `qrcode`;
+  no QR-decoding library in the app (the phone's native camera scans); campus allow-list matched with stdlib
+  `ipaddress`, client IP read from `CF-Connecting-IP` behind the tunnel.
 - **ML / LLM** (D7, D10, D12): local face detector OpenCV YuNet, threshold 0.4 (Ultralytics YOLO tested and
   rejected in the tools report), local transcription with `faster-whisper`, Anthropic Claude for summaries and
   reviews (model and API key from environment variables, never committed).
 - **Demo hosting** (D13): app on a laptop exposed with a Cloudflare quick tunnel (public HTTPS URL); plan B phone
-  hotspot / LAN; plan C recorded rehearsal.
+  hotspot / LAN (its range added to the allow-list); plan C recorded rehearsal.
 
 ### How to run
 
@@ -93,12 +97,12 @@ Coming with the demo app (To Do 10).
 | To Do | Deliverable | Location | Status |
 |---|---|---|---|
 | — | Requirements R1-R37 | [docs/requirements.md](docs/requirements.md) | Done |
-| — | Validated decisions D1-D25 | [docs/decisions.md](docs/decisions.md) | Done |
+| — | Validated decisions D1-D30 | [docs/decisions.md](docs/decisions.md) | Done |
 | 1 | Repository, problem and scope | this README | Done |
 | 2 | Repository link submitted via the course form | (by the student) | Planned |
 | 3 | Tools report, every tool tested for real | [docs/tools_report.md](docs/tools_report.md) | Done |
 | 4 | Statement of Work | [docs/sow.md](docs/sow.md) | Done |
-| 5 | Software Requirements Specification | [docs/srs.md](docs/srs.md) | Planned |
+| 5 | Software Requirements Specification | [docs/srs.md](docs/srs.md) | Done |
 | 6 | Use cases (client stories) | [docs/use_cases.md](docs/use_cases.md) | Planned |
 | 7 | Main software components | [docs/design.md](docs/design.md) | Planned |
 | 8 | Class and sequence diagrams | [docs/design.md](docs/design.md) | Planned |
@@ -120,5 +124,5 @@ Coming with the demo app (To Do 10).
 
 This project was designed and built with the help of **Claude Code** (Anthropic) AI agents, working under the
 student's direction. The agents drafted the requirements, decisions, documents and code; the student defined the
-key design choices (e.g. the chain-of-trust check-in, D5) and reviewed and validated every decision before it was
+key design choices (e.g. the campus-network + projector QR + code check-in, D30) and reviewed and validated every decision before it was
 applied. Third-party libraries and services used by the app are listed in the tools report.

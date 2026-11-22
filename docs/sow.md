@@ -1,7 +1,7 @@
 # Statement of Work (To Do 4)
 
-Covers R26. Requirements are cited as R1-R37 ([requirements.md](requirements.md)), validated decisions as D1-D25
-([decisions.md](decisions.md)).
+Covers R26. Requirements are cited as R1-R37 ([requirements.md](requirements.md)), validated decisions as D1-D30
+([decisions.md](decisions.md); D5 and D26 are superseded by D30).
 
 ## 1. Purpose and background
 
@@ -14,7 +14,7 @@ implementation is secondary and composes existing tools rather than coding from 
 
 | # | Objective | R / D |
 |---|---|---|
-| O1 | Attendance (main feature): chain-of-trust check-in from the phone, automatic photo head count with a consistency alert, online table + offline CSV/XLSX | R1-R4, D5-D8 |
+| O1 | Attendance (main feature): check-in from the phone on the campus network (projector QR + 3-digit code), automatic photo head count with a consistency alert, online table + offline CSV/XLSX | R1-R4, D6-D8, D30 |
 | O2 | Comments and suggestions, real time and asynchronous | R5, D4, D8 |
 | O3 | On-the-spot KISS polls | R6, D9 |
 | O4 | ML summary of a recorded class video, better than the Zoom automatic summary | R7, R8, D10 |
@@ -25,17 +25,21 @@ implementation is secondary and composes existing tools rather than coding from 
 ## 3. Scope
 
 **In scope** (D1): all five features designed and implemented in one Flask app (D2) with SQLite storage (D3); F1
-first and most robust. Attendance follows D5: at the end of class the lecturer projects a root QR (first 5 scans
-only); checked-in students then sponsor classmates with their own QR (3 by default, 1-5 per session); students scan
-with the phone's native camera; every QR regenerates every 10 s and is accepted if at most 15 s old on arrival,
-followed by a 2-minute claim to confirm; the sponsor tree is stored; a lecturer phone QR is the fallback. Identity
-is a nickname plus a random device token (D6); lecturer pages are protected by a single PIN (D22). F4 is designed
+first and most robust. Attendance follows D30: the lecturer opens a session and the projector shows a QR
+regenerated every 10 s and a 3-digit code regenerated every 5 s; students scan the QR with the phone's native
+camera; the QR is accepted if at most 15 s old on arrival, then the student has a 1-minute window to type the code
+(current or previous one, at most 5 attempts); check-in is accepted only from client IPs in a campus allow-list
+edited by the lecturer; one check-in per device per session; a student who cannot scan is added by the lecturer
+after class in the exported spreadsheet. A chain-of-trust design and a local Wi-Fi bubble were studied and
+rejected (D30). Identity is a nickname plus a random device token (D6); lecturer pages are protected by a single
+PIN (D22). F4 is designed
 and planned last; its implementation details are deferred until F1-F3 are done (D10).
 
 **Out of scope:** Moodle, Zoom, Meet or Google Classroom integration (R15); personal data of any kind, including
 real names, IDs, e-mails, face recognition and location (R16, D6, D21); user accounts (D6, D22); native mobile app
 (R14); late-arrival handling (D5); network-offline mode (PWA) and Google Sheets sync (D8); pre-computed ML/LLM
-outputs (D1, D10, D11); typed attendance codes (D5); manual correction of the head count (D7).
+outputs (D1, D10, D11); in-app check-in fallback for a phone that cannot scan (D30); manual correction of the
+head count (D7).
 
 ## 4. Deliverables
 
@@ -56,12 +60,12 @@ outputs (D1, D10, D11); typed attendance codes (D5); manual correction of the he
 
 ## 5. Approach
 
-- **Design first:** requirements (R1-R37) and validated decisions (D1-D25) precede SRS, use cases and design; code
+- **Design first:** requirements (R1-R37) and validated decisions (D1-D30) precede SRS, use cases and design; code
   only implements what is designed (R17).
 - **Compose existing tools:** Flask, `qrcode`, OpenCV YuNet, faster-whisper, Anthropic SDK, `openpyxl`,
   `cloudflared`, each tested for real in the tools report before adoption (R18, R25, D15).
 - **AI-assisted, student-validated:** AI agents (Claude Code) draft documents, code and tests; the student defines
-  the key design choices (e.g. D5) and validates every decision and deliverable. AI use is disclosed in the README.
+  the key design choices (e.g. D30) and validates every decision and deliverable. AI use is disclosed in the README.
 - **Incremental delivery:** feature order F1 > F3 > F2 > F5 > F4 (D1); each task is coded, then tested with pytest
   and the Flask test client (D25); frequent small commits (D24).
 
@@ -70,9 +74,9 @@ outputs (D1, D10, D11); typed attendance codes (D5); manual correction of the he
 | Date | Milestone |
 |---|---|
 | 22/11 | Requirements, decisions, README (To Do 1), tools report (To Do 3) — done |
-| 23/11 | SoW, SRS, use cases (To Do 4-6) |
+| 23/11 | SoW, SRS, use cases (To Do 4-6); the student measures the campus public IP range(s) on site (D30) |
 | 24/11 | Components, class and sequence diagrams, test strategy (To Do 7-9) |
-| 25-26/11 | F1 attendance: check-in chain, head count and consistency alert, spreadsheet (To Do 10) |
+| 25-26/11 | F1 attendance: campus-network check-in (QR + code), head count and consistency alert, spreadsheet (To Do 10) |
 | 26/11 | F2 comments, F3 polls |
 | 27/11 | F5 homework review, then F4 video summary (after the D10 revisit) |
 | 28/11 | Quality review, fixes, tests on real phones through the tunnel |
@@ -85,7 +89,7 @@ outputs (D1, D10, D11); typed attendance codes (D5); manual correction of the he
 |---|---|
 | Student (owner) | Decision maker: validates every decision and deliverable, runs the manual phone tests, publishes the repository, submits the form, performs the demo (D18, D20, D24) |
 | AI agents | Draft documents, code and tests under the student's direction; never push or submit (D24) |
-| Lecturer (client, evaluator) | Defines the needs (assignment statement), gives feedback (e.g. on D5), evaluates the deliverables and the demo |
+| Lecturer (client, evaluator) | Defines the needs (assignment statement), gives feedback (e.g. on D5, later replaced by D30), evaluates the deliverables and the demo |
 
 ## 8. Assumptions and constraints
 
@@ -93,6 +97,8 @@ outputs (D1, D10, D11); typed attendance codes (D5); manual correction of the he
   only aggregate numbers are reported (R16, D21).
 - KISS smartphone web app, few taps, no installation (R14); only implementable designs (R17).
 - Demo hosted on the student's laptop, exposed by a Cloudflare quick tunnel (D13).
+- Students in the room can join the university Wi-Fi; the university has no VPN, so an allow-listed IP means
+  "on the campus network" (not "in this room") (D30).
 - An Anthropic API key is available for F4/F5; without it F1-F3 still run and F4/F5 show a plain error (D12, D23).
 - Individual work (D20); deadline 30/11/2026 (D16); the class demo date is still to be confirmed (D17).
 
@@ -100,9 +106,11 @@ outputs (D1, D10, D11); typed attendance codes (D5); manual correction of the he
 
 | Risk | Mitigation | D |
 |---|---|---|
-| A phone cannot scan the QR (camera, old OS) | Native camera only, no in-page scanner or permission prompt; lecturer phone QR as fallback; tested on real phones before the demo | D5 |
+| A phone cannot scan the QR (camera, old OS) | Native camera only, no in-page scanner or permission prompt; tested on real phones before the demo; otherwise the lecturer adds the student manually after class in the exported spreadsheet | D30 |
 | Classroom network or tunnel fails | Plan B: phone hotspot / LAN over HTTP (works, no in-page camera needed); plan C: recorded rehearsal; QR codes encode the configured base URL | D13 |
-| Chain check-in takes too long or distracts the class (lecturer's concern) | Done at the end of class; one click for the lecturer; 5 projector roots in parallel (about 65 students in 3 waves); 2-minute claim; target < 2 min, measured live and reported | D5, D17 |
+| Check-in takes too long or distracts the class (lecturer's concern) | One click for the lecturer; every student scans the same projector QR in parallel; 1-minute window to type the code; whole-class duration measured live and reported | D17, D30 |
+| Campus public IP unknown until measured, or campus Wi-Fi down on demo day | Allow-list editable in the app by the lecturer (PIN); IP measured on site on 23/11; plan B: hotspot / LAN with its range added to the allow-list; the photo consistency alert stays as the global check | D7, D13, D22, D30 |
+| A present student relays the QR and code live to an absent friend who is on campus | Code changes every 5 s and must be typed within the 1-minute window; one check-in per device; the photo consistency alert flags the gap (D7 limit applies) | D7, D30 |
 | Head count misses hidden faces | Measured recall ~94 %, precision ~96 % on 4 provided photos (tools report 2.5); asymmetric consistency alert; advice to shoot when students look up; limit stated (fraud under ~7 absent check-ins for N ≈ 45 stays in the noise) | D7 |
 | LLM API unavailable, slow or costly | Short capped inputs; one call per request; plain error message, no canned output; model configurable by env var | D11, D12, D23 |
 | F4 too slow live | Deferred decision; candidate: 2-3 min clip with faster-whisper `base`/`small` (measured real-time factor 0.06 / 0.17, tools report 2.6) plus one LLM call | D10 |
@@ -111,7 +119,7 @@ outputs (D1, D10, D11); typed attendance codes (D5); manual correction of the he
 
 | # | Criterion | R |
 |---|---|---|
-| A1 | A student checks in from a phone browser (native camera, no install) and appears in the lecturer's live list and sponsor tree | R1, R14, D5 |
+| A1 | A student on the campus network checks in from a phone browser (native camera, 3-digit code, no install) and appears in the lecturer's live list; a phone on 4G/5G is refused with a plain message | R1, R14, D30 |
 | A2 | A class photo returns a head count and a consistent/anomaly status next to the number of check-ins; the photo is not stored | R2, R16, D7 |
 | A3 | The lecturer sees the attendance table online and downloads it as CSV/XLSX | R3, D8 |
 | A4 | A comment posted from a phone appears on the lecturer page within 5 s; a comment posted outside a session is visible later | R5, D4, D8 |

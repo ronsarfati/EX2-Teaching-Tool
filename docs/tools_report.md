@@ -1,8 +1,11 @@
 # Tools Report (To Do 3)
 
 Covers R24 (technical tools report) and R25 (every suggested tool is tested for real, with evidence).
-It follows the validated decisions: D2 (Flask stack), D5/D6 (QR chain-of-trust attendance, nicknames),
-D7 (photo head count), D8 (spreadsheet), D10 (video summary), D11/D12 (LLM), D13 (hosting), D25 (pytest).
+It follows the validated decisions: D2 (Flask stack), D6 (nicknames), D30 (check-in on the campus network with a
+projector QR and a 3-digit code), D7 (photo head count), D8 (spreadsheet), D10 (video summary), D11/D12 (LLM),
+D13 (hosting), D25 (pytest). The tests below were run on 22/11 for the earlier chain-of-trust design (D5); a chain of
+trust and a local Wi-Fi bubble were then studied and rejected (D30). The tested tools are the same; only the
+parameters change (see 2.2).
 
 - **Test date:** 2026-11-22. **Machine:** Apple M3 laptop, 16 GB RAM, macOS, CPU only (no GPU used).
 - **Runtime:** Python 3.13.2 in a local virtualenv `.venv` (git-ignored); Node.js 24.14.1 for the JS decoder test.
@@ -17,15 +20,16 @@ D7 (photo head count), D8 (spreadsheet), D10 (video summary), D11/D12 (LLM), D13
 | # | Need (R / D) | Recommended tool | Version tested | Real test result | Verdict |
 |---|---|---|---|---|---|
 | 1 | Web framework (R14, D2) | Flask | 3.1.3 (Werkzeug 3.1.9) | `/ping` served, `curl` got HTTP 200 in 1.6 ms | ADOPT |
-| 2 | Rotating attendance tokens: new QR every 10 s, accepted if <= 15 s old at server arrival (R1, D5) | stdlib `hmac` (+ `itsdangerous` as alternative) | Python 3.13 stdlib / itsdangerous 2.2.0 | tested with a 10 s window: fresh token accepted; tampered and 11 s old tokens rejected (real 11 s wait); window is a parameter | ADOPT stdlib `hmac` |
-| 3 | QR generation (server) (R1, D5) | `qrcode` | 8.2 | 3/3 QR codes decoded back identically (OpenCV) | ADOPT |
-| 4 | QR scanning on the student's phone (R1, D5) | Phone's **native camera app** (QR encodes the check-in URL; no library on the phone) | iOS / Android built-in | not testable by an agent (needs real phones, Section 3); alternative jsQR evaluated: 3/3 clean + 5/5 degraded QR decoded under Node | ADOPT native camera, phone test pending (manual); jsQR not adopted |
+| 2 | Rotating attendance tokens: new QR every 10 s, accepted if <= 15 s old at server arrival (R1, D30) | stdlib `hmac` (+ `itsdangerous` as alternative) | Python 3.13 stdlib / itsdangerous 2.2.0 | tested with a 10 s window: fresh token accepted; tampered and 11 s old tokens rejected (real 11 s wait); window is a parameter | ADOPT stdlib `hmac` |
+| 3 | QR generation (server) (R1, D30) | `qrcode` | 8.2 | 3/3 QR codes decoded back identically (OpenCV) | ADOPT |
+| 4 | QR scanning on the student's phone (R1, D30) | Phone's **native camera app** (QR encodes the check-in URL; no library on the phone) | iOS / Android built-in | not testable by an agent (needs real phones, Section 3); alternative jsQR evaluated: 3/3 clean + 5/5 degraded QR decoded under Node | ADOPT native camera, phone test pending (manual); jsQR not adopted |
 | 5 | Photo head count (R2, D7) | OpenCV YuNet face detector, full image, threshold 0.4 | OpenCV 5.1.0.95, model 2023mar | on 4 photos checked box by box: recall 94 %, precision 96 %, mean count error 2.5 people, < 0.1 s/photo; tiling tested and rejected | ADOPT YuNet + alert tolerance (2.5.3); YOLO rejected |
 | 6 | Video transcription (R7, D10) | faster-whisper (`small` for Hebrew, `base` for speed) | 1.2.1 (CTranslate2 4.9.1) | m21.mp4: Hebrew detected (p=0.94-0.96); 150 s English test audio: WER 1.5 % (`small`), 25 s | ADOPT (pin `av<17`) |
 | 7 | LLM summary / homework review (R7-R10, D12) | Anthropic Python SDK + Claude | anthropic 2.12.0 | 1 real call: 3.5 s, 107 in / 92 out tokens | ADOPT |
 | 8 | Offline spreadsheet (R3, D8) | `openpyxl` (XLSX) + stdlib `csv` | 3.1.5 | XLSX and CSV written and read back identically | ADOPT |
 | 9 | Public HTTPS URL for the live demo (R13, D13) | Cloudflare quick tunnel (`cloudflared`) | 2026.11.1 | public `https://<random>.trycloudflare.com/ping` returned HTTP 200 (3/3, 0.96-1.99 s) | ADOPT, plan B needed |
 | 10 | Tests (R32, D25) | pytest + Flask test client | 9.2.0 | 3 passed in 0.09 s (5 runs); caught a real intermittent token bug | ADOPT |
+| 11 | Campus network filter (R1, R13, D30) | stdlib `ipaddress` (CIDR match) + `CF-Connecting-IP` header behind cloudflared | Python stdlib / cloudflared 2026.11.1 | **not tested yet** (PLANNED, 2.11 and Section 3 tests 5-7) | PLANNED |
 
 Other building blocks that need no separate test: SQLite (Python stdlib `sqlite3`, D3), short polling with
 `fetch()` every 2-3 s (D4; also compatible with the quick tunnel, which does not support Server-Sent Events).
@@ -44,19 +48,20 @@ Other building blocks that need no separate test: SQLite (Python stdlib `sqlite3
 - **Result:** `{"app":"tools-test","status":"ok"}` - `HTTP 200 in 0.001644s`.
 - **Verdict:** ADOPT. Fallback: FastAPI.
 
-### 2.2 Rotating signed tokens (R1, D5)
+### 2.2 Rotating signed tokens (R1, D30)
 
-**Rule validated in D5:** the server generates a new QR token every **10 s**; a scanned token is accepted if it is
-**<= 15 s old when the request arrives at the server** (age measured with the server clock only, so phone clocks do
-not matter). An accepted scan opens a **2-minute claim** during which the student types a nickname (first visit
-only) and taps "Confirm". The projector root QR accepts only the first 5 scans; then sponsors take over (3 sponsors
-per student by default, configurable by the lecturer from 1 to 5). The tests below used a **10 s** acceptance
-window; the window is a single constant of the same code (`TTL` in the script, `max_age` for itsdangerous), so 15 s and the 2-minute claim use the same
-mechanism without new code.
+**Rule validated in D30** (first set in D5, kept): the server generates a new projector QR token every **10 s**; a
+scanned token is accepted if it is **<= 15 s old when the request arrives at the server** (age measured with the
+server clock only, so phone clocks do not matter). An accepted scan opens a **1-minute check-in window** during
+which the student types the 3-digit code shown under the QR (regenerated every 5 s) and a nickname (first visit
+only). The tests below used a **10 s** acceptance window; the window is a single constant of the same code (`TTL` in
+the script, `max_age` for itsdangerous), so 15 s and the 1-minute window use the same mechanism without new code.
+The 3-digit code needs no extra tool (Python stdlib); its 5 s rotation and its tolerance (current or previous code)
+are to be tested with an injected clock in the app tests (D25), not in this report.
 
 | Candidate | Licence | Notes |
 |---|---|---|
-| **stdlib `hmac` + `hashlib` + `time`** | PSF | No dependency; ~20 lines; full control of payload (session, sponsor). |
+| **stdlib `hmac` + `hashlib` + `time`** | PSF | No dependency; ~20 lines; full control of payload (session, creation time). |
 | `itsdangerous.TimestampSigner` | BSD-3 | Already installed with Flask; `max_age` check built in. |
 | PyJWT | MIT | JWT is overkill here (headers, algorithms); extra dependency. |
 
@@ -77,10 +82,11 @@ mechanism without new code.
 - **Verdict:** ADOPT stdlib `hmac` (no dependency, explicit). Fallback: `itsdangerous` (equally tested).
   The secret key must come from an environment variable in the real app. Expiry is checked on the server only, at
   request arrival. The 15 s acceptance window (10 s rotation + 5 s margin) must cover the camera app opening the URL
-  and the request reaching the server on slow Wi-Fi; typing the nickname is outside this window (2-minute claim).
+  and the request reaching the server on slow Wi-Fi; typing the code and the nickname is outside this window
+  (1-minute check-in window).
   To be confirmed by manual test 3 (Section 3).
 
-### 2.3 QR code generation on the server (R1, D5)
+### 2.3 QR code generation on the server (R1, D30)
 
 | Candidate | Licence | Notes |
 |---|---|---|
@@ -93,7 +99,7 @@ mechanism without new code.
   version 2 (264 px); generation 4-38 ms; decoding 8-15 ms; **round-trip OK 3/3**.
 - **Verdict:** ADOPT. Keep the URL + token short (about 100 chars gives QR version 6, easy to scan from a screen).
 
-### 2.4 QR scanning on the student's phone (R1, R14, D5)
+### 2.4 QR scanning on the student's phone (R1, R14, D30)
 
 | Candidate | Licence | Maturity | Notes |
 |---|---|---|---|
@@ -104,7 +110,7 @@ mechanism without new code.
 
 **Recommended approach: native camera app.** The app has no in-page scanner. The server only has to generate QR
 codes whose content is a short URL (tested in 2.3: about 100 chars gives QR version 6, decoded 3/3). The phone side
-cannot be tested by an agent; it is manual tests 1-4 in Section 3. Because the camera is not used by the web page,
+cannot be tested by an agent; it is manual tests 1-3 in Section 3. Because the camera is not used by the web page,
 the **HTTPS requirement for camera access disappears**: plan B on a hotspot / LAN with plain HTTP (2.9) also works
 for attendance. Note: the URL opens in the phone's **default** browser, so the nickname cookie lives there (manual
 tests 1-2 check this).
@@ -121,10 +127,11 @@ tests 1-2 check this).
   LAN), shows a **camera permission prompt** in the browser, and adds **extra JS** (decoder + camera loop) to write,
   load and test, while the native camera app does the same job with zero code.
 
-**Verdict:** ADOPT the native camera app + URL in the QR. Fallback if a student cannot scan: the D5
-fallback where **the lecturer shows a personal lecturer QR** on their own phone (unlimited sponsorships, same
-10 s / 15 s rule), which the student scans up close. No typed code: it was rejected (D5), because a code can be
-forwarded by message within the acceptance window.
+**Verdict:** ADOPT the native camera app + URL in the QR. A typed **3-digit code** (every 5 s) is used together
+with the QR (D30): a relayed screenshot is useless because the code changes before a remote friend can type it, and
+the campus-network filter means a relay must come from someone on campus (covered by the photo alert, D7). No
+in-app fallback if a student cannot scan: the lecturer adds the student manually after class in the exported
+spreadsheet (D30).
 
 ### 2.5 Photo head count (R2, D7)
 
@@ -336,7 +343,8 @@ Command: `python tools_tests/head_count.py <yunet.onnx> <yolo11n.pt|yolov8n.pt|n
   with 2-3 s polling), no Server-Sent Events (polling is fine), hostname changes at each start.
 - **Verdict:** ADOPT. Plan B (D13): phone hotspot + LAN URL over plain HTTP. Since the app has no in-page scanner
   (2.4), the missing HTTPS does not block attendance: the native camera app opens the `http://<laptop-ip>:<port>/...`
-  URL encoded in the QR. Still to confirm on real phones (Section 3, test 6). Plan C: recorded run (D13).
+  URL encoded in the QR. Still to confirm on real phones (Section 3, test 9). With the D30 filter, the LAN / hotspot
+  range must be added to the campus allow-list in plan B. Plan C: recorded run (D13).
 
 ### 2.10 Testing (R32, D25)
 
@@ -346,29 +354,49 @@ Command: `python tools_tests/head_count.py <yunet.onnx> <yolo11n.pt|yolov8n.pt|n
   accepted at +5 s and rejected at +11 s with injected time; 2,000 random-key tokens verified).
 - **Verdict:** ADOPT pytest 9.2.0 + Flask test client. Inject time into the token code to test expiry without sleeping.
 
+### 2.11 Campus network filter (R1, R13, D30) - PLANNED, not tested yet
+
+| Candidate | Licence | Notes |
+|---|---|---|
+| **stdlib `ipaddress`** (`ip_address(x) in ip_network(cidr)`) | PSF | IPv4 and IPv6 CIDR matching, no dependency. |
+| **`CF-Connecting-IP` header** set by Cloudflare | built into the tunnel | Carries the phone's address through the quick tunnel; trusted only when the socket peer is localhost (D30). In plan B the socket address is used directly. |
+
+No result is reported yet. The checks to run are manual tests 5-7 in Section 3 (address seen from a phone on the
+campus Wi-Fi vs on 4G/5G, IPv6 case, measurement of the campus public IP on 23/11); the CIDR matching and the
+header rule will also be unit-tested with an injected client IP (D25).
+
 ## 3. Manual tests still to do by the student
 
 These need a real phone, a camera or the classroom, so they could not be run by an agent.
 
 1. **iPhone native camera opens the QR URL:** start the app and the tunnel, point the iPhone's Camera app at the
-   projector root QR, tap the link banner. Check that the check-in page opens in the default browser, the nickname
-   is asked on the first visit only (cookie kept on the second scan), and "Confirm" works.
+   projector QR, tap the link banner. Check that the check-in page opens in the default browser, the numeric
+   keypad appears for the 3-digit code, the nickname is asked on the first visit only (cookie kept on the second
+   scan), and the check-in is recorded.
 2. **Android native camera / Google Lens opens the QR URL:** same test on an Android phone (built-in camera app,
    and Google Lens if the camera app has no QR reader).
-3. **Time from scan to "Confirmed" on slow Wi-Fi:** on the campus Wi-Fi (or a throttled hotspot), measure the time
-   from pointing the camera to the server accepting the token (must be < 15 s from QR generation) and then to
-   "Confirmed" (must be < 2 min claim). Also check that a QR photographed and opened later than 15 s is refused.
-4. **Phone-to-phone scan of a sponsor QR:** phone A shows its sponsor QR on screen (brightness at maximum), phone B
-   scans it with the native camera. Check decoding distance/angle, reflections, and that the sponsor counter
-   stops at the configured limit (3 by default).
+3. **Time from scan to check-in on slow Wi-Fi:** on the campus Wi-Fi (or a throttled hotspot), measure the time
+   from pointing the camera to the server accepting the token (must be < 15 s from QR generation) and then to the
+   recorded check-in (code typed within the 1-minute window). Also check that a QR photographed and opened later
+   than 15 s is refused.
 4. **Classroom network:** check that the university Wi-Fi does not block `*.trycloudflare.com` (open the URL from a
    phone on the campus network once before the demo).
-5. **Head count on a fresh photo** taken with the lecturer's phone in the actual room (count only, photo not stored).
-6. **Plan B without HTTPS (hotspot / LAN):** repeat test 1 with an `http://<laptop-ip>` URL in the QR (iPhone and
-   Android) and check that the camera app opens plain-HTTP links without blocking.
-7. **Longer lecture recording:** the provided `m21.mp4` is 5.7 s, which is too short to judge the summary against the
-   Zoom example (R8). If a longer recording is available, run `tools_tests/transcribe.py` on it with `small` and
-   `language` set, then the LLM summary.
+5. **PLANNED - client IP seen through the tunnel (D30):** with the app behind cloudflared, log the
+   `CF-Connecting-IP` value for a request from a phone on the campus Wi-Fi, then from the same phone on 4G/5G.
+   Expected: the campus address is inside the allow-list and accepted; the 4G/5G address is refused with the
+   off-campus message.
+6. **PLANNED - IPv6 case (D30):** check whether a phone on the campus Wi-Fi (and on 4G/5G) reaches the tunnel over
+   IPv6; if so, note the IPv6 prefix and check that an IPv6 range in the allow-list matches it.
+7. **PLANNED - campus public IP measurement (23/11, D30):** on site, record the public IPv4/IPv6 address(es) of the
+   campus Wi-Fi seen by the server (from several places in the building if possible) and enter the range(s) in the
+   allow-list (only network ranges are kept, D21).
+8. **Head count on a fresh photo** taken with the lecturer's phone in the actual room (count only, photo not stored).
+9. **Plan B without HTTPS (hotspot / LAN):** repeat test 1 with an `http://<laptop-ip>` URL in the QR (iPhone and
+   Android), with the LAN range in the allow-list, and check that the camera app opens plain-HTTP links without
+   blocking.
+10. **Longer lecture recording:** the provided `m21.mp4` is 5.7 s, which is too short to judge the summary against
+    the Zoom example (R8). If a longer recording is available, run `tools_tests/transcribe.py` on it with `small`
+    and `language` set, then the LLM summary.
 
 ## 4. Reproduce
 

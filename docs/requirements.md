@@ -136,6 +136,9 @@ Priority of F2..F5 vs. demo scope is an open question (OQ1); the values below re
   others partially/stubbed? (Goal says "design", TD10 says "demo (KISS)", F1 is "main".)
 - **OQ2** "Automatically" for attendance (F1): what mechanism (QR code/session code shown on the projector, geolocation,
   Wi-Fi, one-tap link)? How to prevent marking from outside the class?
+  *Resolved by D30* (campus-network allow-list + rotating projector QR + 3-digit code); it replaces D5 (chain of
+  trust), which was studied and rejected. No R describes the check-in mechanism itself: R1 only asks for a simple
+  phone check-in, R16 for no personal data.
 - **OQ3** Photo-based count (F1): count only (heads) or also identify students? Identification would conflict with G1
   (personal information). What to do when the count differs from marked attendances?
 - **OQ4** Student identity without personal information (G1): anonymous token, nickname, student-chosen code, or the
