@@ -106,7 +106,7 @@ Coming with the demo app (To Do 10).
 | 6 | Use cases (client stories) | [docs/use_cases.md](docs/use_cases.md) | Done |
 | 7 | Main software components | [docs/design.md](docs/design.md) (sections 1-2) | Done |
 | 8 | Class and sequence diagrams | [docs/design.md](docs/design.md) (sections 3-5) | Done |
-| 9 | Test strategy (per class) | [docs/test_strategy.md](docs/test_strategy.md) | Planned |
+| 9 | Test strategy (per class) | [docs/test_strategy.md](docs/test_strategy.md) | Done |
 | 10 | Demo KISS web application | [app/](app/), [tests/](tests/) | Planned |
 | 11 | Live demo in class | demo script (with plan B) | Planned |
 | 12 | Short description of the results | [docs/results.md](docs/results.md) | Planned |
