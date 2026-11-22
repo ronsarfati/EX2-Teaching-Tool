@@ -1,6 +1,7 @@
 """One short real call to the Anthropic API (key from env var ANTHROPIC_API_KEY or repo-root .env).
 
 Run:  python tools_tests/llm_call.py <text_file_outside_repo> [model]
+Model: argument, else env var ANTHROPIC_MODEL, else claude-sonnet-5-5.
 Prints model, latency and token usage only. Never prints the key.
 """
 import os
@@ -40,4 +41,4 @@ def main(text_file, model):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else "claude-sonnet-5-5")
+    main(sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5-5"))

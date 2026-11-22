@@ -98,8 +98,10 @@ Other building blocks that need no separate test: SQLite (Python stdlib `sqlite3
   15 degree rotation, low contrast, perspective skew): **5/5 decoded** by jsQR (5-41 ms) and 5/5 by OpenCV.
 - **Not tested here:** live camera access in a phone browser. It needs HTTPS (provided by the tunnel) and a
   real phone - see Section 3. html5-qrcode was installed (v2.3.8) but needs a DOM and a camera, so it was not run.
-- **Verdict:** ADOPT jsQR with our own small camera loop. Fallback: html5-qrcode. Recommended design fallback:
-  show a short text code under every QR so a student can type it if the camera fails.
+- **Verdict:** ADOPT jsQR with our own small camera loop. Fallback library: html5-qrcode. If a student's camera
+  fails, the fallback is the one validated in D5: **the lecturer scans that student's QR directly** (the lecturer's
+  phone uses the same scanner page). No typed code: it was rejected (D5), because a code can be forwarded by
+  message within the 10 s window.
 
 ### 2.5 Photo head count (R2, D7)
 
@@ -252,7 +254,10 @@ Command: `python tools_tests/head_count.py <yunet.onnx> <yolo11n.pt|yolov8n.pt|n
 - **Issue found and fixed:** faster-whisper 1.2.1 crashes with PyAV 19 (`TypeError: open() got an unexpected keyword
   argument 'metadata_errors'`). **Pin `av<17`** (tested with av 16.1.0).
 - **Estimate for a real 90-minute lecture** (from the RTF above, CPU): about 6 min with `base`, about 15 min with
-  `small`. So the demo must use a **pre-computed** transcript/summary as planned in D10, with a live run on a short clip.
+  `small`, which is too long for a 10-minute demo. F4 is **deferred** (D10) and must run live, with no pre-computed
+  output. The candidate is a live demo on a **short 2-3 min clip**. From the measured real-time factors, transcribing
+  such a clip takes about 7-11 s with `base` (RTF 0.06) or 20-30 s with `small` (RTF 0.17), plus model loading
+  (1-2 s once the model is cached) and one Claude call (3.5 s measured in 2.7).
 - **Verdict:** ADOPT faster-whisper; `small` for Hebrew lectures (quality), `base` for a quick live demo.
   Hebrew accuracy could not be measured (5.7 s of speech only, no reference text). Fallback: openai-whisper.
 
@@ -264,15 +269,19 @@ Command: `python tools_tests/head_count.py <yunet.onnx> <yolo11n.pt|yolov8n.pt|n
 | OpenAI SDK + GPT | MIT SDK; paid | Would need another key. Not tested. |
 | Local LLM (Ollama) | free | Large download; weaker summaries on a laptop CPU. Not tested. |
 
-- **Command:** `python tools_tests/llm_call.py <text_file> claude-sonnet-4-5` (the key is read from the environment
+- **Command:** `ANTHROPIC_MODEL=claude-sonnet-4-5 python tools_tests/llm_call.py <text_file>` (equivalent to passing the
+  model as second argument, which is how it was run; the key is read from the environment
   or `.env`, never printed). **One** real call: "summarise this lecture excerpt in 3 bullet points" on a fictitious
   4-sentence excerpt (no personal data).
 - **Result:** `model=claude-sonnet-4-5-20250929 latency_s=3.5 input_tokens=107 output_tokens=92 stop=end_turn`.
 - **Note:** the SDK warned that `claude-sonnet-4-5` reaches end-of-life on **2026-11-30**. The account's model list
   (API `models.list`, no generation) includes `claude-sonnet-5-5`, `claude-haiku-5-5` and `claude-opus-5-5`.
-  The script default is now `claude-sonnet-5-5`; the app should read the model name from an env variable.
+  As validated in D12, the model name comes from the env variable **`ANTHROPIC_MODEL`** (the test script does the same).
+  The tested model `claude-sonnet-4-5` retires on 30/11/2026, so the default is `claude-sonnet-5-5`, which still has to
+  be confirmed by a real call during coding (only one call was allowed in this test).
 - **Privacy:** only transcripts and public repository code are sent; no names or photos (R16).
-- **Verdict:** ADOPT. Fallback: pre-computed outputs (D10, D11) if the network or the key fails during the demo.
+- **Verdict:** ADOPT. No pre-computed outputs (D1). F5 (homework review) runs live; if the key is missing or the API
+  call fails, the app shows a plain "LLM service unavailable" message (D12, D23) and F1-F3 keep working.
 
 ### 2.8 Spreadsheet export (R3, D8)
 
@@ -302,8 +311,10 @@ Command: `python tools_tests/head_count.py <yunet.onnx> <yolo11n.pt|yolov8n.pt|n
   Tunnel stopped after ~25 s.
 - **Documented limits** (Cloudflare docs): no uptime guarantee, **200 in-flight requests max** (enough for one class
   with 2-3 s polling), no Server-Sent Events (polling is fine), hostname changes at each start.
-- **Verdict:** ADOPT. Plan B: phone hotspot + LAN IP (QR scan replaced by typed code, since there is no HTTPS);
-  plan C: recorded run (D13).
+- **Verdict:** ADOPT. Plan B (D13): phone hotspot + LAN URL. Note: without HTTPS, phone browsers block in-page camera
+  access (except on `localhost`), so the in-app scanner does not work in plan B. Because each QR encodes a URL, the
+  phone's **native camera app** could open it instead; this is **not tested** and is listed in Section 3.
+  Plan C: recorded run (D13).
 
 ### 2.10 Testing (R32, D25)
 
@@ -326,7 +337,9 @@ These need a real phone, a camera or the classroom, so they could not be run by 
 4. **Classroom network:** check that the university Wi-Fi does not block `*.trycloudflare.com` (open the URL from a
    phone on the campus network once before the demo).
 5. **Head count on a fresh photo** taken with the lecturer's phone in the actual room (count only, photo not stored).
-6. **Longer lecture recording:** the provided `m21.mp4` is 5.7 s, which is too short to judge the summary against the
+6. **Plan B without HTTPS (hotspot / LAN):** check whether scanning a QR with the phone's native camera app opens the
+   check-in URL in the browser that holds the student's nickname (iPhone and Android).
+7. **Longer lecture recording:** the provided `m21.mp4` is 5.7 s, which is too short to judge the summary against the
    Zoom example (R8). If a longer recording is available, run `tools_tests/transcribe.py` on it with `small` and
    `language` set, then the LLM summary.
 
