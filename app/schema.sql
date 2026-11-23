@@ -68,3 +68,10 @@ CREATE TABLE IF NOT EXISTS vote (
     voted_at     REAL    NOT NULL,
     PRIMARY KEY (poll_id, device_token)                  -- one vote per device per poll (FR-3.2)
 );
+
+-- F2 comments (D29). Anonymous by construction: text and time only, no session, device, IP or nickname column.
+CREATE TABLE IF NOT EXISTS comment (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    text       TEXT NOT NULL,
+    created_at REAL NOT NULL
+);

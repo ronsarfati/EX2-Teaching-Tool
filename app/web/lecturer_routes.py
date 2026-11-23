@@ -129,3 +129,10 @@ def polls():
 def close_poll(poll_id: int):
     _services()["poll_service"].close(poll_id)
     return redirect(url_for("lecturer.polls"))
+
+
+@bp.get("/comments")
+@lecturer_required
+def comments():
+    """Page that polls /api/comments (FR-2.2, UC-8)."""
+    return render_template("lecturer_comments.html")

@@ -3,5 +3,5 @@
 {% block content %}
 <h1>{{ heading }}</h1>
 <p>{{ text }}</p>
-{% if link_url %}<a role="button" href="{{ link_url }}">{{ link_text }}</a>{% endif %}
+{% for url, label in links or [] %}<p><a role="button" href="{{ url }}">{{ label }}</a></p>{% endfor %}
 {% endblock %}

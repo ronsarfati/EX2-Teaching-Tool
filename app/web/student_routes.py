@@ -20,8 +20,7 @@ def menu():
         "message.html",
         heading="Teaching tool",
         text="To check in, scan the QR code on the projector.",
-        link_url="/checkin",
-        link_text="Check in",
+        links=[("/checkin", "Check in"), ("/poll", "Poll"), ("/comments", "Comments")],
     )
 
 
@@ -63,3 +62,12 @@ def vote():
         raise InvalidPollError() from None
     _services()["poll_service"].vote(poll_id, option_id, device_token())
     return redirect(url_for("student.poll", voted=1))
+
+
+@bp.route("/comments", methods=["GET", "POST"])
+def comments():
+    """Post an anonymous comment or suggestion; no session needed, so it also works after class (FR-2.1, FR-2.3)."""
+    if request.method == "POST":
+        _services()["comment_service"].post(request.form.get("text", ""))
+        return redirect(url_for("student.comments", sent=1))
+    return render_template("comments.html", sent=request.args.get("sent") == "1")

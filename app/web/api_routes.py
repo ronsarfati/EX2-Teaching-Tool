@@ -57,3 +57,11 @@ def poll_current():
     """The open poll for students, or null; no PIN needed (FR-3.2)."""
     poll = current_app.extensions["services"]["poll_service"].current()
     return jsonify(poll=_poll_json(poll) if poll else None)
+
+
+@bp.get("/comments")
+@lecturer_required
+def comments():
+    """Newest comments first: text and time only (FR-2.2, D29)."""
+    recent = current_app.extensions["services"]["comment_service"].recent()
+    return jsonify(comments=[{"text": c.text, "created_at": c.created_at} for c in recent])
