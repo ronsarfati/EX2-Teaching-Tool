@@ -36,10 +36,14 @@ class FakeHeadCounter:
 class FakeLLMClient:
     """LLMClient returning a preset text (or a function of the prompt), or raising a preset error; records calls."""
 
-    def __init__(self, reply="OK", error: Exception | None = None) -> None:
+    def __init__(self, reply="OK", error: Exception | None = None, configured: bool = True) -> None:
         self.reply = reply
         self.error = error
+        self.configured = configured
         self.calls: list[dict] = []
+
+    def is_configured(self) -> bool:
+        return self.configured
 
     def complete(self, system: str, prompt: str, max_tokens: int, feature: str = "review") -> str:
         self.calls.append({"system": system, "prompt": prompt, "max_tokens": max_tokens})

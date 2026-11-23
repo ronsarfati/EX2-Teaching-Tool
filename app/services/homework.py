@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 
 from app.adapters.llm import LLMClient
 from app.adapters.repo_fetcher import RepoExtract, RepoFetcher
-from app.errors import RepoUnavailableError
+from app.errors import LLMUnavailableError, RepoUnavailableError
 from app.repositories.settings import SettingsRepository
 
 SYSTEM_PROMPT = (
@@ -48,6 +48,8 @@ class HomeworkReviewer:
 
     def review(self, repo_url: str) -> ReviewResult:
         """Review one public repository; raises InvalidRepoUrlError, RepoUnavailableError or LLMUnavailableError."""
+        if not self._llm.is_configured():  # fail before downloading anything we could not use
+            raise LLMUnavailableError(feature="review")
         target_url = self._fetcher.normalize_url(repo_url)
         target = self._fetcher.fetch(target_url, self.TARGET_CAP_CHARS)
         peers = self._fetch_peers(target_url)  # [(label, url, extract)]

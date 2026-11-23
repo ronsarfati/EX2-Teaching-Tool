@@ -14,6 +14,10 @@ _LOG = logging.getLogger(__name__)
 class LLMClient(Protocol):
     """One text-in, text-out call. `feature` ("review"/"summary") only selects the error wording."""
 
+    def is_configured(self) -> bool:
+        """False when the LLM cannot be used at all (e.g. no API key), so callers can fail before any other work."""
+        ...
+
     def complete(self, system: str, prompt: str, max_tokens: int, feature: str = "review") -> str: ...
 
 
@@ -24,6 +28,9 @@ class ClaudeClient:
         self._api_key = (api_key or "").strip()  # a blank key counts as missing
         self._model = model
         self._timeout_s = timeout_s
+
+    def is_configured(self) -> bool:
+        return bool(self._api_key)
 
     def complete(self, system: str, prompt: str, max_tokens: int, feature: str = "review") -> str:
         if not self._api_key:

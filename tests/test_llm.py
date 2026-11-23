@@ -78,3 +78,13 @@ def test_fake_client_records_and_fails():
     assert fake.calls == [{"system": "s", "prompt": "abc", "max_tokens": 5}]
     with pytest.raises(LLMUnavailableError):
         FakeLLMClient(error=LLMUnavailableError("summary")).complete("s", "p", 1)
+
+
+@pytest.mark.parametrize("key, expected", [(KEY, True), (None, False), ("", False), ("   ", False)])
+def test_is_configured_reflects_key(key, expected):
+    assert ClaudeClient(key, "m").is_configured() is expected
+
+
+def test_fake_is_configured_by_default_and_switchable():
+    assert FakeLLMClient().is_configured() is True
+    assert FakeLLMClient(configured=False).is_configured() is False

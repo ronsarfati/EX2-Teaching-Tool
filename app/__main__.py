@@ -6,9 +6,11 @@ import sys
 
 from app import create_app
 from app.config import Config, ConfigError
+from app.env_file import load_env_file
 
 
 def main() -> None:
+    load_env_file()  # only here, never in create_app: tests must not read a real .env
     try:
         config = Config.from_env(os.environ)
     except ConfigError as exc:

@@ -146,3 +146,12 @@ def test_peers_invalid_line_keeps_list(client, reviewer):
     assert response.status_code == 400
     assert b"public GitHub repository link" in response.data
     assert reviewer.peer_repos() == [PEER_B]
+
+
+def test_review_without_llm_key_fails_before_any_fetch(config, clock, fetcher):
+    from app.services.homework import HomeworkReviewer
+    reviewer = HomeworkReviewer(fetcher, FakeLLMClient(configured=False), settings=None)
+    with pytest.raises(LLMUnavailableError) as e:
+        reviewer.review(TARGET)
+    assert fetcher.calls == []
+    assert e.value.user_message == "The review service is unavailable right now. Please try again later."
