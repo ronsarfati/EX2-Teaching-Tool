@@ -6,6 +6,7 @@ import logging
 from flask import Flask, jsonify, render_template, request
 from werkzeug.exceptions import HTTPException
 
+from app.adapters.head_counter import HeadCounter, YuNetHeadCounter
 from app.clock import Clock, SystemClock
 from app.config import Config
 from app.db import Database
@@ -22,20 +23,23 @@ from app.web.api_routes import bp as api_bp
 from app.web.lecturer_routes import bp as lecturer_bp
 from app.web.student_routes import bp as student_bp
 
+MAX_PHOTO_BYTES = 25 * 1024 * 1024  # a phone photo is a few MB; refuse absurd uploads
 GENERIC_MESSAGE = "Something went wrong. Please try again."
 logger = logging.getLogger(__name__)
 
 
-def create_app(config: Config, *, clock: Clock | None = None, **fakes: object) -> Flask:
+def create_app(config: Config, *, clock: Clock | None = None,
+               head_counter: HeadCounter | None = None, **fakes: object) -> Flask:
     """Build the app. Anything left out (clock, adapters) gets its real implementation.
 
-    `fakes` is where later tasks add head_counter, llm, fetcher and transcriber; tests inject doubles there.
+    `fakes` is where later tasks add llm, fetcher and transcriber; tests inject doubles there.
     """
     app = Flask(__name__)
-    app.config.update(SECRET_KEY=config.secret_key, DEBUG=False)  # NFR-8: never debug
+    app.config.update(SECRET_KEY=config.secret_key, DEBUG=False, MAX_CONTENT_LENGTH=MAX_PHOTO_BYTES)  # NFR-8: never debug
     db = Database(config.database_path)
     db.init_schema()
     clock = clock or SystemClock()
+    head_counter = head_counter or YuNetHeadCounter(config.yunet_model_path, config.face_score_threshold)
     sessions = SessionRepository(db)
     credentials = RotatingCredentials(config.secret_key, clock)
     check_ins = CheckInRepository(db)
@@ -47,11 +51,12 @@ def create_app(config: Config, *, clock: Clock | None = None, **fakes: object) -
         "db": db,
         "sessions": sessions,
         "session_service": SessionService(
-            sessions, clock, credentials, config.base_url, check_ins
+            sessions, clock, credentials, config.base_url, check_ins, head_counter
         ),
         "checkin_service": CheckInService(
             NetworkPolicy(settings), credentials, sessions, check_ins, windows, db, clock
         ),
+        "head_counter": head_counter,
         "check_ins": check_ins,
         "windows": windows,
         "settings": settings,

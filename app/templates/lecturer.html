@@ -16,6 +16,7 @@
 {% if current %}
 <h2>Attendance</h2>
 <p>Checked in (N): <strong id="n">0</strong> | Faces in photo (D): <strong id="d">&mdash;</strong> | Status: <strong id="status">&mdash;</strong></p>
+<p><a href="{{ url_for('lecturer.photo', session_id=current.id) }}">Count heads on a class photo</a></p>
 <p id="attendance-error" hidden>Connection problem, retrying...</p>
 <table>
   <thead><tr><th>Nickname</th><th>Checked in at</th></tr></thead>

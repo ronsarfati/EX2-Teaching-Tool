@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from flask import Blueprint, current_app, redirect, render_template, request, session, url_for
 
-from app.errors import InvalidNetworkRangeError, WrongPinError
+from app.errors import InvalidNetworkRangeError, UnreadablePhotoError, WrongPinError
 from app.services.network import NetworkPolicy
 from app.web.auth import lecturer_required, pin_matches
 
@@ -67,3 +67,19 @@ def open_session():
 def close_session():
     _services()["session_service"].close_session()
     return redirect(url_for("lecturer.dashboard"))
+
+
+@bp.route("/sessions/<int:session_id>/photo", methods=["GET", "POST"])
+@lecturer_required
+def photo(session_id: int):
+    """Upload or shoot a class photo, count the faces, show N / D / status (FR-1.15-FR-1.17, UC-4).
+
+    The upload is read into memory and dropped with the request; no edit-count route exists (FR-1.17).
+    """
+    summary = None
+    if request.method == "POST":
+        upload = request.files.get("photo")
+        if upload is None:
+            raise UnreadablePhotoError()
+        summary = _services()["session_service"].record_head_count(session_id, upload.read())
+    return render_template("photo.html", session_id=session_id, summary=summary)

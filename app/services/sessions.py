@@ -9,6 +9,8 @@ from app.clock import Clock
 from app.errors import SessionAlreadyOpenError, NoOpenSessionError
 from app.repositories.checkins import CheckIn, CheckInRepository
 from app.repositories.sessions import AttendanceSession, SessionRepository
+from app.adapters.head_counter import HeadCounter
+from app.services.consistency import ConsistencyResult
 from app.services.credentials import RotatingCredentials
 
 
@@ -22,12 +24,12 @@ class ProjectorState:
 
 @dataclass(frozen=True)
 class SessionSummary:
-    """Everything the live table shows: the check-ins and N. `consistency` stays None until a photo is counted (T11)."""
+    """Everything the live table shows: the check-ins and N. `consistency` stays None until a photo is counted (FR-1.16)."""
 
     session: AttendanceSession
     check_ins: list[CheckIn]
     n: int
-    consistency: Optional[str] = None  # "consistent" / "anomaly" once T11 evaluates it
+    consistency: Optional[str] = None  # "consistent" / "anomaly" once a photo is counted
 
 
 class SessionService:
@@ -38,9 +40,11 @@ class SessionService:
         credentials: RotatingCredentials,
         base_url: str,
         check_ins: CheckInRepository,
+        head_counter: HeadCounter,
     ) -> None:
         self._sessions = sessions
         self._check_ins = check_ins
+        self._head_counter = head_counter
         self._clock = clock
         self._credentials = credentials
         self._base_url = base_url
@@ -81,4 +85,15 @@ class SessionService:
         if session is None:
             raise NoOpenSessionError()
         rows = self._check_ins.list_for_session(session_id)
-        return SessionSummary(session=session, check_ins=rows, n=len(rows))
+        consistency = None
+        if session.head_count is not None:
+            consistency = ConsistencyResult.evaluate(len(rows), session.head_count).label()
+        return SessionSummary(session=session, check_ins=rows, n=len(rows), consistency=consistency)
+
+    def record_head_count(self, session_id: int, photo: bytes) -> SessionSummary:
+        """Count faces on `photo` and store D, replacing any earlier one (D31, OI-5). The bytes stay in memory only (FR-1.17)."""
+        if self._sessions.get(session_id) is None:
+            raise NoOpenSessionError()
+        count = self._head_counter.count_faces(photo)
+        self._sessions.set_head_count(session_id, count, self._clock.now())
+        return self.summary(session_id)
