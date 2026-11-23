@@ -1,8 +1,9 @@
 # Software Requirements Specification (To Do 5)
 
 Covers R27. IEEE-830-inspired, kept short. Requirements are cited as R1-R37
-([requirements.md](requirements.md)), validated decisions as D1-D31 ([decisions.md](decisions.md); D5 and D26
-are superseded by D30; D31 records the design-level choices validated on 23/11), measured figures as sections of the [tools report](tools_report.md). Scope and schedule: [sow.md](sow.md).
+([requirements.md](requirements.md)), validated decisions as D1-D32 ([decisions.md](decisions.md); D5 and D26
+are superseded by D30; D31 records the design-level choices validated on 23/11; D32 (24/11) accepts every network and
+labels each check-in campus / Apple relay / off campus), measured figures as sections of the [tools report](tools_report.md). Scope and schedule: [sow.md](sow.md).
 
 ## 1. Introduction
 
@@ -38,8 +39,10 @@ rejected (D30).
 | Projector QR | QR shown on the projector page while a session is open; it encodes a URL with a signed token (session, creation time), is regenerated every 10 s and is accepted if at most 15 s old when the request reaches the server (D30). |
 | Check-in code | 3-digit numeric code shown under the projector QR, regenerated every 5 s; the student types it on the check-in page (D30). |
 | Check-in window | 1-minute period opened by a valid projector QR scan, bound to the scanning browser's device token, during which the student types the check-in code (D30). |
-| Campus allow-list | List of IPv4/IPv6 network ranges (CIDR notation) of the campus network, edited by the lecturer; check-in requests from other addresses are refused (D30). |
+| Campus allow-list | List of IPv4/IPv6 network ranges (CIDR notation) of the campus network, edited by the lecturer; a check-in from these ranges has the origin "campus"; from other addresses it is still accepted but labelled (D30 amended by D32); while the list is empty every check-in is refused. |
 | Client IP | Address of the phone as seen by the server: the `CF-Connecting-IP` header behind the tunnel, otherwise the socket address; used only for the allow-list check, never stored (D13, D21, D30). |
+| Apple relay ranges | Network ranges published by Apple for iCloud Private Relay egress (`mask-api.icloud.com/egress-ip-ranges.csv`), kept for country IL only in a git-ignored file read at start-up; an iPhone using Safari with iCloud+ reaches the app from one of them instead of the campus address (D32). |
+| Network origin | Label of a check-in computed from the client IP (D32): "campus" (in the allow-list), "Apple relay" (else in the Apple relay ranges), "off campus" (anything else: mobile data, VPN, home). Stored instead of the IP. |
 | Check-in | An attendance record: session, device token, nickname, time (D6, D30). |
 | Head count (D) | Number of faces detected by YuNet on a class photo (D7). |
 | N | Number of check-ins in the session (D7). |
@@ -73,7 +76,9 @@ flowchart LR
 A self-contained Flask app (D2) on the laptop, SQLite storage (D3), short polling (D4), exposed by a Cloudflare
 quick tunnel; plan B: phone hotspot / LAN over plain HTTP (D13). Students never install anything and the page
 never uses the camera: the projector QR is read by the phone's native camera app (D30). Check-in requests are
-accepted only from the campus allow-list; the tunnel passes the phone's address in `CF-Connecting-IP` (D30).
+accepted from any network once the campus allow-list is configured, and each one is labelled campus, Apple relay
+(iCloud Private Relay ranges for Israel) or off campus for the lecturer (D32); the tunnel passes the phone's address
+in `CF-Connecting-IP` (D30).
 
 ### 2.2 User classes
 
@@ -99,7 +104,10 @@ accepted only from the campus allow-list; the tunnel passes the phone's address 
   `openpyxl`, `cloudflared`), each tested in the tools report (R17, R18, R25).
 - C5 Live 10-minute demo in this class (R13, R19).
 - C6 Secrets (API key, PIN, signing key) only in environment variables / git-ignored `.env` (D12, D22).
-- C7 Check-in only from the campus network; the filter proves "on the campus network", not "in this room" (D30).
+- C7 The network check labels, it does not block (D30 amended by D32): "campus" proves "on the campus network", not
+  "in this room"; "Apple relay" proves only "an iCloud+ user in Israel"; "off campus" proves nothing. Presence rests on
+  the rotating QR, the projected code, the visible labels and the photo check (FR-1.16). No location is ever asked
+  (R16, D5).
 
 ### 2.5 Assumptions and dependencies
 
@@ -109,9 +117,14 @@ accepted only from the campus allow-list; the tunnel passes the phone's address 
 - A3 An Anthropic API key is available for F4/F5; without it F1-F3 work unchanged (D12).
 - A4 Check-in happens at the end of class; late arrivals are not handled (D5; timing unchanged by D30).
 - A5 The YuNet model file is downloaded locally (not committed) before the demo (D21).
-- A6 Students in the room can join the university Wi-Fi; the university has no VPN; the campus public IP range(s)
-  are data entered by the lecturer via UC-6 (FR-1.4, no code change); the real value is pending the student's on-site
-  measurement and placeholders are used until then (D30, D31, OI-3).
+- A6 Students in the room can usually join the university Wi-Fi, but it is not reliable (a phone fell back to 5G on
+  24/11, D32); the university has no VPN; the campus public IP range(s)
+  are data entered by the lecturer via UC-6 (FR-1.4, no code change); measured on site on 24/11: `192.114.52.0/24`
+  (D30, D31, D32, OI-3). The campus Wi-Fi isolates clients, so a phone cannot reach the laptop by its LAN address
+  (D32, D13 note).
+- A8 Apple keeps publishing its Private Relay egress list at the same URL in the same CSV format; the lecturer runs
+  `scripts/update_relay_ranges.py` before class (D32). Without the file, iPhones behind the relay are still accepted
+  but labelled "off campus".
 - A7 Restarting the quick tunnel changes its host name, so the device-token cookie is lost and phones are treated as
   first-time (nickname typed again) (D31, OI-4).
 
@@ -127,13 +140,15 @@ shall be open at a time.
 P: MUST-MAIN. Trace: R1, R4, D22, D27, D30. AC: opening a session from the lecturer page succeeds; opening a second
 session while one is open is rejected with the message of section 5.
 
-**FR-1.2 Campus network check.** The system shall accept a check-in request (QR scan and code submission) only if
-the client IP (FR-1.3) belongs to a range of the campus allow-list (IPv4 and IPv6, CIDR notation, matched with
-stdlib `ipaddress`); otherwise it shall refuse it with the off-campus message of section 5. An empty allow-list
-refuses everyone (D31).
-P: MUST-MAIN. Trace: R1, R13, D30. AC (injected client IP): an IPv4 and an IPv6 address inside the list are
-accepted; an IPv4 and an IPv6 address outside it are refused with the message and create no window and no record; with an empty list every address is
-refused.
+**FR-1.2 Campus network check.** The system shall classify the client IP (FR-1.3) of every check-in request (QR
+scan and code submission) as "campus" if it belongs to a range of the campus allow-list (IPv4 and IPv6, CIDR
+notation, matched with stdlib `ipaddress`), otherwise as specified in FR-1.19 ("Apple relay" or "off campus"), and
+accept it in every case (D32). It shall refuse the request with the off-campus message of section 5 only while the
+allow-list is empty (app not configured, D31) or when the client IP is malformed.
+P: MUST-MAIN. Trace: R1, R13, D30, D32. AC (injected client IP): an IPv4 and an IPv6 address inside the list are
+accepted as campus; an IPv4 and an IPv6 address outside it are accepted as off campus (FR-1.19); with an empty list
+every address (campus, relay or other) is refused with the message and creates no window and no record; a malformed
+address is refused the same way.
 
 **FR-1.3 Client IP resolution.** The system shall take the client IP from the `CF-Connecting-IP` header only when
 the socket peer is localhost (request coming through the local tunnel, plan A); otherwise it shall use the socket
@@ -145,8 +160,9 @@ any other peer (spoofing attempt); no table or export has an IP column.
 range shall be rejected with a plain message. For plan B the LAN / hotspot range is added the same way.
 P: MUST-MAIN. Trace: R13, D13, D22, D30. AC: without the PIN the editor is not reachable; a valid IPv4 and IPv6 CIDR
 are saved and used by FR-1.2 at once; an invalid entry is rejected and the list is unchanged.
-The ranges are runtime data entered here, nothing is hard-coded (D31, OI-3); the real campus value is pending the
-student's on-site measurement.
+The ranges are runtime data entered here, nothing is hard-coded (D31, OI-3); the campus value measured on site is
+`192.114.52.0/24` (D32). The page also shows whether the Apple relay list is loaded and how many ranges it holds
+(FR-1.19); that list is not editable here.
 
 **FR-1.5 Projector QR.** While a session is open, the projector page shall show a QR encoding a URL built from the
 configured base URL, with a token HMAC-signed with its creation time (the start of its 10 s slice, D31), regenerated every 10 s; the
@@ -203,7 +219,8 @@ shall be rejected and the projector shows no QR or code.
 P: MUST-MAIN. Trace: R1, D27, D30. AC: a scan and an open window's code submission after closing are both rejected.
 
 **FR-1.14 Live attendance table (online spreadsheet).** The lecturer page shall show the session's check-ins
-(nickname, check-in time) and N, refreshed by polling.
+(nickname, check-in time, and a marker for "Apple relay" and, more visible, for "off campus" check-ins, FR-1.19)
+and N with its breakdown "N checked in (x off campus, y via Apple relay)", refreshed by polling.
 P: MUST-MAIN. Trace: R3, D4, D8. AC: a new check-in appears within 5 s without reload (NFR-2); an open window
 without a correct code does not change the table or N.
 
@@ -226,13 +243,38 @@ P: MUST-MAIN. Trace: R2, R16, D7, D21. AC: after an upload no image file exists 
 only the number; no edit-count route exists.
 
 **FR-1.18 Export (offline spreadsheet).** The lecturer shall download the attendance as CSV and as XLSX, one row
-per check-in with the columns session date, nickname, check-in time (no IP); plus a per-session summary: check-ins
-(N), faces detected (D), consistency status. One export covers all sessions: XLSX with two sheets "Check-ins" and
+per check-in with the columns session date, nickname, check-in time, network (`campus`, `Apple relay` or
+`off campus`, FR-1.19) (no IP); plus a per-session summary: check-ins (N), faces detected (D), consistency status,
+off campus, via Apple relay. One export covers all sessions: XLSX with two sheets "Check-ins" and
 "Summary"; CSV as two files `checkins.csv` and `summary.csv` (D31, OI-6). The app has no other check-in route: a student whose camera cannot
 scan the QR is added by the lecturer after class in the exported spreadsheet.
 P: MUST-MAIN. Trace: R3, D6, D8, D21, D30 (P3), tools report 2.8. AC: the files open in a spreadsheet tool and
 their rows equal the live table; the XLSX has the two sheets; the summary values equal those on the lecturer page; no route creates a check-in
 without a valid QR scan and code.
+
+**FR-1.19 Network origin: campus, Apple relay, off campus.** A check-in request whose client IP is not in the
+campus allow-list (FR-1.2) shall still be accepted (when the list is not empty) and labelled: "Apple relay" if the IP
+belongs to Apple's iCloud Private Relay egress ranges for country IL, otherwise "off campus" (mobile data, VPN, home
+network...). The relay ranges are read once at start-up from a local file produced by
+`scripts/update_relay_ranges.py` (download of Apple's public list, country filter, validation, atomic write; the
+file is not committed). If the IP is in both lists, it counts as campus. The origin of each check-in shall be stored
+(`campus` / `apple_relay` / `off_campus`; check-ins stored before this requirement read as campus) and shown in the
+live table (FR-1.14: discreet marker for Apple relay, warning-style marker "off campus network" for off campus,
+counters), in the attendance JSON and in the export (FR-1.18). Only this label is stored, never the IP (D21); no
+location is asked (R16, D5). If the relay file is missing or unreadable, the app still starts and relay addresses are
+labelled off campus; malformed lines are skipped. All other check-in rules (FR-1.5-FR-1.12) and the student-facing
+messages are unchanged; the student sees no label.
+P: MUST-MAIN. Trace: R1, R3, R13, R14, R16, D21, D30, D32. AC (injected client IP, no network): an IPv4 and an IPv6
+address just inside a relay range are accepted as Apple relay, just outside as off campus; an IPv4 and an IPv6
+address in no list are accepted as off campus; an IPv4-mapped IPv6 address is matched as IPv4; an address in both
+lists is recorded as campus; with an empty campus list relay and off-campus addresses are refused; a malformed
+address is refused; a missing file or malformed lines do not stop the app; the label appears per row in the JSON,
+the table and both export formats, and the counters (off campus, via Apple relay) match in the page and the export;
+a database created before this requirement gets the column and its rows read as campus; the script, fed a fake
+downloaded CSV, writes only the valid IL lines and leaves the previous file intact on failure.
+Known weakness (D32): an absent student can check in from anywhere if an accomplice in the room relays the QR and the
+code live; such a check-in is labelled off campus (or Apple relay for an iCloud+ user in Israel) for the lecturer,
+and an inflated N is flagged by the photo check (FR-1.16).
 
 ### 3.2 F2 Comments and suggestions
 
@@ -353,8 +395,8 @@ P: MUST. Trace: R13, D13, D30. AC: see FR-1.5.
 | NFR-3 | Performance (head count) | Head count takes < 1 s per photo on the demo laptop (measured median 86 ms at 2000x1500 px, threshold 0.4, tools report 2.5.2). | R2, D7 | Timed unit test on a non-personal image |
 | NFR-4 | Performance (check-in) | Each scan / code submission is handled by the server in < 1 s on the demo laptop, so that network delay dominates the 15 s QR window and the 5 s code rotation. | R1, D30 | Timed test with the Flask test client; manual test 3 (tools report section 3) |
 | NFR-5 | Capacity | One class (up to 52 faces detected on a provided class photo, tools report 2.5.2) with polling every 2-3 s stays under the quick tunnel limit of 200 in-flight requests (tools report 2.9). | R13, D13, D30 | Rehearsal with several tabs and phones |
-| NFR-6 | Measured, not assumed | The whole-class check-in duration and the number of refusals (off-campus, expired QR or window, wrong code) are measured live during the class demo and reported in `docs/results.md`; no target figure is claimed beforehand. | R1, R19, D17, D30 | Live measurement |
-| NFR-7 | Privacy | No field asks for a name, ID or e-mail; photos are never stored; client IPs are used only for the allow-list check and never stored; only text (transcripts, public code) is sent to the LLM API; no photo or participant list leaves the laptop; the repository contains fictitious data only. | R16, D6, D7, D12, D21, D30 | Code review, tests FR-1.3 and FR-1.17, history check before commit (D24) |
+| NFR-6 | Measured, not assumed | The whole-class check-in duration, the number of refusals (expired QR or window, wrong code) and the numbers of off-campus and Apple relay check-ins (D32) are measured live during the class demo and reported in `docs/results.md`; no target figure is claimed beforehand. | R1, R19, D17, D30 | Live measurement |
+| NFR-7 | Privacy | No field asks for a name, ID or e-mail; photos are never stored; client IPs are used only for the allow-list check and never stored (a check-in keeps only its network origin label, D32; no location is ever asked); only text (transcripts, public code) is sent to the LLM API; no photo or participant list leaves the laptop; the repository contains fictitious data only. | R16, D6, D7, D12, D21, D30 | Code review, tests FR-1.3 and FR-1.17, history check before commit (D24) |
 | NFR-8 | Security | QR tokens are HMAC-signed with a secret key from the environment; tampered or expired tokens are rejected; `CF-Connecting-IP` is trusted only from the local tunnel; at most 5 code attempts per window; lecturer pages and the allow-list editor need the PIN; API key, PIN and signing key live in the git-ignored `.env` (`.env.example` committed); Flask debug off in the demo. | D12, D22, D23, D30, tools report 2.2 | Unit tests (tampered / expired token, header spoofing, attempt limit, PIN), repo check |
 | NFR-9 | Reliability (demo) | The app runs on plan A (tunnel, HTTPS) and plan B (hotspot / LAN, plain HTTP) by changing only the base URL and adding the LAN range to the allow-list; plan C is a recorded rehearsal. F1-F3 work without an LLM key. | R13, R19, D12, D13, D30 | Rehearsal on both plans; test with no key |
 | NFR-10 | Error messages | User-facing errors are short, plain English and actionable; they never show database IDs, tokens, stack traces, file paths or exception names; details go to the server log only. | D23 | One test per row of section 5 |
@@ -367,7 +409,7 @@ Every case is covered by a test (D23). Messages are indicative wording.
 
 | Situation | User-facing message |
 |---|---|
-| Client IP outside the campus allow-list (e.g. 4G/5G) | "Check-in only works on the university Wi-Fi. Please connect to it and scan again." |
+| Campus allow-list still empty (app not configured), or malformed client IP (D32: an IP outside the list is no longer refused, it is labelled, FR-1.19) | "Check-in only works on the university Wi-Fi. Please connect to it and scan again." |
 | QR older than 15 s on arrival, or invalid signature | "This QR code has expired. Scan a fresh one." |
 | Check-in window older than 1 minute | "Your check-in time ran out. Scan the QR code again." |
 | Wrong check-in code | "Wrong code. Type the code shown under the QR now." |
@@ -398,7 +440,7 @@ Every case is covered by a test (D23). Messages are indicative wording.
 
 | R | Covered by |
 |---|---|
-| R1 | FR-1.1-FR-1.13 (check-in flow of D30, replacing D5/D26), NFR-1, NFR-4, NFR-6 |
+| R1 | FR-1.1-FR-1.13 (check-in flow of D30, replacing D5/D26), FR-1.19 (D32), NFR-1, NFR-4, NFR-6 |
 | R2 | FR-1.15-FR-1.17, NFR-3 |
 | R3 | FR-1.11, FR-1.14, FR-1.18 (columns without IP; manual addition after class, D30) |
 | R4 | Section 3.1 (most detailed, first), all FR-1.x MUST-MAIN |
@@ -410,10 +452,10 @@ Every case is covered by a test (D23). Messages are indicative wording.
 | R10 | FR-5.4, FR-5.5 |
 | R11 | FR-4.3, FR-5.3, NFR-12 (`LLMClient` interface) |
 | R12 | Sections 2-3 (end-to-end, phone to lecturer output, every feature) |
-| R13 | FR-1.2-FR-1.5, FR-6.3, NFR-5, NFR-9, C5, C7 |
+| R13 | FR-1.2-FR-1.5, FR-1.19, FR-6.3, NFR-5, NFR-9, C5, C7 |
 | R14 | FR-1.5, FR-1.7, FR-6.2, NFR-1, NFR-11, C3 |
 | R15 | FR-4.1, C2 |
-| R16 | FR-1.3, FR-1.10, FR-1.17, FR-2.1, FR-4.2, FR-5.4, FR-6.1, NFR-7, C1 |
+| R16 | FR-1.3, FR-1.10, FR-1.17, FR-1.19 (origin label only, no IP, no location), FR-2.1, FR-4.2, FR-5.4, FR-6.1, NFR-7, C1 |
 | R17 | C4 (every FR maps to a tested tool) |
 | R18 | C4, NFR-12 |
 | R19 | NFR-6, NFR-9, C5 |
@@ -433,4 +475,4 @@ All closed by D31 (validated by the student on 23/11).
 |---|---|---|
 | OI-1 | Source of the 1-2 other submissions used for the F5 comparison | CLOSED: list pasted by the lecturer on `/lecturer/peers` (FR-5.4, FR-5.5) |
 | OI-2 | Nickname rules | CLOSED: 1-30 characters after trimming, not unique (FR-1.10) |
-| OI-3 | Campus public IPv4/IPv6 range(s) | CLOSED for the design: data entered via UC-6 (FR-1.4), no code change; the value itself is pending the student's on-site measurement (placeholders until then, A6) |
+| OI-3 | Campus public IPv4/IPv6 range(s) | CLOSED: data entered via UC-6 (FR-1.4), no code change; value measured on site on 24/11: `192.114.52.0/24` (A6); other networks (Apple relay, mobile data): accepted and labelled, FR-1.19 (D32) |
