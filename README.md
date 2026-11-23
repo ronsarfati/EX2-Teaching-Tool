@@ -31,22 +31,21 @@ most robust part (D1). F4 (video summary) is designed but its implementation is 
 
 - **F1 Attendance (main)**
   - *Projector check-in* (D30): the lecturer opens a session (one click, PIN) and the projector shows a **QR**
-    regenerated **every 10 s** and, under it, a **3-digit code** regenerated **every 5 s**. Students scan the QR with
-    the phone's **native camera**, which opens the check-in URL in the browser (no app, no in-page scanner). The QR
-    is accepted only if it is **<= 15 s old when the request reaches the server**; the student then has a
-    **1-minute window** to type, the first time only, a nickname (D6), then the 3-digit code (the current or the
-    previous one, at most 5 attempts), and tap "Confirm". Every check-in is accepted and **classified by network origin** (D32): `campus` (client IP in the
-    allow-list of IP ranges edited by the lecturer), `apple_relay` (Apple iCloud Private Relay egress ranges for
-    Israel) or `off_campus` (mobile data, VPN...). Non-campus origins are shown with a marker in the live table and in
-    the export column "network"; the IP is never stored. Only an empty allow-list or a malformed IP is refused.
-    One check-in per device per session. A student whose camera cannot scan is added manually by the lecturer after
-    class in the exported spreadsheet. A chain-of-trust design (students validating each other) and a local Wi-Fi
-    bubble were studied and rejected (D30).
+    regenerated **every 10 s** and, under it, a **4-digit code** (0000-9999) regenerated **every 5 s**. Students scan
+    the QR with the phone's **native camera**, which opens the check-in URL in the browser (no app, no in-page
+    scanner). The QR is accepted only if it is **<= 15 s old when the request reaches the server**; the student then
+    has a **1-minute window** to type, the first time only, a nickname (D6), then the 4-digit code (the current or the
+    previous one, at most 5 attempts), and tap "Confirm". One check-in per device per session. No IP address is read
+    or stored and there is no network filter (D33). A student whose camera cannot scan is added manually by the
+    lecturer after class in the exported spreadsheet. A chain-of-trust design (students validating each other), a
+    local Wi-Fi bubble and a campus-IP filter were studied and rejected (D30, D33).
+    Residual risk (D33): a remote student helped by an accomplice in the room can still check in; the photo
+    consistency alert below is the room-level check. Guessing the code by rescanning needs about 5,000 tries on average.
   - *Photo head count as a global check* (D7): the lecturer uploads a class photo; OpenCV **YuNet** counts faces only
     (no identification) and the app shows "checked in N / detected D" with an automatic **consistent / anomaly**
     alert. The photo is processed in memory and **discarded**.
   - *Spreadsheet* (D8): live table on the lecturer page (online) and CSV/XLSX download (offline). Columns: session
-    date, nickname, check-in time (D6). Client IP addresses are never stored (D21).
+    date, nickname, check-in time (D6). No client IP address is read or stored (D21, D33).
 - **F2 Comments** (D8): real time (visible on the lecturer page within a few seconds, D4) and asynchronous (posted
   outside class, read later).
 - **F3 Polls** (D9): one question, 2-4 options, one vote per device, live results, closed by the lecturer.
@@ -82,13 +81,13 @@ most robust part (D1). F4 (video summary) is designed but its implementation is 
 - **Storage** (D3): SQLite (standard library `sqlite3`), one local file, git-ignored.
 - **Real time** (D4): short polling every 2-3 s on student and lecturer pages, every 1 s on the projector page (QR and code, D31); no WebSockets.
 - **Attendance** (D30): rotating signed QR tokens (stdlib `hmac`), QR images generated server-side with `qrcode`;
-  no QR-decoding library in the app (the phone's native camera scans); campus allow-list matched with stdlib
-  `ipaddress`, client IP read from `CF-Connecting-IP` behind the tunnel.
+  no QR-decoding library in the app (the phone's native camera scans); projected 4-digit code (D33); no IP-based
+  check.
 - **ML / LLM** (D7, D10, D12): local face detector OpenCV YuNet, threshold 0.4 (Ultralytics YOLO tested and
   rejected in the tools report), local transcription with `faster-whisper`, Anthropic Claude for summaries and
   reviews (model and API key from environment variables, never committed).
 - **Demo hosting** (D13): app on a laptop exposed with a Cloudflare quick tunnel (public HTTPS URL); plan B phone
-  hotspot (the campus Wi-Fi isolates clients, so a local-LAN mode is impossible there, D32); plan C recorded rehearsal.
+  hotspot; plan C recorded rehearsal.
 
 ### How to run
 
@@ -107,7 +106,6 @@ In `.env` set:
 - `LECTURER_PIN`: the lecturer PIN; use a long one (D22).
 - `BASE_URL`: the public URL phones will use (`http://localhost:5000` locally, the tunnel URL for the demo).
 - `PORT` (optional): on a Mac set `PORT=5050` and use the same port in `BASE_URL` (macOS AirPlay listens on 5000).
-- `RELAY_RANGES_PATH` (optional): Apple relay range file, default `data/apple_relay_ranges_IL.csv`.
 - `ANTHROPIC_API_KEY` (optional): enables the F5 homework review; without it the page shows an "unavailable" message.
 
 `python -m app` loads `.env` with a small standard-library loader; variables already set in the environment win.
@@ -116,17 +114,11 @@ Optional face model: for the photo head count, download the YuNet model `face_de
 the official OpenCV `opencv_zoo` repository and place it in `models/` (or set `YUNET_MODEL_PATH`). The model file
 is not bundled with this repository.
 
-Once before class (needs internet; D32): `python scripts/update_relay_ranges.py` downloads Apple's public iCloud Private
-Relay list and keeps the Israel ranges in `data/apple_relay_ranges_IL.csv` (git-ignored, not bundled). Without this file
-the app still runs, but iPhones using Private Relay are shown as "off campus".
-
-First step for the lecturer: open the app, sign in with the PIN at `/lecturer/login` and enter the campus IP range
-(measured value `192.114.52.0/24`) on `/lecturer/allow-list`, which also shows how many relay ranges are loaded. An
-empty allow-list refuses every check-in (D30, D31).
+First step for the lecturer: open the app and sign in with the PIN at `/lecturer/login`.
 
 Phones must reach the laptop. Either use a Cloudflare quick tunnel
 (`cloudflared tunnel --url http://localhost:5000`, then put the printed URL in `BASE_URL` and restart the app), or
-a phone hotspot. A local-LAN mode does not work on the campus Wi-Fi, which isolates clients (D32). See
+a phone hotspot. See
 [docs/demo_script.md](docs/demo_script.md).
 
 Tests: `python -m pytest -q`.
@@ -166,5 +158,5 @@ Optional demo data (fictional nicknames only, no network, no API key; existing f
 
 This project was designed and built with the help of **Claude Code** (Anthropic) AI agents, working under the
 student's direction. The agents drafted the requirements, decisions, documents and code; the student defined the
-key design choices (e.g. the campus-network + projector QR + code check-in, D30) and reviewed and validated every decision before it was
+key design choices (e.g. the projector QR + 4-digit code check-in, D30, D33) and reviewed and validated every decision before it was
 applied. Third-party libraries and services used by the app are listed in the tools report.

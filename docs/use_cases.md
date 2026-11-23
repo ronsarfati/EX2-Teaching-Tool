@@ -37,7 +37,6 @@ flowchart LR
     UC3(["UC-3 Close attendance session"])
     UC4(["UC-4 Count heads from class photo"])
     UC5(["UC-5 View and export attendance"])
-    UC6(["UC-6 Edit campus allow-list"])
   end
   subgraph F2["F2 Comments"]
     UC7(["UC-7 Post comment or suggestion"])
@@ -67,7 +66,6 @@ flowchart LR
   UC3 --- LE
   UC4 --- LE
   UC5 --- LE
-  UC6 --- LE
   UC8 --- LE
   UC9 --- LE
   UC11 --- LE
@@ -90,8 +88,8 @@ Priority from the SRS: **MUST-MAIN** (F1), **MUST**, **MUST, deferred** (F4, D10
 | UC-2 | Check in | Student | F1 | MUST-MAIN | FR-1.2, FR-1.3, FR-1.6-FR-1.12, NFR-1, NFR-4; R1, R14, R16; D6, D30 |
 | UC-3 | Close attendance session | Lecturer | F1 | MUST-MAIN | FR-1.13; R1; D27, D30 |
 | UC-4 | Count heads from class photo (consistency alert) | Lecturer | F1 | MUST-MAIN | FR-1.15-FR-1.17, NFR-3; R2, R16; D7, D21 |
-| UC-5 | View and export attendance spreadsheet | Lecturer | F1 | MUST-MAIN | FR-1.14, FR-1.18, FR-1.19; R3; D8, D30 (P3), D32 |
-| UC-6 | Edit campus allow-list | Lecturer | F1 | MUST-MAIN | FR-1.4; R13; D13, D22, D30 |
+| UC-5 | View and export attendance spreadsheet | Lecturer | F1 | MUST-MAIN | FR-1.14, FR-1.18; R3; D8, D30 (P3) |
+| UC-6 | *(removed by D33: no allow-list to edit)* | - | - | - | D33 |
 | UC-7 | Post a comment or suggestion | Student | F2 | MUST | FR-2.1, FR-2.3, FR-2.4, FR-6.2; R5; D8, D29 |
 | UC-8 | Read comments (live and later) | Lecturer | F2 | MUST | FR-2.2, FR-2.3, NFR-2; R5; D4, D29 |
 | UC-9 | Create a poll | Lecturer | F3 | MUST | FR-3.1; R6; D9, D28 |
@@ -111,13 +109,13 @@ that the whole class can check in without me leaving the desk.
 - **Goal:** start the check-in period of the current class meeting.
 - **Primary actor:** Lecturer.
 - **Preconditions:** the lecturer has unlocked the lecturer pages (UC-14); no session is open (D27); the base URL
-  of the active hosting plan is configured (FR-6.3, D13); the campus allow-list holds the campus ranges (UC-6).
+  of the active hosting plan is configured (FR-6.3, D13).
 - **Trigger:** end of class, when attendance is taken (A4; late arrivals are out of scope).
 - **Main success scenario:**
   1. The lecturer clicks "Open session" on the lecturer page.
   2. The system creates the session and marks it open (FR-1.1).
   3. The projector page shows a QR encoding the base URL with an HMAC-signed token, regenerated every 10 s
-     (FR-1.5), and under it a 3-digit code regenerated every 5 s (FR-1.8); both are refreshed by polling,
+     (FR-1.5), and under it a 4-digit code (0000-9999) regenerated every 5 s (FR-1.8); both are refreshed by polling,
      every 1 s on the projector page (D4 amended by D31).
   4. The lecturer page shows the live attendance table with N = 0 (UC-5).
 - **Alternative / exception flows:**
@@ -134,46 +132,40 @@ name, so that my attendance is recorded.
 - **Goal:** record one check-in for the student's device in the open session.
 - **Primary actor:** Student.
 - **Preconditions:** a session is open (UC-1); the student is in the room with a smartphone whose camera app reads
-  QR codes (A1) and is preferably connected to the university Wi-Fi (A6); mobile data is accepted and flagged (D32).
+  QR codes (A1) ; any connection that reaches the app works (no network filter, D33).
 - **Trigger:** the projector shows the QR and the code.
 - **Main success scenario:**
   1. The student scans the projector QR with the phone's native camera and taps the link; the browser opens the
      check-in URL (FR-1.5, NFR-11).
-  2. The system resolves the client IP (`CF-Connecting-IP` only from the local tunnel, otherwise the socket
-     address; never stored) and classifies it: campus, Apple relay or off campus (FR-1.2, FR-1.3, FR-1.19, D32).
-  3. The system checks the QR token: valid signature and at most 15 s old on arrival (FR-1.6); the session is open
+  2. The system checks the QR token: valid signature and at most 15 s old on arrival (FR-1.6); the session is open
      and the device token is not yet checked in for it (FR-1.12).
-  4. The system opens a 1-minute check-in window bound to the browser's device token (FR-1.7) and returns the
+  3. The system opens a 1-minute check-in window bound to the browser's device token (FR-1.7) and returns the
      check-in page: first a nickname field with the warning "Do not use your real name or ID", only if the device
      has no nickname yet (FR-1.10, D6), then a numeric code field.
-  5. First check-in on this device: the student types a nickname (1-30 characters, not necessarily unique, D31),
-     then the 3-digit code shown under the QR, and taps "Confirm". Later check-ins (device token remembered): the
-     student types only the 3-digit code and taps "Confirm".
-  6. The system checks again the client IP (FR-1.2), that the window is at most 1 minute old and belongs to this
+  4. First check-in on this device: the student types a nickname (1-30 characters, not necessarily unique, D31),
+     then the 4-digit code shown under the QR, and taps "Confirm". Later check-ins (device token remembered): the
+     student types only the 4-digit code and taps "Confirm".
+  5. The system checks that the window is at most 1 minute old and belongs to this
      device token (FR-1.7), that fewer than 5 attempts were used (FR-1.9), and that the code is the current one or
      the immediately previous one (FR-1.8, P1).
-  7. The system records the check-in (session, nickname, time), closes the window (FR-1.11) and confirms it to the
+  6. The system records the check-in (session, nickname, time), closes the window (FR-1.11) and confirms it to the
      student.
-  8. The check-in appears in the lecturer's live table within 5 s (FR-1.14, NFR-2).
+  7. The check-in appears in the lecturer's live table within 5 s (FR-1.14, NFR-2).
 - **Alternative / exception flows** (messages from SRS section 5):
-  - 2a. Client IP outside the campus allow-list (e.g. 4G/5G, VPN): accepted, not refused (D32); the check-in is
-    stored as `apple_relay` or `off_campus` and the lecturer sees a marker (UC-5). Same classification at step 6; the
-    student sees the same success page.
-  - 2b. Campus allow-list empty or client IP malformed: "Check-in is not available right now. Ask the lecturer." No window, no record. Same check at step 6.
-  - 3a. QR older than 15 s on arrival or tampered: "This QR code has expired. Scan a fresh one."
-  - 3b. Device already checked in for the session: "You are already checked in for this class." No window, no record.
-  - 3c. No open session: "There is no attendance check-in right now."
-  - 3d / 6d. Session closed meanwhile (UC-3): "Attendance for this class is closed."
-  - 4a. Returning device: the nickname is shown, no nickname field; the code is still typed (FR-1.10, step 5).
-  - 6a. Window older than 1 minute: "Your check-in time ran out. Scan the QR code again." The student restarts at
+  - 2a. QR older than 15 s on arrival or tampered: "This QR code has expired. Scan a fresh one."
+  - 2b. Device already checked in for the session: "You are already checked in for this class." No window, no record.
+  - 2c. No open session: "There is no attendance check-in right now."
+  - 2d / 5d. Session closed meanwhile (UC-3): "Attendance for this class is closed."
+  - 3a. Returning device: the nickname is shown, no nickname field; the code is still typed (FR-1.10, step 4).
+  - 5a. Window older than 1 minute: "Your check-in time ran out. Scan the QR code again." The student restarts at
     step 1.
-  - 6b. Wrong or stale code (attempts 1-5): "Wrong code. Type the code shown under the QR now." The student retries
-    from step 5.
-  - 6c. 6th attempt in the same window, even with a correct code: "Too many tries. Scan the QR code again." The
+  - 5b. Wrong or stale code, or not exactly 4 ASCII digits (attempts 1-5): "Wrong code. Type the code shown under the QR now." The student retries
+    from step 4.
+  - 5c. 6th attempt in the same window, even with a correct code: "Too many tries. Scan the QR code again." The
     window is closed (FR-1.9, P2).
-  - 6e. Empty nickname, or longer than 30 characters, on first use: "Please choose a nickname (not your real name or
+  - 5e. Empty nickname, or longer than 30 characters, on first use: "Please choose a nickname (not your real name or
     ID)." Not counted as an attempt (D31).
-  - 6f. After 6a or 6c the student scans again: a new 1-minute window opens with 0 attempts (FR-1.9, D31).
+  - 5f. After 5a or 5c the student scans again: a new 1-minute window opens with 0 attempts (FR-1.9, D31).
   - 1b. The student opens `/checkin` directly (e.g. from the menu) while a session is open: "Scan the QR code on the
     projector." (D31).
   - 1c. The quick tunnel was restarted (new host name): the device cookie is lost, so the device is treated as
@@ -184,20 +176,20 @@ Student-side order of actions (validated by the student, 23/11):
 
 ```mermaid
 flowchart LR
-  A["Scan projector QR<br/>(native camera)"] --> B["Page opens<br/>(campus IP check)"]
+  A["Scan projector QR<br/>(native camera)"] --> B["Page opens"]
   B --> C{"Device already<br/>has a nickname?"}
-  C -- "no (first check-in)" --> D["Type nickname"] --> E["Type 3-digit code"]
+  C -- "no (first check-in)" --> D["Type nickname"] --> E["Type 4-digit code"]
   C -- "yes (later check-ins)" --> E
   E --> F["Tap Confirm"]
 ```
 
 - **Postconditions:** success: one check-in exists for (session, device token), N increases by 1; failure: no
-  record; a scan never completed leaves no record (FR-1.11). No IP address is stored (FR-1.3, NFR-7).
-- **Trace:** FR-1.2, FR-1.3, FR-1.5-FR-1.12, FR-1.14, NFR-1, NFR-2, NFR-4, NFR-7; R1, R13, R14, R16; D6, D21, D30
-  (points 1-4, P1-P3), D32.
-- **Known limit:** the network origin is only a label: `campus` means "on the campus network", not "in this room"
-  (C7). An off-campus student helped by an accomplice who relays the QR and code live is accepted but flagged; a relay
-  from someone on campus is caught globally by UC-4 (D30 point 5, D7).
+  record; a scan never completed leaves no record (FR-1.11). No IP address is read or stored (D33, NFR-7).
+- **Trace:** FR-1.5-FR-1.12, FR-1.14, NFR-1, NFR-2, NFR-4, NFR-7; R1, R14, R16; D6, D21, D30
+  (points 2-4, P1-P3), D33.
+- **Known limit (D33):** nothing proves that the phone is in the room. A remote student helped by an accomplice who
+  relays the QR and the code live can check in; this is caught globally by the photo consistency alert (UC-4, D7).
+  Guessing the 4-digit code by rescanning needs about 5,000 tries on average (5 attempts per window).
 
 ### UC-3 Close attendance session
 
@@ -253,46 +245,24 @@ attendance during class and keep the records afterwards.
 - **Primary actor:** Lecturer.
 - **Preconditions:** lecturer pages unlocked (UC-14); at least one session exists.
 - **Main success scenario:**
-  1. The lecturer opens the attendance page; it shows the session's check-ins (nickname, check-in time, a marker "Apple relay" or, more visible, "off campus network") and N with the
-     counters "x off campus, y via Apple relay", refreshed by polling (FR-1.14, FR-1.19, D4, D32).
+  1. The lecturer opens the attendance page; it shows the session's check-ins (nickname, check-in time) and N, refreshed by polling (FR-1.14, D4).
   2. New check-ins (UC-2) appear within 5 s without reload (NFR-2).
   3. The lecturer downloads the attendance of all sessions as XLSX (sheets "Check-ins" and "Summary") or as CSV
      (`checkins.csv` and `summary.csv`) (FR-1.18, D31).
-  4. The export contains one row per check-in (session date, nickname, check-in time, network `campus` / `Apple relay` / `off campus`; no IP) and a per-session
-     summary: check-ins (N), faces detected (D, from UC-4), consistency status, off-campus and Apple-relay counts.
+  4. The export contains one row per check-in (session date, nickname, check-in time) and a per-session
+     summary: check-ins (N), faces detected (D, from UC-4), consistency status.
   5. The lecturer opens the file in a spreadsheet tool.
 - **Alternative flows:**
   - 3a. Student whose phone could not scan the QR (D30 P3): after class, the lecturer adds a row for that student
     manually in the downloaded spreadsheet. The app itself has no route that creates a check-in without a valid
     QR scan and code (FR-1.18).
 - **Postconditions:** the file rows equal the live table; the summary equals the values on the lecturer page.
-- **Trace:** FR-1.14, FR-1.18, FR-1.19, NFR-2, NFR-7; R3; D4, D6, D8, D21, D30 (P3), D32.
+- **Trace:** FR-1.14, FR-1.18, NFR-2, NFR-7; R3; D4, D6, D8, D21, D30 (P3).
 
-### UC-6 Edit campus allow-list
+### UC-6 (removed by D33)
 
-*Story:* As a lecturer, I want to set the network ranges of the campus, so that check-ins from the university Wi-Fi are
-recognised as campus and other networks are flagged.
-
-- **Goal:** maintain the IPv4/IPv6 campus ranges used to classify the network origin of a check-in (D30 point 1, D32), and see whether
-  the Apple relay list is loaded.
-- **Primary actor:** Lecturer.
-- **Preconditions:** lecturer pages unlocked (UC-14); the campus public ranges are known (runtime data entered here,
-  no code change; value pending the on-site measurement, D31, SRS OI-3). An empty list refuses everyone (FR-1.2); the measured campus range is `192.114.52.0/24` (D32). Before class the lecturer ran `python scripts/update_relay_ranges.py` (FR-1.19).
-- **Main success scenario:**
-  1. The lecturer opens the allow-list editor; the current ranges are listed, with "Apple Private Relay list: N ranges
-     loaded" or "not loaded" (FR-1.19).
-  2. The lecturer adds or removes a range in CIDR notation (IPv4 or IPv6).
-  3. The lecturer saves.
-  4. The system validates every range with stdlib `ipaddress` and saves the list.
-  5. The next check-in request (UC-2) is checked against the new list at once (FR-1.4).
-- **Alternative / exception flows:**
-  - 4a. Invalid range: "This is not a valid network range (e.g. 192.0.2.0/24)." The list is unchanged.
-  - 2a. Plan B (phone hotspot, D13): the lecturer adds its range the same way. A local-LAN mode is impossible on the
-    campus Wi-Fi (client isolation, D32).
-  - 1b. Relay list "not loaded": the app works, iPhones with Private Relay are shown as off campus.
-  - 1a. Without the PIN, the editor is not reachable (redirect to the PIN page).
-- **Postconditions:** the saved list holds network ranges only, never individual student addresses (D21).
-- **Trace:** FR-1.2, FR-1.4, FR-1.19, NFR-8, NFR-9; R13; D13, D21, D22, D30, D32.
+The campus allow-list editor no longer exists: the app reads no client IP and has no network filter (D33,
+FR-1.2-FR-1.4 removed). The number is kept so that other references stay valid.
 
 ## 5. Short use cases (F2-F5, access)
 
@@ -400,16 +370,15 @@ submissions, so that I see its strengths and weaknesses before (or while) gradin
 | SRS group | Requirements | Use cases |
 |---|---|---|
 | F1 sessions | FR-1.1, FR-1.13 | UC-1, UC-3 |
-| F1 campus network | FR-1.2, FR-1.3, FR-1.4, FR-1.19 | UC-2, UC-6 |
 | F1 QR, code, window, check-in | FR-1.5-FR-1.12 | UC-1, UC-2 |
-| F1 table and export | FR-1.14, FR-1.18, FR-1.19 | UC-5 |
+| F1 table and export | FR-1.14, FR-1.18 | UC-5 |
 | F1 photo head count | FR-1.15-FR-1.17 | UC-4 |
 | F2 Comments | FR-2.1-FR-2.4 | UC-7, UC-8 |
 | F3 Polls | FR-3.1-FR-3.4 | UC-9, UC-10, UC-11 |
 | F4 Video summary (deferred) | FR-4.1-FR-4.4 | UC-12 |
 | F5 Homework review | FR-5.1-FR-5.5 | UC-13 |
 | Access and configuration | FR-6.1, FR-6.2, FR-6.3 | UC-14; UC-2, UC-7, UC-10, UC-13; UC-1 |
-| Non-functional | NFR-1, NFR-4 / NFR-2 / NFR-3 / NFR-7, NFR-8 | UC-2 / UC-5, UC-8, UC-11 / UC-4 / UC-2, UC-4, UC-6, UC-14 |
+| Non-functional | NFR-1, NFR-4 / NFR-2 / NFR-3 / NFR-7, NFR-8 | UC-2 / UC-5, UC-8, UC-11 / UC-4 / UC-2, UC-4, UC-14 |
 
 Every FR of the SRS is covered by at least one use case, and every user-facing row of the SRS error table
 (section 5) appears in an exception flow above, except the generic "Something went wrong. Please try again.",

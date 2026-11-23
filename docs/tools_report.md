@@ -1,10 +1,10 @@
 # Tools Report (To Do 3)
 
 Covers R24 (technical tools report) and R25 (every suggested tool is tested for real, with evidence).
-It follows the validated decisions: D2 (Flask stack), D6 (nicknames), D30 (check-in on the campus network with a
-projector QR and a 3-digit code), D7 (photo head count), D8 (spreadsheet), D10 (video summary), D11/D12 (LLM),
+It follows the validated decisions: D2 (Flask stack), D6 (nicknames), D30 (check-in with a
+projector QR and a typed code, 4 digits since D33), D7 (photo head count), D8 (spreadsheet), D10 (video summary), D11/D12 (LLM),
 D13 (hosting), D25 (pytest). The tests below were run on 22/11 for the earlier chain-of-trust design (D5); a chain of
-trust and a local Wi-Fi bubble were then studied and rejected (D30). The tested tools are the same; only the
+trust and a local Wi-Fi bubble were then studied and rejected (D30). A campus-IP filter and Apple's relay list were tested on 24/11 and abandoned (D33, 2.11-2.12). The tested tools are the same; only the
 parameters change (see 2.2).
 
 - **Test date:** 2026-11-22. **Machine:** Apple M3 laptop, 16 GB RAM, macOS, CPU only (no GPU used).
@@ -29,8 +29,8 @@ parameters change (see 2.2).
 | 8 | Offline spreadsheet (R3, D8) | `openpyxl` (XLSX) + stdlib `csv` | 3.1.5 | XLSX and CSV written and read back identically | ADOPT |
 | 9 | Public HTTPS URL for the live demo (R13, D13) | Cloudflare quick tunnel (`cloudflared`) | 2026.11.1 | public `https://<random>.trycloudflare.com/ping` returned HTTP 200 (3/3, 0.96-1.99 s) | ADOPT, plan B needed |
 | 10 | Tests (R32, D25) | pytest + Flask test client | 9.2.0 | 3 passed in 0.09 s (5 runs); caught a real intermittent token bug | ADOPT |
-| 11 | Network origin of a check-in (R1, R13, D30, D32) | stdlib `ipaddress` (CIDR match) + `CF-Connecting-IP` header behind cloudflared | Python stdlib / cloudflared 2026.11.1 | measured campus IP on 24/11 (2.12); CIDR matching covered by unit tests; phone tests of Section 3 still pending | ADOPT (classification, D32) |
-| 12 | Apple iCloud Private Relay egress list (R1, D32) | `https://mask-api.icloud.com/egress-ip-ranges.csv` (public CSV), filtered by `scripts/update_relay_ranges.py`; campus IP measured with `ifconfig.me` | file downloaded 24/11 | 12 MB, about 285k ranges, Israel 248 (61 IPv4, 187 IPv6); the student's iPhone relay address was found in it | ADOPT, filter by country only |
+| 11 | Network origin of a check-in (R1, R13, D30, D32) | stdlib `ipaddress` + `CF-Connecting-IP` header behind cloudflared | Python stdlib / cloudflared 2026.11.1 | tested on site 24/11 (2.11) | ABANDONED (D33) |
+| 12 | Apple iCloud Private Relay egress list (R1, D32) | public CSV published by Apple | file downloaded 24/11 | tested on site 24/11 (2.12) | ABANDONED (D33) |
 
 Other building blocks that need no separate test: SQLite (Python stdlib `sqlite3`, D3), short polling with
 `fetch()` every 2-3 s (1 s on the projector page, D31) (D4; also compatible with the quick tunnel, which does not support Server-Sent Events).
@@ -54,10 +54,10 @@ Other building blocks that need no separate test: SQLite (Python stdlib `sqlite3
 **Rule validated in D30** (first set in D5, kept): the server generates a new projector QR token every **10 s**; a
 scanned token is accepted if it is **<= 15 s old when the request arrives at the server** (age measured with the
 server clock only, so phone clocks do not matter). An accepted scan opens a **1-minute check-in window** during
-which the student types a nickname (first visit only), then the 3-digit code shown under the QR (regenerated every
+which the student types a nickname (first visit only), then the 4-digit code shown under the QR (regenerated every
 5 s), and taps "Confirm". The tests below used a **10 s** acceptance window; the window is a single constant of the same code (`TTL` in
 the script, `max_age` for itsdangerous), so 15 s and the 1-minute window use the same mechanism without new code.
-The 3-digit code needs no extra tool (Python stdlib); its 5 s rotation and its tolerance (current or previous code)
+The 4-digit code needs no extra tool (Python stdlib); its 5 s rotation and its tolerance (current or previous code)
 are to be tested with an injected clock in the app tests (D25), not in this report.
 
 | Candidate | Licence | Notes |
@@ -128,9 +128,8 @@ tests 1-2 check this).
   LAN), shows a **camera permission prompt** in the browser, and adds **extra JS** (decoder + camera loop) to write,
   load and test, while the native camera app does the same job with zero code.
 
-**Verdict:** ADOPT the native camera app + URL in the QR. A typed **3-digit code** (every 5 s) is used together
-with the QR (D30): a relayed screenshot is useless because the code changes before a remote friend can type it, and
-the campus-network filter means a relay must come from someone on campus (covered by the photo alert, D7). No
+**Verdict:** ADOPT the native camera app + URL in the QR. A typed **4-digit code** (every 5 s, D33) is used together
+with the QR (D30): a relayed screenshot is useless because the code changes before a remote friend can type it; a live relay by an accomplice is not prevented (residual risk of D33, covered globally by the photo alert, D7). No
 in-app fallback if a student cannot scan: the lecturer adds the student manually after class in the exported
 spreadsheet (D30).
 
@@ -344,8 +343,7 @@ Command: `python tools_tests/head_count.py <yunet.onnx> <yolo11n.pt|yolov8n.pt|n
   with 2-3 s polling), no Server-Sent Events (polling is fine), hostname changes at each start.
 - **Verdict:** ADOPT. Plan B (D13): phone hotspot + LAN URL over plain HTTP. Since the app has no in-page scanner
   (2.4), the missing HTTPS does not block attendance: the native camera app opens the `http://<laptop-ip>:<port>/...`
-  URL encoded in the QR. Still to confirm on real phones (Section 3, test 9). A local LAN without a hotspot is impossible on the campus Wi-Fi (client isolation, D32); on a hotspot the
-  range can be added to the allow-list, otherwise check-ins are flagged off campus. Plan C: recorded run (D13).
+  URL encoded in the QR. Still to confirm on real phones (Section 3, test 9). Plan C: recorded run (D13).
 
 ### 2.10 Testing (R32, D25)
 
@@ -355,29 +353,23 @@ Command: `python tools_tests/head_count.py <yunet.onnx> <yolo11n.pt|yolov8n.pt|n
   accepted at +5 s and rejected at +11 s with injected time; 2,000 random-key tokens verified).
 - **Verdict:** ADOPT pytest 9.2.0 + Flask test client. Inject time into the token code to test expiry without sleeping.
 
-### 2.11 Network origin of a check-in (R1, R13, D30, D32)
+### 2.11 Network origin of a check-in - tested on 24/11, abandoned by D33
 
-| Candidate | Licence | Notes |
-|---|---|---|
-| **stdlib `ipaddress`** (`ip_address(x) in ip_network(cidr)`) | PSF | IPv4 and IPv6 CIDR matching, no dependency. |
-| **`CF-Connecting-IP` header** set by Cloudflare | built into the tunnel | Carries the phone's address through the quick tunnel; trusted only when the socket peer is localhost (D30). In plan B the socket address is used directly. |
+- **Tried:** match the client IP (stdlib `ipaddress`, `CF-Connecting-IP` header behind the tunnel) against a campus
+  range measured on site with a public "what is my IP" service.
+- **Findings on site:** the campus Wi-Fi isolates clients (a local-LAN mode is impossible); the exit addresses do not
+  identify the room, so the filter would at best prove "on the campus network"; phones on mobile data or with a
+  privacy relay do not show a campus address.
+- **Outcome:** abandoned (D33). No client IP is read by the app. Measured addresses are deliberately not recorded.
 
-Since D32 the address is classified (campus / Apple relay / off campus), not used to refuse. The campus IP and the
-relay list were measured on 24/11 (2.12). The checks left are manual tests 5-7 in Section 3 (phone on campus Wi-Fi vs
-4G/5G, IPv6 case); the CIDR matching and the header rule are unit-tested with an injected client IP (D25).
+### 2.12 Apple Private Relay egress list - tested on 24/11, abandoned by D33
 
-### 2.12 Apple Private Relay egress list and campus IP measurement (R1, D32) - tested on 24/11
-
-- **Why:** iPhones with iCloud Private Relay do not show the campus IP (decision D32). Apple publishes its egress
-  ranges, so a check-in from them can be labelled instead of looking like an unknown network.
-- **Tested for real (24/11):** the file `https://mask-api.icloud.com/egress-ip-ranges.csv` was downloaded:
-  **12 MB, about 285k ranges**; country `IL` = **248 ranges (61 IPv4, 187 IPv6)**; the student's iPhone relay
-  address was found among them. **Region and city are unreliable**, so only the country column is used.
-  `python scripts/update_relay_ranges.py` keeps the Israel lines in `data/apple_relay_ranges_IL.csv` (git-ignored).
-- **Campus IP:** measured with `ifconfig.me` on the campus Wi-Fi: several exit addresses, `192.114.52.6` and
-  `192.114.52.10`, hence the range `192.114.52.0/24` entered in the allow-list.
-- **Verdict:** ADOPT. Limits: the list is a snapshot to refresh before each class; Android VPNs are not in it and
-  show as off campus; no further figures were measured.
+- **Tried:** download Apple's public iCloud Private Relay egress list and label check-ins coming from it (D32).
+- **Findings:** the list is large (about 12 MB), only its country column is usable (region and city are unreliable),
+  it is a snapshot to refresh before each class, and it does not cover other VPNs. It would only have relabelled
+  part of the non-campus traffic, not proved presence.
+- **Outcome:** abandoned with the network part (D33): added complexity and a script for no reliable gain. Remaining
+  anti-cheat measures and the residual risk are in D33.
 
 ## 3. Manual tests still to do by the student
 
@@ -385,30 +377,21 @@ These need a real phone, a camera or the classroom, so they could not be run by 
 
 1. **iPhone native camera opens the QR URL:** start the app and the tunnel, point the iPhone's Camera app at the
    projector QR, tap the link banner. Check that the check-in page opens in the default browser, the numeric
-   keypad appears for the 3-digit code, the nickname is asked on the first visit only (cookie kept on the second
+   keypad appears for the 4-digit code, the nickname is asked on the first visit only (cookie kept on the second
    scan), and the check-in is recorded.
 2. **Android native camera / Google Lens opens the QR URL:** same test on an Android phone (built-in camera app,
    and Google Lens if the camera app has no QR reader).
-3. **Time from scan to check-in on slow Wi-Fi:** on the campus Wi-Fi (or a throttled hotspot), measure the time
+3. **Time from scan to check-in on slow Wi-Fi:** on slow Wi-Fi (or a throttled hotspot), measure the time
    from pointing the camera to the server accepting the token (must be < 15 s from QR generation) and then to the
    recorded check-in (code typed within the 1-minute window). Also check that a QR photographed and opened later
    than 15 s is refused.
 4. **Classroom network:** check that the university Wi-Fi does not block `*.trycloudflare.com` (open the URL from a
    phone on the campus network once before the demo).
-5. **PLANNED - client IP seen through the tunnel (D30):** with the app behind cloudflared, log the
-   `CF-Connecting-IP` value for a request from a phone on the campus Wi-Fi, then from the same phone on 4G/5G.
-   Expected (D32): the campus address is inside the allow-list (`campus`); the 4G/5G address is accepted and labelled
-   `off campus`.
-6. **PLANNED - IPv6 case (D30):** check whether a phone on the campus Wi-Fi (and on 4G/5G) reaches the tunnel over
-   IPv6; if so, note the IPv6 prefix and check that an IPv6 range in the allow-list matches it.
-7. **PLANNED - campus public IP measurement (23/11, D30):** on site, record the public IPv4/IPv6 address(es) of the
-   campus Wi-Fi seen by the server (from several places in the building if possible) and enter the range(s) in the
-   allow-list (only network ranges are kept, D21).
-8. **Head count on a fresh photo** taken with the lecturer's phone in the actual room (count only, photo not stored).
-9. **Plan B without HTTPS (hotspot / LAN):** repeat test 1 with an `http://<laptop-ip>` URL in the QR (iPhone and
-   Android), with the hotspot range in the allow-list, and check that the camera app opens plain-HTTP links without
+5. **Head count on a fresh photo** taken with the lecturer's phone in the actual room (count only, photo not stored).
+6. **Plan B without HTTPS (hotspot / LAN):** repeat test 1 with an `http://<laptop-ip>` URL in the QR (iPhone and
+   Android) and check that the camera app opens plain-HTTP links without
    blocking.
-10. **Longer lecture recording:** the provided `m21.mp4` is 5.7 s, which is too short to judge the summary against
+7. **Longer lecture recording:** the provided `m21.mp4` is 5.7 s, which is too short to judge the summary against
     the Zoom example (R8). If a longer recording is available, run `tools_tests/transcribe.py` on it with `small`
     and `language` set, then the LLM summary.
 
