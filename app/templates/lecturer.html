@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Lecturer{% endblock %}
+{% block content %}
+<h1>Lecturer</h1>
+{% if current %}
+<p>A session is open.</p>
+<form method="post" action="{{ url_for('lecturer.close_session') }}">
+  <button type="submit">Close session</button>
+</form>
+{% else %}
+<p>No session is open.</p>
+<form method="post" action="{{ url_for('lecturer.open_session') }}">
+  <button type="submit">Open session</button>
+</form>
+{% endif %}
+{% endblock %}

@@ -14,6 +14,12 @@ from app.repositories.checkins import CheckInRepository
 from app.repositories.sessions import SessionRepository
 from app.repositories.settings import SettingsRepository
 from app.repositories.windows import CheckInWindowRepository
+from app.services.checkin import CheckInService
+from app.services.credentials import RotatingCredentials
+from app.services.network import NetworkPolicy
+from app.services.sessions import SessionService
+from app.web.api_routes import bp as api_bp
+from app.web.lecturer_routes import bp as lecturer_bp
 
 GENERIC_MESSAGE = "Something went wrong. Please try again."
 logger = logging.getLogger(__name__)
@@ -28,14 +34,26 @@ def create_app(config: Config, *, clock: Clock | None = None, **fakes: object) -
     app.config.update(SECRET_KEY=config.secret_key, DEBUG=False)  # NFR-8: never debug
     db = Database(config.database_path)
     db.init_schema()
+    clock = clock or SystemClock()
+    sessions = SessionRepository(db)
+    credentials = RotatingCredentials(config.secret_key, clock)
+    check_ins = CheckInRepository(db)
+    windows = CheckInWindowRepository(db)
+    settings = SettingsRepository(db)
     app.extensions["services"] = {
         "config": config,
-        "clock": clock or SystemClock(),
+        "clock": clock,
         "db": db,
-        "sessions": SessionRepository(db),
-        "check_ins": CheckInRepository(db),
-        "windows": CheckInWindowRepository(db),
-        "settings": SettingsRepository(db),
+        "sessions": sessions,
+        "session_service": SessionService(
+            sessions, clock, credentials, config.base_url
+        ),
+        "checkin_service": CheckInService(
+            NetworkPolicy(settings), credentials, sessions, check_ins, windows, db, clock
+        ),
+        "check_ins": check_ins,
+        "windows": windows,
+        "settings": settings,
         **fakes,
     }
 
@@ -43,6 +61,8 @@ def create_app(config: Config, *, clock: Clock | None = None, **fakes: object) -
     def ping() -> str:
         return "ok"
 
+    app.register_blueprint(lecturer_bp)
+    app.register_blueprint(api_bp)
     _register_error_handlers(app)
     return app
 

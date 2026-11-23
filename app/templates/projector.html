@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Projector{% endblock %}
+{% block content %}
+<style>
+  .projector { text-align: center; }
+  .projector img { width: min(70vh, 90vw); height: auto; image-rendering: pixelated; }
+  .projector #code { font-size: 22vh; font-weight: bold; letter-spacing: 0.1em; line-height: 1; margin: 0; }
+  .projector #waiting { font-size: 5vh; }
+</style>
+<div class="projector" data-api-holder>
+  <p id="waiting">No session is open.</p>
+  <img id="qr" alt="Check-in QR code" hidden>
+  <p id="code" hidden></p>
+</div>
+<script>document.body.dataset.api = "{{ url_for('api.projector') }}";</script>
+<script src="{{ url_for('static', filename='projector.js') }}"></script>
+{% endblock %}
