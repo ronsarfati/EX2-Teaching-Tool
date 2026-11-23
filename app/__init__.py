@@ -12,6 +12,7 @@ from app.config import Config
 from app.db import Database
 from app.errors import AppError
 from app.repositories.checkins import CheckInRepository
+from app.repositories.polls import PollRepository
 from app.repositories.sessions import SessionRepository
 from app.repositories.settings import SettingsRepository
 from app.repositories.windows import CheckInWindowRepository
@@ -19,6 +20,7 @@ from app.services.checkin import CheckInService
 from app.services.export import AttendanceExporter
 from app.services.credentials import RotatingCredentials
 from app.services.network import NetworkPolicy
+from app.services.polls import PollService
 from app.services.sessions import SessionService
 from app.web.api_routes import bp as api_bp
 from app.web.lecturer_routes import bp as lecturer_bp
@@ -57,6 +59,7 @@ def create_app(config: Config, *, clock: Clock | None = None,
         "checkin_service": CheckInService(
             NetworkPolicy(settings), credentials, sessions, check_ins, windows, db, clock
         ),
+        "poll_service": PollService(PollRepository(db), clock),
         "exporter": AttendanceExporter(sessions, check_ins),
         "head_counter": head_counter,
         "check_ins": check_ins,

@@ -5,7 +5,7 @@ import sqlite3
 from dataclasses import dataclass
 from typing import Optional
 
-from app.db import Database
+from app.db import Database, valid_row_id
 
 
 @dataclass(frozen=True)
@@ -35,6 +35,8 @@ class SessionRepository:
         return AttendanceSession(cursor.lastrowid, opened_at, None, None)
 
     def get(self, session_id: int) -> Optional[AttendanceSession]:
+        if not valid_row_id(session_id):
+            return None  # same answer as any unknown id
         row = self._db.conn().execute("SELECT * FROM attendance_session WHERE id = ?", (session_id,)).fetchone()
         return _to_session(row) if row else None
 

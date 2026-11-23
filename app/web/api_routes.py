@@ -32,3 +32,28 @@ def attendance(session_id: int):
         consistency=summary.consistency,  # string status, null until T11
         check_ins=[{"nickname": c.nickname, "checked_in_at": c.checked_in_at} for c in summary.check_ins],
     )
+
+
+def _poll_json(poll) -> dict:
+    """Counts per option; no voter information exists to leak (D28)."""
+    return {
+        "id": poll.id,
+        "question": poll.question,
+        "open": poll.is_open,
+        "total": poll.total_votes(),
+        "options": [{"id": o.id, "label": o.label, "votes": o.votes} for o in poll.options],
+    }
+
+
+@bp.get("/polls/<int:poll_id>/results")
+@lecturer_required
+def poll_results(poll_id: int):
+    """Live counts for the lecturer page (FR-3.3)."""
+    return jsonify(_poll_json(current_app.extensions["services"]["poll_service"].get(poll_id)))
+
+
+@bp.get("/poll/current")
+def poll_current():
+    """The open poll for students, or null; no PIN needed (FR-3.2)."""
+    poll = current_app.extensions["services"]["poll_service"].current()
+    return jsonify(poll=_poll_json(poll) if poll else None)

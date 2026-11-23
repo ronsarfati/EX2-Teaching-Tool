@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Poll{% endblock %}
+{% block content %}
+<h1>Poll</h1>
+{% if voted %}<p><strong>Thanks, your vote is counted.</strong></p>{% endif %}
+{% if poll %}
+<h2>{{ poll.question }}</h2>
+{% if not voted %}
+<form method="post" action="{{ url_for('student.vote') }}">
+  <input type="hidden" name="poll_id" value="{{ poll.id }}">
+  {% for option in poll.options %}
+  <label><input type="radio" name="option_id" value="{{ option.id }}" required> {{ option.label }}</label>
+  {% endfor %}
+  <button type="submit">Vote</button>
+</form>
+{% endif %}
+{% else %}
+<p>No poll is open right now. This page checks again by itself.</p>
+{% endif %}
+<script>
+// Reload when the lecturer opens, replaces or closes a poll (short polling, D4).
+const shownId = {{ poll.id if poll else 'null' }};
+setInterval(async () => {
+  try {
+    const data = await (await fetch("{{ url_for('api.poll_current') }}", { cache: "no-store" })).json();
+    if ((data.poll ? data.poll.id : null) !== shownId) location.href = "{{ url_for('student.poll') }}";
+  } catch (error) { /* offline: keep the page, try again at the next tick */ }
+}, 3000);
+</script>
+{% endblock %}

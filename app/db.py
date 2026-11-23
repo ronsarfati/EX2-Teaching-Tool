@@ -9,6 +9,12 @@ from typing import Iterator
 
 SCHEMA_PATH = Path(__file__).with_name("schema.sql")
 BUSY_TIMEOUT_MS = 5000
+SQLITE_MAX_INT = 2**63 - 1  # larger Python ints make the sqlite3 driver raise OverflowError
+
+
+def valid_row_id(value: int) -> bool:
+    """True if `value` can be a row id. Lookups treat any other id exactly like an unknown one (404, not 500)."""
+    return 0 <= value <= SQLITE_MAX_INT
 
 
 class Database:

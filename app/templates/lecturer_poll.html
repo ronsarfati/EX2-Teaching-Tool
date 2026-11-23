@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Polls{% endblock %}
+{% block content %}
+<h1>Polls</h1>
+{% if not poll or not poll.is_open %}
+<h2>New poll</h2>
+<form method="post" action="{{ url_for('lecturer.polls') }}">
+  <input name="question" placeholder="Question" maxlength="200" required>
+  {% for i in range(4) %}
+  <input name="option" placeholder="Option {{ i + 1 }}{{ '' if i > 1 else ' (required)' }}" maxlength="100">
+  {% endfor %}
+  <button type="submit">Open poll</button>
+</form>
+{% endif %}
+{% if poll %}
+<h2>{{ poll.question }} {% if not poll.is_open %}(closed){% endif %}</h2>
+<p id="poll-error" hidden>Connection problem, retrying...</p>
+<div id="poll-options">
+  {% for option in poll.options %}
+  <p>{{ option.label }}: <strong>{{ option.votes }}</strong><progress value="{{ option.votes }}" max="{{ poll.total_votes() or 1 }}"></progress></p>
+  {% endfor %}
+</div>
+{% if poll.is_open %}
+<form method="post" action="{{ url_for('lecturer.close_poll', poll_id=poll.id) }}">
+  <button type="submit">Close poll</button>
+</form>
+<script>
+// Counts are redrawn every 2.5 s (D4); labels go through textContent because the lecturer types them.
+const box = document.getElementById("poll-options");
+setInterval(async () => {
+  try {
+    const r = await fetch("{{ url_for('api.poll_results', poll_id=poll.id) }}", { cache: "no-store" });
+    if (!r.ok) throw new Error();
+    const data = await r.json();
+    box.replaceChildren(...data.options.map((o) => {
+      const p = document.createElement("p");
+      const bar = document.createElement("progress");
+      bar.value = o.votes; bar.max = data.total || 1;
+      const count = document.createElement("strong");
+      count.textContent = o.votes;
+      p.append(o.label + ": ", count, bar);
+      return p;
+    }));
+    document.getElementById("poll-error").hidden = true;
+  } catch (error) { document.getElementById("poll-error").hidden = false; }
+}, 2500);
+</script>
+{% endif %}
+{% endif %}
+<p><a href="{{ url_for('lecturer.dashboard') }}">Back</a></p>
+{% endblock %}

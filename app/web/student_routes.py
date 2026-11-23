@@ -1,9 +1,9 @@
 """Student pages without login: menu and attendance check-in (FR-1.7-FR-1.12, FR-6.2, UC-2, UC-3)."""
 from __future__ import annotations
 
-from flask import Blueprint, current_app, render_template, request
+from flask import Blueprint, current_app, redirect, render_template, request, url_for
 
-from app.errors import NoOpenSessionError, QrRequiredError
+from app.errors import InvalidPollError, NoOpenSessionError, QrRequiredError
 from app.web.device import attach_device_cookie, client_ip, device_token
 
 bp = Blueprint("student", __name__)
@@ -46,3 +46,20 @@ def confirm():
         device_token(), client_ip(), request.form.get("code", "").strip(), request.form.get("nickname")
     )
     return render_template("checked_in.html", nickname=check_in.nickname)
+
+
+@bp.get("/poll")
+def poll():
+    """The open poll, if any. No allow-list here: the design only restricts check-in to the campus (FR-3.2)."""
+    return render_template("poll.html", poll=_services()["poll_service"].current(),
+                           voted=request.args.get("voted") == "1")
+
+
+@bp.post("/poll/vote")
+def vote():
+    try:
+        poll_id, option_id = int(request.form["poll_id"]), int(request.form["option_id"])
+    except (KeyError, ValueError):
+        raise InvalidPollError() from None
+    _services()["poll_service"].vote(poll_id, option_id, device_token())
+    return redirect(url_for("student.poll", voted=1))

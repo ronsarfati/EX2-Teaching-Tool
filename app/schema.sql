@@ -42,3 +42,29 @@ CREATE TABLE IF NOT EXISTS setting_item (
     value TEXT NOT NULL,
     PRIMARY KEY (kind, value)
 );
+
+-- F3 polls (D9, D28). Anonymous: a vote stores the random device token only, never a nickname or an IP (D21).
+CREATE TABLE IF NOT EXISTS poll (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    question   TEXT    NOT NULL,
+    is_open    INTEGER NOT NULL DEFAULT 1 CHECK (is_open IN (0, 1)),
+    created_at REAL    NOT NULL,
+    closed_at  REAL
+);
+-- At most one open poll at a time (D28), enforced by the database as defence in depth.
+CREATE UNIQUE INDEX IF NOT EXISTS one_open_poll ON poll(is_open) WHERE is_open = 1;
+
+CREATE TABLE IF NOT EXISTS poll_option (
+    id       INTEGER PRIMARY KEY AUTOINCREMENT,
+    poll_id  INTEGER NOT NULL REFERENCES poll(id),
+    position INTEGER NOT NULL CHECK (position BETWEEN 1 AND 4),
+    label    TEXT    NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS vote (
+    poll_id      INTEGER NOT NULL REFERENCES poll(id),
+    device_token TEXT    NOT NULL,                       -- no FK: voting needs no nickname (D28)
+    option_id    INTEGER NOT NULL REFERENCES poll_option(id),
+    voted_at     REAL    NOT NULL,
+    PRIMARY KEY (poll_id, device_token)                  -- one vote per device per poll (FR-3.2)
+);

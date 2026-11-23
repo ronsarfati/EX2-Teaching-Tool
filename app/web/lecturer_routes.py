@@ -77,7 +77,9 @@ def photo(session_id: int):
     The upload is read into memory and dropped with the request; no edit-count route exists (FR-1.17).
     """
     summary = None
-    if request.method == "POST":
+    if request.method == "GET":
+        _services()["session_service"].summary(session_id)  # 404 for an unknown session instead of an empty form
+    else:
         upload = request.files.get("photo")
         if upload is None:
             raise UnreadablePhotoError()
@@ -109,3 +111,21 @@ def export_xlsx():
     """Both tables as the sheets "Check-ins" and "Summary" of one workbook (FR-1.18)."""
     return _download(_services()["exporter"].xlsx(), "attendance.xlsx",
                      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+
+@bp.route("/polls", methods=["GET", "POST"])
+@lecturer_required
+def polls():
+    """Create a poll (FR-3.1, UC-9) and show the latest one with live results (FR-3.3, FR-3.4)."""
+    service = _services()["poll_service"]
+    if request.method == "POST":
+        service.create(request.form.get("question", ""), request.form.getlist("option"))
+        return redirect(url_for("lecturer.polls"))
+    return render_template("lecturer_poll.html", poll=service.latest())
+
+
+@bp.post("/polls/<int:poll_id>/close")
+@lecturer_required
+def close_poll(poll_id: int):
+    _services()["poll_service"].close(poll_id)
+    return redirect(url_for("lecturer.polls"))
