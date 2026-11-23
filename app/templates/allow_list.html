@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Campus network{% endblock %}
+{% block content %}
+<h1>Campus network</h1>
+{% if error %}<p role="alert">{{ error }}</p>{% endif %}
+{% if not text.strip() %}
+<p role="alert">Nobody can check in until you add the campus network.</p>
+{% endif %}
+<p>One IPv4 or IPv6 address or range (CIDR) per line. Tip: on the campus Wi-Fi, look up your public IP
+(search "what is my IP") and enter it here.</p>
+<form method="post">
+  <textarea name="ranges" rows="8" cols="40">{{ text }}</textarea>
+  <button type="submit">Save</button>
+</form>
+<p><a href="{{ url_for('lecturer.dashboard') }}">Back</a></p>
+{% endblock %}

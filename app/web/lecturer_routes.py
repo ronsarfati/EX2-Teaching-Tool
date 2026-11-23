@@ -3,7 +3,8 @@ from __future__ import annotations
 
 from flask import Blueprint, current_app, redirect, render_template, request, session, url_for
 
-from app.errors import WrongPinError
+from app.errors import InvalidNetworkRangeError, WrongPinError
+from app.services.network import NetworkPolicy
 from app.web.auth import lecturer_required, pin_matches
 
 bp = Blueprint("lecturer", __name__, url_prefix="/lecturer")
@@ -33,6 +34,25 @@ def dashboard():
 @lecturer_required
 def projector():
     return render_template("projector.html")
+
+
+def _render_allow_list(text: str, error: str | None = None, status: int = 200):
+    return render_template("allow_list.html", text=text, error=error), status
+
+
+@bp.route("/allow-list", methods=["GET", "POST"])
+@lecturer_required
+def allow_list():
+    """Edit the campus allow-list (FR-1.4, UC-6); an invalid line keeps the stored list (D31)."""
+    policy = NetworkPolicy(_services()["settings"])
+    if request.method == "POST":
+        text = request.form.get("ranges", "")
+        try:
+            policy.save_ranges(text.splitlines())
+        except InvalidNetworkRangeError as error:
+            return _render_allow_list(text, error.user_message, error.http_status)  # keep what was typed
+        return redirect(url_for("lecturer.allow_list"))
+    return _render_allow_list("\n".join(policy.ranges()))
 
 
 @bp.post("/sessions")
