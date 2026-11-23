@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from flask import Blueprint, Response, current_app, redirect, render_template, request, session, url_for
 
-from app.errors import InvalidNetworkRangeError, UnreadablePhotoError, WrongPinError
+from app.errors import InvalidNetworkRangeError, InvalidRepoUrlError, UnreadablePhotoError, WrongPinError
 from app.services.network import NetworkPolicy
 from app.web.auth import lecturer_required, pin_matches
 
@@ -136,3 +136,18 @@ def close_poll(poll_id: int):
 def comments():
     """Page that polls /api/comments (FR-2.2, UC-8)."""
     return render_template("lecturer_comments.html")
+
+
+@bp.route("/peers", methods=["GET", "POST"])
+@lecturer_required
+def peers():
+    """Edit the comparison repositories used by the homework review (FR-5.5, OI-1); a bad line keeps the list."""
+    reviewer = _services()["reviewer"]
+    if request.method == "POST":
+        text = request.form.get("urls", "")
+        try:
+            reviewer.set_peer_repos(text.splitlines())
+        except InvalidRepoUrlError as error:
+            return render_template("peers.html", text=text, error=error.user_message), error.http_status
+        return redirect(url_for("lecturer.peers"))
+    return render_template("peers.html", text="\n".join(reviewer.peer_repos()), error=None)

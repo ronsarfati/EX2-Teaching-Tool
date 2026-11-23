@@ -7,6 +7,8 @@ from flask import Flask, jsonify, render_template, request
 from werkzeug.exceptions import HTTPException
 
 from app.adapters.head_counter import HeadCounter, YuNetHeadCounter
+from app.adapters.llm import ClaudeClient, LLMClient
+from app.adapters.repo_fetcher import GitHubRepoFetcher, RepoFetcher
 from app.clock import Clock, SystemClock
 from app.config import Config
 from app.db import Database
@@ -20,6 +22,7 @@ from app.repositories.windows import CheckInWindowRepository
 from app.services.comments import CommentService
 from app.services.checkin import CheckInService
 from app.services.export import AttendanceExporter
+from app.services.homework import HomeworkReviewer
 from app.services.credentials import RotatingCredentials
 from app.services.network import NetworkPolicy
 from app.services.polls import PollService
@@ -34,10 +37,11 @@ logger = logging.getLogger(__name__)
 
 
 def create_app(config: Config, *, clock: Clock | None = None,
-               head_counter: HeadCounter | None = None, **fakes: object) -> Flask:
+               head_counter: HeadCounter | None = None, llm: LLMClient | None = None,
+               fetcher: RepoFetcher | None = None, **fakes: object) -> Flask:
     """Build the app. Anything left out (clock, adapters) gets its real implementation.
 
-    `fakes` is where later tasks add llm, fetcher and transcriber; tests inject doubles there.
+    `fakes` is where later tasks add the transcriber; tests inject doubles there.
     """
     app = Flask(__name__)
     app.config.update(SECRET_KEY=config.secret_key, DEBUG=False, MAX_CONTENT_LENGTH=MAX_PHOTO_BYTES)  # NFR-8: never debug
@@ -45,6 +49,8 @@ def create_app(config: Config, *, clock: Clock | None = None,
     db.init_schema()
     clock = clock or SystemClock()
     head_counter = head_counter or YuNetHeadCounter(config.yunet_model_path, config.face_score_threshold)
+    llm = llm or ClaudeClient(config.anthropic_api_key, config.anthropic_model)
+    fetcher = fetcher or GitHubRepoFetcher()
     sessions = SessionRepository(db)
     credentials = RotatingCredentials(config.secret_key, clock)
     check_ins = CheckInRepository(db)
@@ -63,6 +69,7 @@ def create_app(config: Config, *, clock: Clock | None = None,
         ),
         "comment_service": CommentService(CommentRepository(db), clock),
         "poll_service": PollService(PollRepository(db), clock),
+        "reviewer": HomeworkReviewer(fetcher, llm, settings),
         "exporter": AttendanceExporter(sessions, check_ins),
         "head_counter": head_counter,
         "check_ins": check_ins,

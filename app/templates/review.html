@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Homework review{% endblock %}
+{% block content %}
+<h1>Homework review</h1>
+<form method="post">
+  <input type="url" name="url" placeholder="https://github.com/owner/repository" required>
+  <button type="submit">Review</button>
+</form>
+{% if result %}
+<article>
+  <p>Your repository: {{ result.target_metrics.file_count }} files, {{ result.target_metrics.line_count }} lines.</p>
+  {% if result.comparison_available %}
+  <ul>
+    {% for label, metrics in result.peer_metrics.items() %}
+    <li>{{ label }}: {{ metrics.file_count }} files, {{ metrics.line_count }} lines</li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p>{{ no_peer }}</p>
+  {% endif %}
+  <div style="white-space: pre-wrap">{{ result.review_text }}</div>
+</article>
+{% endif %}
+<p><a href="/">Back to the menu</a></p>
+{% endblock %}

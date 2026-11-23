@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Comparison repositories{% endblock %}
+{% block content %}
+<h1>Comparison repositories</h1>
+{% if error %}<p role="alert">{{ error }}</p>{% endif %}
+<p>One public GitHub repository link per line. The first two (other than the reviewed one) are used, anonymised.</p>
+<form method="post">
+  <textarea name="urls" rows="8" cols="60">{{ text }}</textarea>
+  <button type="submit">Save</button>
+</form>
+<p><a href="{{ url_for('lecturer.dashboard') }}">Back</a></p>
+{% endblock %}

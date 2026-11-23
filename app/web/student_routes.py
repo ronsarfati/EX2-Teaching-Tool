@@ -4,6 +4,7 @@ from __future__ import annotations
 from flask import Blueprint, current_app, redirect, render_template, request, url_for
 
 from app.errors import InvalidPollError, NoOpenSessionError, QrRequiredError
+from app.services.homework import NO_PEER_SENTENCE
 from app.web.device import attach_device_cookie, client_ip, device_token
 
 bp = Blueprint("student", __name__)
@@ -20,7 +21,7 @@ def menu():
         "message.html",
         heading="Teaching tool",
         text="To check in, scan the QR code on the projector.",
-        links=[("/checkin", "Check in"), ("/poll", "Poll"), ("/comments", "Comments")],
+        links=[("/checkin", "Check in"), ("/poll", "Poll"), ("/comments", "Comments"), ("/review", "Homework review")],
     )
 
 
@@ -71,3 +72,12 @@ def comments():
         _services()["comment_service"].post(request.form.get("text", ""))
         return redirect(url_for("student.comments", sent=1))
     return render_template("comments.html", sent=request.args.get("sent") == "1")
+
+
+@bp.route("/review", methods=["GET", "POST"])
+def review():
+    """Homework review (FR-5.1-FR-5.4, UC-13). No PIN (OI-10); the result is rendered, never stored (OI-9)."""
+    result = None
+    if request.method == "POST":
+        result = _services()["reviewer"].review(request.form.get("url", ""))
+    return render_template("review.html", result=result, no_peer=NO_PEER_SENTENCE)
