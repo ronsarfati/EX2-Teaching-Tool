@@ -376,10 +376,10 @@ Every case is covered by a test (D23). Messages are indicative wording.
 | Session closed (scan or code submission) | "Attendance for this class is closed." |
 | No open session | "There is no attendance check-in right now." |
 | Opening a session while one is open (D27) | "A session is already open. Close it first." |
-| Empty nickname, or longer than 30 characters (FR-1.10) | "Please choose a nickname (not your real name or ID)." |
+| Empty nickname (also one made only of invisible characters), or longer than 30 characters (FR-1.10) | "Please choose a nickname (not your real name or ID)." |
 | `/checkin` opened without a QR token while a session is open (FR-1.7, D31) | "Scan the QR code on the projector." |
-| Invalid range in the allow-list editor (lecturer) | "This is not a valid network range (e.g. 192.0.2.0/24)." |
-| Photo missing or not a readable image | "We could not read this photo. Please try another one." |
+| Invalid range or comment line in the allow-list editor (lecturer); the stored list is kept | "This is not a valid network range (e.g. 192.0.2.0/24)." |
+| Photo missing, not a readable image, or above 40 megapixels | "We could not read this photo. Please try another one." |
 | Face detector model not available | "Head count is not available right now." |
 | Empty comment | "Please write something before sending." |
 | Comment longer than 500 characters (FR-2.4, D31) | "Please keep your comment under 500 characters." |

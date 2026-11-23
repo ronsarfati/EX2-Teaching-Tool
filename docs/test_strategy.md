@@ -92,7 +92,7 @@ Each subsection gives: responsibility, test type, doubles, key cases (input -> e
 
 #### `AppError` family and the error handler
 - **Responsibility:** carry the exact SRS message and HTTP status. **Type:** unit + integration (test route).
-- **Key cases:** one parametrised test over the table of design 3.8: for each of the 24 concrete `AppError` subclasses,
+- **Key cases:** one parametrised test over the table of design 3.8: for each of the 25 concrete `AppError` subclasses,
   `user_message` equals the SRS section 5 text and `http_status` equals the table value (e.g. `OffCampusError` 403,
   `TooManyAttemptsError` 429, `LLMUnavailableError` 503, `WrongPinError` 401) and it is an instance of its group
   base of design 3.8 (`CheckInError`, `PhotoError`, `CommentError`, `PollError`, `ReviewError`); a test route raising an `AppError`
@@ -471,6 +471,7 @@ M10-M12 are added here. Results are written in `docs/results.md`.
 | T16 | `test_repo_fetcher.py` | URL table and zip cases pass; manual download recorded (M12) |
 | T17 | `test_homework.py`, `test_review_routes.py` | redaction, peer rules, no storage, UC-13 row pass |
 | T18 | `test_video.py`, `test_video_routes.py` | UC-12 row passes (only after the D10 revisit) |
+| hardening | `test_redteam_fixes.py` | `strip_invisible` and invisible-only nickname refused; XLSX export survives a control character; photo above 40 MP refused before decoding; 25 MB upload cap; werkzeug log silenced; `X-Frame-Options` / `nosniff` on every response; `SameSite=Lax` cookies; glued peer names masked, unrelated words not (T4, T7-T9, T11, T12, T17; design 2.1) |
 | all | `test_privacy.py` | no IP, no personal column, no image file after a full run |
 
 Before the demo: full suite green, coverage report taken, M1-M12 done (or the failed ones noted with the plan B used).

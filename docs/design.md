@@ -124,7 +124,7 @@ limit).
 | `student_routes` | `GET /` | none (menu) | no | FR-6.2 |
 | | `GET /c/<qr_token>` | `CheckInService.start` | no | FR-1.2, FR-1.6, FR-1.7, FR-1.12 / UC-2 |
 | | `POST /checkin` | `CheckInService.confirm` | no | FR-1.7-FR-1.11 / UC-2 |
-| | `GET /checkin` (no token, e.g. from the menu) | `SessionService.current`; none -> `NoOpenSessionError`, else "Scan the QR code on the projector." | no | UC-2 3c |
+| | `GET /checkin` (no token, e.g. from the menu) | `SessionService.current`; none -> `NoOpenSessionError`, else `QrRequiredError` ("Scan the QR code on the projector.", 400) | no | UC-2 3c |
 | | `GET, POST /comments` | `CommentService.post` | no | FR-2.1, FR-2.4 / UC-7 |
 | | `GET /poll`, `POST /poll/vote` | `PollService.current`, `PollService.vote` | no | FR-3.2 / UC-10 |
 | | `GET, POST /review` | `HomeworkReviewer.review` | no | FR-5.1-FR-5.4 / UC-13 |
@@ -134,7 +134,7 @@ limit).
 | | `GET /lecturer/projector` | page only (data by polling) | yes | FR-1.5, FR-1.8 / UC-1 |
 | | `GET, POST /lecturer/sessions/<id>/photo` | `SessionService.record_head_count` | yes | FR-1.15-FR-1.17 / UC-4 |
 | | `GET /lecturer/export.xlsx`, `/lecturer/export/checkins.csv`, `/lecturer/export/summary.csv` | `AttendanceExporter` | yes | FR-1.18 / UC-5 |
-| | `GET, POST /lecturer/allow-list` | `NetworkPolicy.ranges`, `save_ranges` | yes | FR-1.4 / UC-6 |
+| | `GET, POST /lecturer/allow-list` | `NetworkPolicy.ranges`, `save_ranges` (invalid input: page re-shown with the typed text, HTTP 400, stored list kept) | yes | FR-1.4 / UC-6 |
 | | `GET /lecturer/comments` | page only | yes | FR-2.2 / UC-8 |
 | | `GET, POST /lecturer/polls`, `POST /lecturer/polls/<id>/close` | `PollService.create`, `close` | yes | FR-3.1, FR-3.4 / UC-9, UC-11 |
 | | `GET, POST /lecturer/peers` | `HomeworkReviewer.peer_repos`, `set_peer_repos` | yes | FR-5.5 (OI-1, D31) |
@@ -155,6 +155,13 @@ Helpers (functions, not classes, because they hold no state):
 - Error handler: `AppError` -> page (or JSON `{"error": message}` under `/api/`) with `user_message` and its
   HTTP status; any other exception -> logged with traceback, user sees "Something went wrong. Please try again."
   (D23, NFR-10). Flask debug is off (NFR-8).
+- Hardening in `create_app` (code facts, no new requirement): `after_request` adds `X-Frame-Options: DENY` and
+  `X-Content-Type-Options: nosniff` to every response; the Flask session cookie is `SameSite=Lax` (like the `dt`
+  cookie); `MAX_CONTENT_LENGTH` is 25 MB (an upload above it is refused by Flask before the route runs); the
+  `werkzeug` logger is set to `ERROR`, so its access log (peer address, QR token in the URL) is never written (D21).
+- `create_app(config, *, clock=None, head_counter=None, llm=None, fetcher=None, **fakes)`: every external
+  dependency can be injected (D25); a missing one gets its real implementation (`SystemClock`, `YuNetHeadCounter`,
+  `ClaudeClient`, `GitHubRepoFetcher`). `**fakes` overrides any other entry of the services registry.
 
 ## 3. Classes
 
@@ -332,12 +339,16 @@ classDiagram
 **`NetworkPolicy`** - decides whether a request comes from the campus network (FR-1.2-FR-1.4, D30 point 1).
 - `resolve_client_ip(peer, cf_connecting_ip) -> str` (static): returns the header value **only if** `peer` is a
   loopback address (`ipaddress.ip_address(peer).is_loopback`, i.e. the request came through the local `cloudflared`),
-  otherwise `peer` (plan B, and spoofing attempts from any other peer). IPv4-mapped IPv6 is normalised.
+  otherwise `peer` (plan B, and spoofing attempts from any other peer). IPv4-mapped IPv6 is normalised. The header
+  must be **one** address: a value that does not parse (e.g. a comma-separated list) is returned unchanged and
+  `ensure_allowed` then refuses it (fail closed).
 - `ensure_allowed(client_ip) -> None`: loads the ranges from `SettingsRepository` **at every call** (so an edit is
   used at once, FR-1.4) and raises `OffCampusError` if the address is in none of them. An empty list refuses
   everybody (fail closed); the lecturer page shows a warning in that case.
 - `save_ranges(lines)`: strips blank lines, parses each with `ipaddress.ip_network(line, strict=False)`; any
-  invalid line raises `InvalidNetworkRangeError` and **nothing** is saved; otherwise stores the normalised CIDR strings.
+  invalid line (a comment line such as `# campus` is invalid too, there is no comment syntax) raises
+  `InvalidNetworkRangeError` and **nothing** is saved, so the stored list is not lost; otherwise stores the
+  normalised CIDR strings.
 - Invariants: holds network ranges only, never an individual student address (D21); the client IP is a method
   argument and is never stored or logged at INFO level.
 
@@ -362,7 +373,9 @@ FR-1.6, FR-1.8). Stateless: nothing is stored, so there is nothing to clean up.
   and returns the stored nickname, or `None` if the device has none (the page then shows the nickname field, FR-1.10).
 - `confirm(device_token, client_ip, code, nickname) -> CheckIn`, inside one `Database.transaction()`, in this order:
   `ensure_allowed`; window found and `now - opened_at <= 60` (`WindowExpiredError`); its session still open
-  (`SessionClosedError`); nickname required and valid if none stored (`EmptyNicknameError`, not counted as an
+  (`SessionClosedError`); nickname required and valid if none stored: `strip_invisible` (`app/services/text.py`) removes the Unicode
+  categories Cc, Cf and Cs and the characters openpyxl refuses, then the text is stripped and must have 1-30
+  characters (`EmptyNicknameError`, so a name made only of zero-width characters is refused; not counted as an
   attempt); `increment_attempts` and, if the result is above 5, delete the window and raise `TooManyAttemptsError`
   (the 6th attempt fails even with a right code, FR-1.9); `is_valid_code` (`WrongCodeError`); then save the nickname
   (first time), add the check-in, delete the window.
@@ -497,7 +510,10 @@ FR-1.8, FR-1.13-FR-1.17).
 
 **`HeadCounter`** (port) / **`YuNetHeadCounter`** - count faces on an image (FR-1.15, D7). Reason for the port today:
 tests use a `FakeHeadCounter` (no model file, no OpenCV), and OpenCV is the heaviest dependency.
-- `count_faces(image: bytes) -> int`: `cv2.imdecode` in memory; `UnreadablePhotoError` if it returns `None`; resize
+- `count_faces(image: bytes) -> int`: first `_check_dimensions` reads only the image header with Pillow and
+  raises `UnreadablePhotoError` above 40 megapixels (`MAX_PIXELS = 40_000_000`) or if the header is unreadable,
+  **before** any pixel is decoded (decompression-bomb guard); the upload itself is capped at 25 MB (2.1 hardening);
+  then `cv2.imdecode` in memory; `UnreadablePhotoError` if it returns `None`; resize
   so the long side is at most 2000 px; `setInputSize`, `setScoreThreshold(0.4)`, `detect` (code reused from
   `tools_tests/head_count.py`). The detector is created lazily once (model load) and protected by a lock (OpenCV
   objects are not thread-safe). Missing model file -> `DetectorUnavailableError`.
@@ -506,11 +522,16 @@ tests use a `FakeHeadCounter` (no model file, no OpenCV), and OpenCV is the heav
 `lower = n - max(7, ceil(0.15 * n))`, `upper = n + max(4, ceil(0.10 * n))`, `consistent = lower <= d <= upper`;
 `label()` returns `"consistent"` or `"anomaly"`. Pure, no dependency: tested exhaustively at its boundaries.
 
+**`valid_row_id(value) -> bool`** (`app/db.py`) - true if `0 <= value <= 2**63 - 1`. `SessionRepository.get` and
+`PollRepository.get` return `None` for any other id, exactly like an unknown id, so a huge id in a URL gives the
+normal 404 instead of an `OverflowError` (500).
+
 **`AttendanceExporter`** - offline spreadsheet (FR-1.18, D8). Columns of `checkins_csv()`: session date, nickname,
 check-in time (one row per check-in, all sessions, oldest first). `summary_csv()`: session date, check-ins (N),
 faces detected (D), consistency status. `xlsx()`: the same two tables as two sheets "Check-ins" and "Summary"
 (`openpyxl`, frozen header row; code reused from `tools_tests/xlsx_roundtrip.py`). No IP and no device token column
-(FR-1.3, NFR-7). File split: OI-6 (validated, D31).
+(FR-1.3, NFR-7). Every text cell goes through a sanitiser that removes the characters openpyxl cannot write
+(`ILLEGAL_CHARACTERS_RE`), so an old row with a control character cannot break the XLSX. File split: OI-6 (validated, D31).
 
 **`qr_png_data_uri(text: str) -> str`** (function in `app/adapters/qr.py`) - draws the QR with `qrcode` as a PNG
 (tested path of the tools report 2.3) and returns a `data:image/png;base64,...` URI for the projector JSON. A
@@ -658,15 +679,16 @@ classDiagram
 ```
 
 - **`GitHubRepoFetcher`** (FR-5.1, FR-5.2, D11): `normalize_url` accepts only
-  `https://github.com/<owner>/<repo>` (optional `.git` or trailing `/`), else `InvalidRepoUrlError`. `fetch`
+  `https://github.com/<owner>/<repo>` (optional `.git` or trailing `/`), else `InvalidRepoUrlError`; a non-`str`
+  input, a port or a URL with userinfo (`user@github.com`) is rejected too. `fetch`
   downloads `https://codeload.github.com/<owner>/<repo>/zip/HEAD` with stdlib `urllib.request` (no token), reads the
   zip **in memory** (`zipfile`, at most 20 MB), takes the README first, then text source files (`.py .java .js .ts
   .cs .cpp .c .h .md`, skipping `node_modules`, `.git`, `venv`, `build`, `dist`) in path order until `max_chars`;
   counts files and lines of the whole archive. 404 / private / network error / too large -> `RepoUnavailableError`.
   Reason for the port: F5 tests run without network (D25).
 - **`ClaudeClient`** (D12): `anthropic.Anthropic(api_key=..., timeout=60).messages.create(model, max_tokens,
-  system, messages=[...])` (code reused from `tools_tests/llm_call.py`); returns the text. Missing key, any
-  `anthropic.APIError` or timeout -> `LLMUnavailableError` (the app still starts without a key; F1-F3 unaffected,
+  system, messages=[...])` (code reused from `tools_tests/llm_call.py`); returns the text. Missing key (None, empty or
+  whitespace-only: the key is stripped), any `anthropic.APIError` or timeout -> `LLMUnavailableError` (the app still starts without a key; F1-F3 unaffected,
   NFR-9). Reason for the port: fakes in tests (no key, no cost, D25); shared by F4 and F5.
 - **`HomeworkReviewer`** (FR-5.3-FR-5.5, D11, D31):
   `review(repo_url)`: normalise; fetch the target (cap 50,000 chars); take up to 2 peer URLs from the lecturer list
@@ -674,9 +696,12 @@ classDiagram
   that fails is skipped); build **one** prompt: a short rubric (purpose and README, structure / OOP design, code
   quality, tests, top 3 improvements) + the target labelled "Submission A" + peers labelled "Submission B",
   "Submission C" + the deterministic metrics; the system prompt forbids naming people or URLs. Before sending and
-  after receiving, the owner and repository names of the peers are replaced by their labels (redaction, FR-5.4).
+  after receiving, the owner and repository names of the peers are replaced by their labels (redaction, FR-5.4): case-insensitive, and a name glued to other text by `-`, `_` or `.`
+  is masked as well (`alice-utils`), while a name inside a longer run of letters or digits is left alone.
   One `LLMClient.complete` call. If no peer could be fetched, the review is still shown with
   `comparison_available = False` and the sentence "No other submission was available for comparison." (OI-12).
+- `ReviewResult` (frozen dataclass): `review_text`, `target_metrics`, `peer_metrics` (keyed by label),
+  `comparison_available`; returned by `review` and rendered by `review.html`.
 - Invariants: nothing of F5 is stored except the lecturer's peer URL list (local SQLite, git-ignored, D21);
   no pre-computed output exists (D1, D11).
 
@@ -772,6 +797,7 @@ classDiagram
   CheckInError <|-- TooManyAttemptsError
   CheckInError <|-- AlreadyCheckedInError
   CheckInError <|-- SessionClosedError
+  CheckInError <|-- QrRequiredError
   CheckInError <|-- NoOpenSessionError
   CheckInError <|-- EmptyNicknameError
   PhotoError <|-- UnreadablePhotoError
@@ -795,6 +821,7 @@ classDiagram
 | `TooManyAttemptsError` | `CheckInService.confirm` | Too many tries. Scan the QR code again. | 429 |
 | `AlreadyCheckedInError` | `CheckInService.start`, `confirm` | You are already checked in for this class. | 409 |
 | `SessionClosedError` | `CheckInService.start`, `confirm` | Attendance for this class is closed. | 409 |
+| `QrRequiredError` | check-in route without token, session open | Scan the QR code on the projector. | 400 |
 | `NoOpenSessionError` | check-in route without token | There is no attendance check-in right now. | 404 |
 | `EmptyNicknameError` | `CheckInService.confirm` | Please choose a nickname (not your real name or ID). | 400 |
 | `SessionAlreadyOpenError` | `SessionService.open_session` | A session is already open. Close it first. | 409 |
@@ -1413,6 +1440,8 @@ next scan; no clean-up job is needed. The check-in code and QR token are never s
 | SVG QR without Pillow | Not the tested path (the tools report tested PNG). |
 
 ## 7. Implementation tasks (T1-T18)
+
+Status: **T1-T17 done** (`pytest` green); **T18 deferred** (D10).
 
 Order: F1 first and complete (R4, D1), then F3 > F2 > F5 > F4 (D1). Every task ends with `pytest` green and a
 commit (D24). Tests use the Flask test client, a temporary SQLite file, `FakeClock` and fakes (D25). T1-T2 give a
