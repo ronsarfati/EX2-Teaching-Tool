@@ -4,7 +4,7 @@ Covers R24 (technical tools report) and R25 (every suggested tool is tested for 
 It follows the validated decisions: D2 (Flask stack), D6 (nicknames), D30 (check-in with a
 projector QR and a typed code, 4 digits since D33), D7 (photo head count), D8 (spreadsheet), D10 (video summary), D11/D12 (LLM),
 D13 (hosting), D25 (pytest). The tests below were run on 22/11 for the earlier chain-of-trust design (D5); a chain of
-trust and a local Wi-Fi bubble were then studied and rejected (D30). A campus-IP filter and Apple's relay list were tested on 24/11 and abandoned (D33, 2.11-2.12). The tested tools are the same; only the
+trust and a local Wi-Fi bubble were then studied and rejected (D30). A campus-IP filter and Apple's relay list were tested on 23/11 and abandoned (D33, 2.11-2.12). The tested tools are the same; only the
 parameters change (see 2.2).
 
 - **Test date:** 2026-11-22. **Machine:** Apple M3 laptop, 16 GB RAM, macOS, CPU only (no GPU used).
@@ -29,8 +29,8 @@ parameters change (see 2.2).
 | 8 | Offline spreadsheet (R3, D8) | `openpyxl` (XLSX) + stdlib `csv` | 3.1.5 | XLSX and CSV written and read back identically | ADOPT |
 | 9 | Public HTTPS URL for the live demo (R13, D13) | Cloudflare quick tunnel (`cloudflared`) | 2026.11.1 | public `https://<random>.trycloudflare.com/ping` returned HTTP 200 (3/3, 0.96-1.99 s) | ADOPT, plan B needed |
 | 10 | Tests (R32, D25) | pytest + Flask test client | 9.2.0 | 3 passed in 0.09 s (5 runs); caught a real intermittent token bug | ADOPT |
-| 11 | Network origin of a check-in (R1, R13, D30, D32) | stdlib `ipaddress` + `CF-Connecting-IP` header behind cloudflared | Python stdlib / cloudflared 2026.11.1 | tested on site 24/11 (2.11) | ABANDONED (D33) |
-| 12 | Apple iCloud Private Relay egress list (R1, D32) | public CSV published by Apple | file downloaded 24/11 | tested on site 24/11 (2.12) | ABANDONED (D33) |
+| 11 | Network origin of a check-in (R1, R13, D30, D32) | stdlib `ipaddress` + `CF-Connecting-IP` header behind cloudflared | Python stdlib / cloudflared 2026.11.1 | tested on site 23/11 (2.11) | ABANDONED (D33) |
+| 12 | Apple iCloud Private Relay egress list (R1, D32) | public CSV published by Apple | file downloaded 23/11 | tested on site 23/11 (2.12) | ABANDONED (D33) |
 
 Other building blocks that need no separate test: SQLite (Python stdlib `sqlite3`, D3), short polling with
 `fetch()` every 2-3 s (1 s on the projector page, D31) (D4; also compatible with the quick tunnel, which does not support Server-Sent Events).
@@ -353,7 +353,7 @@ Command: `python tools_tests/head_count.py <yunet.onnx> <yolo11n.pt|yolov8n.pt|n
   accepted at +5 s and rejected at +11 s with injected time; 2,000 random-key tokens verified).
 - **Verdict:** ADOPT pytest 9.2.0 + Flask test client. Inject time into the token code to test expiry without sleeping.
 
-### 2.11 Network origin of a check-in - tested on 24/11, abandoned by D33
+### 2.11 Network origin of a check-in - tested on 23/11, abandoned by D33
 
 - **Tried:** match the client IP (stdlib `ipaddress`, `CF-Connecting-IP` header behind the tunnel) against a campus
   range measured on site with a public "what is my IP" service.
@@ -362,7 +362,7 @@ Command: `python tools_tests/head_count.py <yunet.onnx> <yolo11n.pt|yolov8n.pt|n
   privacy relay do not show a campus address.
 - **Outcome:** abandoned (D33). No client IP is read by the app. Measured addresses are deliberately not recorded.
 
-### 2.12 Apple Private Relay egress list - tested on 24/11, abandoned by D33
+### 2.12 Apple Private Relay egress list - tested on 23/11, abandoned by D33
 
 - **Tried:** download Apple's public iCloud Private Relay egress list and label check-ins coming from it (D32).
 - **Findings:** the list is large (about 12 MB), only its country column is usable (region and city are unreliable),

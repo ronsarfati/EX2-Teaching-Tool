@@ -4,7 +4,7 @@ Covers R29 (main software components), R30 (low-level class diagrams) and R31 (s
 [SRS](srs.md) (FR-x.y, NFR-n, error table of section 5), the [use cases](use_cases.md) (UC-1 to UC-14), the
 requirements R1-R37 ([requirements.md](requirements.md)), the validated decisions D1-D33
 ([decisions.md](decisions.md); **D5 and D26 are superseded by D30 and not used**; D10 / F4 is deferred; D31 records
-the open points of section 9, all validated on 23/11; **D32 is superseded by D33** (24/11): the app reads no client
+the open points of section 9, all validated on 23/11; **D32 is superseded by D33** (23/11): the app reads no client
 IP at all, the network check of D30 point 1 is removed, and the projected code has 4 digits) and the
 libraries tested in the [tools report](tools_report.md). All diagrams are Mermaid (D14).
 
@@ -326,7 +326,7 @@ classDiagram
   CheckInWindowRepository ..> CheckInWindow : returns
 ```
 
-**Removed by D33 (24/11):** `NetworkPolicy` (allow-list, `CF-Connecting-IP` resolution, classification),
+**Removed by D33 (23/11):** `NetworkPolicy` (allow-list, `CF-Connecting-IP` resolution, classification),
 `NetworkOrigin` and `count_origins`, the `relay_ranges` module with `ParsedRanges`, and
 `scripts/update_relay_ranges.py`. Reason (D33): measured on campus, the IP says nothing about the room (shared
 campus range, 4G/5G carrier NAT, Apple relay), so the check neither protected nor informed the lecturer. Nothing
@@ -1418,9 +1418,8 @@ database (e.g. the demo seed) simply has no such column.
 
 ## 7. Implementation tasks (T1-T21)
 
-Status: **T1-T17 done** (`pytest` green); **T18 deferred** (D10); **T19 done then removed by D33** (24/11);
-**T4 and T9 removed by D33**; **T20 and T21 to do** (D33, F1, so they go before any other remaining work; T20
-first, then T21).
+Status: **T1-T17 done** (`pytest` green); **T18 deferred** (D10); **T19 done then removed by D33** (23/11);
+**T4 and T9 removed by D33**; **T20 and T21 done** (D33, commit 728381d).
 
 Order: F1 first and complete (R4, D1), then F3 > F2 > F5 > F4 (D1). Every task ends with `pytest` green and a
 commit (D24). Tests use the Flask test client, a temporary SQLite file, `FakeClock` and fakes (D25). T1-T2 give a
@@ -1446,7 +1445,7 @@ runnable skeleton.
 | **T16** | Repository fetcher | `app/adapters/repo_fetcher.py`; `FakeRepoFetcher` | `RepoFetcher`, `GitHubRepoFetcher` | URL validation table (valid, `.git`, trailing slash, non-GitHub, missing repo part); extraction tested on an in-memory zip built in the test (cap respected, README first, vendored dirs skipped, counts right); one manual real download of a public repository, recorded in the tools report (R25) | FR-5.1, FR-5.2, D11 |
 | **T17** | Homework review + peer list | `app/services/homework.py`, routes `/review`, `/lecturer/peers`, `review.html`, `peers.html` | `HomeworkReviewer` | With fakes: prompt contains Submission A / B / C and metrics; peer owner and repository names absent from prompt and output; target excluded from peers; failed peer skipped; no peer -> "No other submission was available for comparison."; LLM failure -> message; nothing stored; `/lecturer/peers` needs the PIN | FR-5.3-FR-5.5, UC-13, D11, D31 |
 | **T18** | F4 video summary (**only after the D10 revisit**) | `app/adapters/transcriber.py`, `app/services/video.py`, route `/lecturer/video`; `FakeTranscriber` | `Transcriber`, `WhisperTranscriber`, `VideoSummarizer` | With fakes: four sections displayed; temporary file deleted also on error; unreadable file -> message; no key -> message; no network call carries the video | FR-4.1-FR-4.4, UC-12, D10 |
-| ~~**T19**~~ | ~~Network origin of each check-in (D32)~~ **Removed by D33** (done and tested on real phones on 24/11, then removed; T20 deletes its code and tests) | - | - | - | D32, D33 |
+| ~~**T19**~~ | ~~Network origin of each check-in (D32)~~ **Removed by D33** (done and tested on real phones on 23/11, then removed; T20 deletes its code and tests) | - | - | - | D32, D33 |
 | **T20** | Remove the IP filter and the relay classification (D33) | **Delete:** `app/services/network.py`, `app/adapters/relay_ranges.py`, `scripts/update_relay_ranges.py`, `app/templates/allow_list.html`, `tests/test_network.py`, `tests/test_network_extra.py`, `tests/test_relay_ranges.py`, `tests/test_update_relay_ranges.py`, `tests/test_t19_network_origin.py`, `tests/test_t19_update_script.py`, `tests/test_allow_list.py`, `tests/test_allow_list_extra.py`. **Modify:** `app/services/checkin.py`, `app/web/device.py`, `app/web/student_routes.py`, `app/web/lecturer_routes.py`, `app/web/api_routes.py`, `app/templates/lecturer.html`, `app/static/poll_json.js`, `app/repositories/checkins.py`, `app/repositories/settings.py` (docstring), `app/services/sessions.py`, `app/services/export.py`, `app/schema.sql`, `app/db.py`, `app/config.py`, `app/errors.py`, `app/__init__.py`, `.env.example`, `.gitignore` (relay line removed), `scripts/seed_demo.py` if it passes an origin, and every remaining test that seeds a `campus_range` or injects `REMOTE_ADDR` / `CF-Connecting-IP` (`conftest.py`, check-in, student routes, attendance API, export, repositories, core, db, red-team tests). **New:** `tests/test_t20_no_network.py` | `CheckInService(credentials, sessions, check_ins, windows, db, clock)`, `.start(qr_token, device_token) -> Optional[str]`, `.confirm(device_token, code, nickname) -> CheckIn`; `CheckInRepository.add(session_id, device_token, nickname, at) -> CheckIn`; `CheckIn(session_id, nickname, checked_in_at)`; `SessionSummary(session, check_ins, n, consistency)`; `Config` without `relay_ranges_path`; exporter headers of 3.4 | See the T20 acceptance list below | FR-1.6-FR-1.14, FR-1.18, NFR-7, NFR-8, D21, D30, D31, D33 |
 | **T21** | 4-digit projected code (D33 amendment, red-team F-02 option (b)) | `app/services/credentials.py` (`CODE_DIGITS = 4`), `app/templates/checkin.html` (code field), `app/templates/projector.html` / `app/static/projector.js` (display width only if needed), `tests/test_credentials*.py` and the check-in / projector tests that type or assert a 3-digit code; `tests/test_t21_four_digit_code.py` (new) | `RotatingCredentials.CODE_DIGITS`, `current_code(session_id) -> str` (4 chars), `is_valid_code(session_id, code) -> bool` (exactly 4 ASCII digits) | See the T21 acceptance list below | FR-1.7, FR-1.8, FR-1.9, NFR-1, D30 P1-P2, D33 |
 
@@ -1540,7 +1539,7 @@ Demo data (fictitious nicknames) and the demo script belong to Phase 6, not to t
 |---|---|---|---|
 | OI-1 | Source of the 1-2 submissions used for the F5 comparison (D11) | **VALIDATED (23/11).** The lecturer pastes public repository URLs on `/lecturer/peers` (PIN); stored in the local, git-ignored database (`setting_item`, kind `peer_repo`); the first 2 of the list, excluding the reviewed repository, are used | `HomeworkReviewer`, one page |
 | OI-2 | Nickname rules (D6) | **VALIDATED (23/11).** 1-30 characters after trimming; **not unique** (the device token is the identity; duplicates are visible to the lecturer in the table) | `CheckInService` validation |
-| OI-3 | Campus IP ranges (D30) | ~~Runtime data entered with UC-6~~ **Obsolete since D33** (24/11): no allow-list any more | None |
+| OI-3 | Campus IP ranges (D30) | ~~Runtime data entered with UC-6~~ **Obsolete since D33** (23/11): no allow-list any more | None |
 | OI-4 | Device token storage (D6 said cookie + localStorage) | **VALIDATED (23/11).** Cookie only (server-set, HttpOnly, 1 year). Known limit: the quick-tunnel host name changes at each start, so after a tunnel restart phones look "new" (nickname typed again) | `device_token()` helper only |
 | OI-5 | Second photo for the same session | **VALIDATED (23/11).** The last photo replaces D (re-shooting is not a manual correction) | `SessionService.record_head_count` |
 | OI-6 | Export format details (FR-1.18) | **VALIDATED (23/11).** All sessions in one export; XLSX with sheets "Check-ins" and "Summary"; CSV as two files (`checkins.csv`, `summary.csv`) | `AttendanceExporter`, 3 routes |

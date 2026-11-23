@@ -2,7 +2,7 @@
 
 Covers R27. IEEE-830-inspired, kept short. Requirements are cited as R1-R37
 ([requirements.md](requirements.md)), validated decisions as D1-D33 ([decisions.md](decisions.md); D5 and D26
-are superseded by D30; D31 records the design-level choices validated on 23/11; D32 is superseded by D33 (24/11),
+are superseded by D30; D31 records the design-level choices validated on 23/11; D32 is superseded by D33 (23/11),
 which removes every network / IP check and makes the projected code 4 digits), measured figures as sections of the [tools report](tools_report.md). Scope and schedule: [sow.md](sow.md).
 
 ## 1. Introduction

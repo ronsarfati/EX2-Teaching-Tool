@@ -122,9 +122,10 @@ Each subsection gives: responsibility, test type, doubles, key cases (input -> e
   `is_valid_code(1, current)` true; `is_valid_code(1, c_k)` true (previous); at `t0 + 10` (slice k+2) `c_k` -> false
   (two slices old); a wrong 4-digit code (one not equal to the current or previous) -> false.
 - **Strict input (T21, D33):** with the right value `"0042"`, `is_valid_code` is false for `"042"` (3 digits),
-  `"00042"` (5 digits), `" 0042"`, `"00 42"`, `"+042"`, full-width or other non-ASCII digits, `"12a4"` and `""` (no
-  exception); through `POST /checkin` each gives "Wrong code. Type the code shown under the QR now." and counts as an
-  attempt (P2 unchanged). One random guess is accepted with probability 2 / 10,000 (current + previous code), about
+  `"00042"` (5 digits), `" 0042"`, `"0042 "`, `"00 42"`, `"+042"`, full-width or other non-ASCII digits, `"12a4"` and `""` (no
+  exception); through `POST /checkin` each of these gives "Wrong code. Type the code shown under the QR now." and counts as an
+  attempt (P2 unchanged), **except** `" 0042"` and `"0042 "`: the route strips leading/trailing whitespace first (design T21-4),
+  so they are accepted via POST; inner spaces (`"00 42"`) stay refused. One random guess is accepted with probability 2 / 10,000 (current + previous code), about
   5,000 guesses expected versus 500 with 3 digits (D33 residual risk).
 - **Trace:** FR-1.5, FR-1.6, FR-1.8, NFR-8, D30 (P1), D31, D33; T3, T21.
 
@@ -354,22 +355,22 @@ verbatim in the response body.
 
 | UC | Main path (expected) | Error / alternative paths (expected) | File |
 |---|---|---|---|
-| UC-1 Open session | `POST /lecturer/sessions` -> redirect to `/lecturer/projector`; `GET /api/projector` -> JSON with a PNG data URI decoding to `https://test.example/c/...` and a 4-digit code; FakeClock +10 s -> new QR, +5 s -> new code | session already open -> "A session is already open. Close it first."; no PIN -> redirect; no page contains `getUserMedia` (no camera access, FR-1.5) | `test_lecturer_sessions.py`, `test_projector.py` |
-| UC-2 Check in | `GET /c/<token>` (first device) -> page with nickname field, warning "Do not use your real name or ID", `inputmode="numeric"` code field, Confirm; `POST /checkin` -> "You are checked in"; second session, same cookie -> no nickname field, "Hello BlueFox"; scan + confirm each answered in < 1 s (`perf_counter`, NFR-4) | the same check-in succeeds whatever `REMOTE_ADDR` and `CF-Connecting-IP` are (T20); on a fresh database with no setting the check-in succeeds; code with 3 or 5 digits, spaces or non-ASCII digits -> wrong-code message and counts as an attempt (T21); QR +15.001 s -> expired message; window +60.001 s -> time ran out; wrong code -> wrong-code message; 6th attempt -> "Too many tries. Scan the QR code again."; empty / 31-char nickname -> nickname message; checked-in device scans again -> "You are already checked in for this class."; closed session -> "Attendance for this class is closed."; `GET /checkin` without token: no session -> `NoOpenSessionError` "There is no attendance check-in right now." (404), open session -> "Scan the QR code on the projector." | `test_checkin_routes.py` |
-| UC-3 Close session | `POST /lecturer/sessions/close` -> `GET /api/projector` has no QR and no code | scan after close and confirm of a window opened before close -> "Attendance for this class is closed." | `test_lecturer_sessions.py` |
-| UC-4 Head count | `POST /lecturer/sessions/<id>/photo` (multipart, `FakeHeadCounter(40)`, N = 45) -> "checked in 45 / detected 40 / consistent"; page shows the "look up" advice; second photo replaces D | `FakeHeadCounter` raising -> "We could not read this photo. Please try another one." / "Head count is not available right now."; no file left on disk; no route edits D (route list check) | `test_photo_routes.py` |
-| UC-5 Table and export | after a check-in, `GET /api/sessions/<id>/attendance` lists it, N + 1, on the next poll; an open window without a right code leaves N unchanged; the three export routes return attachments whose rows equal the JSON | no PIN -> redirect; no route creates a check-in without scan and code (route list check, FR-1.18) | `test_live_table.py`, `test_export_routes.py` |
+| UC-1 Open session | `POST /lecturer/sessions` -> redirect to `/lecturer/projector`; `GET /api/projector` -> JSON with a PNG data URI decoding to `https://test.example/c/...` and a 4-digit code; FakeClock +10 s -> new QR, +5 s -> new code | session already open -> "A session is already open. Close it first."; no PIN -> redirect; no page contains `getUserMedia` (no camera access, FR-1.5) | `test_lecturer_routes.py`, `test_t5_extra.py`, `test_projector.py` |
+| UC-2 Check in | `GET /c/<token>` (first device) -> page with nickname field, warning "Do not use your real name or ID", `inputmode="numeric"` code field, Confirm; `POST /checkin` -> "You are checked in"; second session, same cookie -> no nickname field, "Hello BlueFox"; scan + confirm each answered in < 1 s (`perf_counter`, NFR-4) | the same check-in succeeds whatever `REMOTE_ADDR` and `CF-Connecting-IP` are (T20); on a fresh database with no setting the check-in succeeds; code with 3 or 5 digits, spaces or non-ASCII digits -> wrong-code message and counts as an attempt (T21); QR +15.001 s -> expired message; window +60.001 s -> time ran out; wrong code -> wrong-code message; 6th attempt -> "Too many tries. Scan the QR code again."; empty / 31-char nickname -> nickname message; checked-in device scans again -> "You are already checked in for this class."; closed session -> "Attendance for this class is closed."; `GET /checkin` without token: no session -> `NoOpenSessionError` "There is no attendance check-in right now." (404), open session -> "Scan the QR code on the projector." | `test_student_routes.py`, `test_student_routes_extra.py` |
+| UC-3 Close session | `POST /lecturer/sessions/close` -> `GET /api/projector` has no QR and no code | scan after close and confirm of a window opened before close -> "Attendance for this class is closed." | `test_lecturer_routes.py`, `test_t5_extra.py` |
+| UC-4 Head count | `POST /lecturer/sessions/<id>/photo` (multipart, `FakeHeadCounter(40)`, N = 45) -> "checked in 45 / detected 40 / consistent"; page shows the "look up" advice; second photo replaces D | `FakeHeadCounter` raising -> "We could not read this photo. Please try another one." / "Head count is not available right now."; no file left on disk; no route edits D (route list check) | `test_head_count.py`, `test_head_count_extra.py` |
+| UC-5 Table and export | after a check-in, `GET /api/sessions/<id>/attendance` lists it, N + 1, on the next poll; an open window without a right code leaves N unchanged; the three export routes return attachments whose rows equal the JSON | no PIN -> redirect; no route creates a check-in without scan and code (route list check, FR-1.18) | `test_attendance_api.py`, `test_attendance_api_extra.py`, `test_export.py`, `test_export_extra.py` |
 | UC-6 (removed by D33) | `GET` and `POST /lecturer/allow-list` with the PIN -> 404; no link on the lecturer page | - | `test_t20_no_network.py` |
-| UC-7 Post comment | `POST /comments` without login and without session -> "Thanks, sent anonymously."; stored row has text and time only | blank -> "Please write something before sending."; 501 chars -> "Please keep your comment under 500 characters." | `test_comment_routes.py` |
-| UC-8 Read comments | `GET /api/comments` (PIN) lists the new comment first, no nickname in the JSON; comments still listed after re-creating the app on the same DB file | no PIN -> redirect | `test_comment_routes.py` |
-| UC-9 Create poll | `POST /lecturer/polls` with 2 options -> results page | 1 or 5 options / empty question -> "A poll needs a question and 2 to 4 options."; second poll -> "A poll is already open. Close it first." | `test_poll_routes.py` |
-| UC-10 Vote | fresh client (no nickname) `GET /api/poll/current` -> open poll; `POST /poll/vote` -> "Thank you, your vote is counted." | second vote -> "You have already voted."; closed poll -> "This poll is closed." | `test_poll_routes.py` |
-| UC-11 Results and close | `GET /api/polls/<id>/results` reflects the vote on the next poll; `POST /lecturer/polls/<id>/close` -> final counts still shown | vote after close refused, counts unchanged | `test_poll_routes.py` |
-| UC-12 Video (deferred) | upload -> four sections displayed; temporary file deleted | unreadable file -> "We could not read this video file."; `FakeLLMClient` failing -> "The summary service is unavailable right now. Please try again later."; temp file deleted on error too | `test_video_routes.py` |
-| UC-13 Review | `POST /review` without PIN, `FakeRepoFetcher` + `FakeLLMClient` -> review with Submission B / C and metrics, no peer owner or repo name in the page; `/lecturer/peers` (PIN) saves the list used by the next review | malformed URL / unavailable repo / LLM failure -> the three SRS messages; no peer -> "No other submission was available for comparison."; `/lecturer/peers` without PIN -> redirect | `test_review_routes.py` |
-| UC-14 Unlock | `POST /lecturer/login` with the right PIN -> redirect to `/lecturer`, later pages open | wrong PIN -> "Wrong PIN." (401); every PIN route without PIN -> redirect | `test_lecturer_access.py` |
+| UC-7 Post comment | `POST /comments` without login and without session -> "Thanks, sent anonymously."; stored row has text and time only | blank -> "Please write something before sending."; 501 chars -> "Please keep your comment under 500 characters." | `test_comments.py`, `test_comments_extra.py` |
+| UC-8 Read comments | `GET /api/comments` (PIN) lists the new comment first, no nickname in the JSON; comments still listed after re-creating the app on the same DB file | no PIN -> redirect | `test_comments.py`, `test_comments_extra.py` |
+| UC-9 Create poll | `POST /lecturer/polls` with 2 options -> results page | 1 or 5 options / empty question -> "A poll needs a question and 2 to 4 options."; second poll -> "A poll is already open. Close it first." | `test_polls.py`, `test_polls_extra.py` |
+| UC-10 Vote | fresh client (no nickname) `GET /api/poll/current` -> open poll; `POST /poll/vote` -> "Thank you, your vote is counted." | second vote -> "You have already voted."; closed poll -> "This poll is closed." | `test_polls.py`, `test_polls_extra.py` |
+| UC-11 Results and close | `GET /api/polls/<id>/results` reflects the vote on the next poll; `POST /lecturer/polls/<id>/close` -> final counts still shown | vote after close refused, counts unchanged | `test_polls.py`, `test_polls_extra.py` |
+| UC-12 Video (deferred) | upload -> four sections displayed; temporary file deleted | unreadable file -> "We could not read this video file."; `FakeLLMClient` failing -> "The summary service is unavailable right now. Please try again later."; temp file deleted on error too | none (F4 deferred, no test file yet) |
+| UC-13 Review | `POST /review` without PIN, `FakeRepoFetcher` + `FakeLLMClient` -> review with Submission B / C and metrics, no peer owner or repo name in the page; `/lecturer/peers` (PIN) saves the list used by the next review | malformed URL / unavailable repo / LLM failure -> the three SRS messages; no peer -> "No other submission was available for comparison."; `/lecturer/peers` without PIN -> redirect | `test_review.py`, `test_review_extra.py` |
+| UC-14 Unlock | `POST /lecturer/login` with the right PIN -> redirect to `/lecturer`, later pages open | wrong PIN -> "Wrong PIN." (401); every PIN route without PIN -> redirect | `test_lecturer_routes.py` |
 
-Cross-cutting integration tests (`test_privacy.py`, `test_polling.py`):
+Cross-cutting integration checks (there is no dedicated `test_t20_no_network.py`, `test_db.py`, `test_export.py` or `test_attendance_api.py`, `test_comments.py`, `test_polls.py`; they are spread over `test_t20_no_network.py`, `test_db.py`, `test_repositories_f1.py`, `test_export.py`, `test_head_count.py` and the polling API tests `test_attendance_api.py`, `test_comments.py`, `test_polls.py`):
 - No IP read (T20 test 1): a source check over `app/` finds none of `remote_addr`, `CF-Connecting-IP`,
   `X-Forwarded-For`, `client_ip`, `ipaddress`, `network_origin`.
 - After a full UC-2 + UC-4 + UC-5 run: no table holds a client IP string (full-text scan of the SQLite dump);
@@ -389,7 +390,7 @@ Cross-cutting integration tests (`test_privacy.py`, `test_polling.py`):
   accuracy measurement stays local and reported as numbers only (tools report 2.5). Logic tests use
   `FakeHeadCounter`. Real-model tests use (a) blank or noise images generated with numpy inside the test and (b) one
   non-personal sample image with a known face count, public-domain or CC0, not showing any class member, whose
-  source, licence and reference count are recorded in `tests/data/README.md`; tolerance +/- 20 % (D25). If no such
+  source, licence and reference count are recorded in `tests/data/README.md` (not created: no such image is committed); tolerance +/- 20 % (D25). If no such
   image is committed, test (b) is skipped and NFR-3 is timed on the manual photo of M7.
 - **F5:** zip archives built in memory in each test (`zipfile` + `io.BytesIO`) with fictitious README and source
   files; no real repository of the provided list (`ex1_repo_links.pdf` stays local, D21).
@@ -430,23 +431,23 @@ are added here. Results are written in `docs/results.md`.
 | T1 | `test_core.py` (Config, Clock, AppError table, error handler, `create_app`, `/ping`) | 2.1 cases pass |
 | T2 | `test_db.py`, `test_repositories_f1.py` | 2.1 `Database` + 2.3 pass, privacy column check passes |
 | T3 | `test_credentials.py` | QR and code boundaries of 2.2 pass |
-| T5 | `test_lecturer_access.py`, `test_lecturer_sessions.py`, `test_sessions.py` (open / close / current) | UC-1, UC-3, UC-14 rows pass |
+| T5 | `test_lecturer_routes.py`, `test_t5_extra.py`, `test_sessions.py` (open / close / current) | UC-1, UC-3, UC-14 rows pass |
 | T6 | `test_projector.py` (`qr_png_data_uri`, `/api/projector`, `projector_state`) | QR decodes to `BASE_URL`, rotation at 10 s / 5 s, closed -> none |
 | T7 | `test_checkin_service.py` | every boundary and error of 2.2 `CheckInService` passes |
-| T8 | `test_checkin_routes.py`, `test_device.py` | UC-2 row passes, cookie flags checked |
-| T10 | `test_live_table.py`, `test_polling.py` | UC-5 live part passes |
-| T11 | `test_consistency.py`, `test_head_count.py`, `test_photo_routes.py` | D7 table + oracle, errors, no file written; `model` tests pass when the model is present |
-| T12 | `test_export.py`, `test_export_routes.py` | round trips equal the table; 3 / 4 export columns; no IP / token |
-| T13 | `test_polls.py`, `test_poll_routes.py` | UC-9-UC-11 rows pass |
-| T14 | `test_comments.py`, `test_comment_routes.py` | UC-7, UC-8 rows pass |
-| T15 | `test_llm_client.py` | mocked cases pass; manual call done once (M10) |
-| T16 | `test_repo_fetcher.py` | URL table and zip cases pass; manual download recorded (M10) |
-| T17 | `test_homework.py`, `test_review_routes.py` | redaction, peer rules, no storage, UC-13 row pass |
-| T18 | `test_video.py`, `test_video_routes.py` | UC-12 row passes (only after the D10 revisit) |
+| T8 | `test_student_routes.py`, `test_student_routes_extra.py`, `test_checkin_extra.py` | UC-2 row passes, cookie flags checked |
+| T10 | `test_attendance_api.py`, `test_attendance_api_extra.py` | UC-5 live part passes |
+| T11 | `test_consistency.py`, `test_head_count.py`, `test_head_count_extra.py` | D7 table + oracle, errors, no file written; `model` tests pass when the model is present |
+| T12 | `test_export.py`, `test_export_extra.py` | round trips equal the table; 3 / 4 export columns; no IP / token |
+| T13 | `test_polls.py`, `test_polls_extra.py` | UC-9-UC-11 rows pass |
+| T14 | `test_comments.py`, `test_comments_extra.py` | UC-7, UC-8 rows pass |
+| T15 | `test_llm.py`, `test_llm_extra.py` | mocked cases pass; manual call done once (M10) |
+| T16 | `test_repo_fetcher.py`, `test_repo_fetcher_extra.py` | URL table and zip cases pass; manual download recorded (M10) |
+| T17 | `test_review.py`, `test_review_extra.py` | redaction, peer rules, no storage, UC-13 row pass |
+| T18 | none (F4 deferred by D10, no video test file exists yet) | UC-12 row passes (only after the D10 revisit) |
 | hardening | `test_redteam_fixes.py` | `strip_invisible` and invisible-only nickname refused; XLSX export survives a control character; photo above 40 MP refused before decoding; 25 MB upload cap; werkzeug log silenced; `X-Frame-Options` / `nosniff` on every response; `SameSite=Lax` cookies; glued peer names masked, unrelated words not (T4, T7-T9, T11, T12, T17; design 2.1) |
 | T20 | `test_t20_no_network.py` | acceptance tests 1-12 of design section 7 pass (no IP read, allow-list gone, new schema, old database untouched) |
 | T21 | `test_t21_four_digit_code.py` | acceptance tests 1-8 of design section 7 pass (format, strict input, rotation, P1, P2) |
-| all | `test_privacy.py` | no IP, no personal column, no image file after a full run |
+| all | `test_t20_no_network.py`, `test_db.py`, `test_repositories_f1.py`, `test_export.py`, `test_head_count.py` (no dedicated privacy file) | no IP, no personal column, no image file after a full run |
 
 Before the demo: full suite green, coverage report taken, M1-M10 done (or the failed ones noted with the plan B used).
 
@@ -468,7 +469,7 @@ Before the demo: full suite green, coverage report taken, M1-M10 done (or the fa
 | FR-1.14 | `SessionService.summary` | UC-5 |
 | FR-1.15 | `YuNetHeadCounter`, `SessionService.record_head_count` | UC-4; M7 |
 | FR-1.16 | `ConsistencyResult` (table + oracle) | UC-4 |
-| FR-1.17 | `YuNetHeadCounter` no file, `SessionService` no manual D | UC-4; `test_privacy.py` |
+| FR-1.17 | `YuNetHeadCounter` no file, `SessionService` no manual D | UC-4; `test_t20_no_network.py`, `test_db.py`, `test_export.py` |
 | FR-1.18 | `AttendanceExporter` | UC-5; M8 |
 | FR-2.1-FR-2.4 | `CommentService`, `CommentRepository` | UC-7, UC-8; M9 |
 | FR-3.1-FR-3.4 | `PollService`, `PollRepository` | UC-9, UC-10, UC-11; M9 |
@@ -480,12 +481,12 @@ Before the demo: full suite green, coverage report taken, M1-M10 done (or the fa
 | FR-6.2 | - | UC-2, UC-7, UC-10, UC-13 (no login step) |
 | FR-6.3 | `Config`, `SessionService.projector_state` | UC-1; M6 |
 | NFR-1, NFR-11 | - | M1, M2, M9 |
-| NFR-2 | - | `test_polling.py`, UC-5, UC-8, UC-11; M9 |
+| NFR-2 | - | `test_attendance_api.py`, `test_comments.py`, `test_polls.py`, UC-5, UC-8, UC-11; M9 |
 | NFR-3 | `YuNetHeadCounter` timed (`model`) | M7 |
 | NFR-4 | - | UC-2 timed requests; M3 |
 | NFR-5 | - | M9 |
 | NFR-6 | - | live demo, `docs/results.md` |
-| NFR-7 | `Database` columns, `AttendanceExporter`, `CommentRepository` columns | `test_privacy.py` |
+| NFR-7 | `Database` columns, `AttendanceExporter`, `CommentRepository` columns | `test_t20_no_network.py`, `test_db.py`, `test_export.py` |
 | NFR-8 | `RotatingCredentials` tampering, `CheckInService` attempts, `create_app` debug off | UC-14 |
 | NFR-9 | `Config` without key, `ClaudeClient` without key | M6 |
 | NFR-10 | `AppError` table, error handler | every UC error path |

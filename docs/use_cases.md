@@ -2,7 +2,7 @@
 
 Covers R28 ("Define the main use cases (client stories)"). Built from the [SRS](srs.md) (FR-x.y, NFR-n, error
 messages of section 5), the requirements R1-R37 ([requirements.md](requirements.md)) and the validated decisions
-D1-D31 ([decisions.md](decisions.md); D31 = design-level choices validated on 23/11). The attendance check-in follows **D30**; D5 and D26 are superseded and not
+D1-D33 ([decisions.md](decisions.md); D31 = design-level choices validated on 23/11). The attendance check-in follows **D30**; D5 and D26 are superseded and not
 used here. F1 Attendance is the main feature (R4) and comes first.
 
 ## 1. Actors
@@ -85,7 +85,7 @@ Priority from the SRS: **MUST-MAIN** (F1), **MUST**, **MUST, deferred** (F4, D10
 | ID | Name | Primary actor | Feature | Priority | Trace |
 |---|---|---|---|---|---|
 | UC-1 | Open attendance session | Lecturer | F1 | MUST-MAIN | FR-1.1, FR-1.5, FR-1.8, FR-6.3; R1, R4; D27, D30 |
-| UC-2 | Check in | Student | F1 | MUST-MAIN | FR-1.2, FR-1.3, FR-1.6-FR-1.12, NFR-1, NFR-4; R1, R14, R16; D6, D30 |
+| UC-2 | Check in | Student | F1 | MUST-MAIN | FR-1.6-FR-1.12, NFR-1, NFR-4; R1, R14, R16; D6, D30 |
 | UC-3 | Close attendance session | Lecturer | F1 | MUST-MAIN | FR-1.13; R1; D27, D30 |
 | UC-4 | Count heads from class photo (consistency alert) | Lecturer | F1 | MUST-MAIN | FR-1.15-FR-1.17, NFR-3; R2, R16; D7, D21 |
 | UC-5 | View and export attendance spreadsheet | Lecturer | F1 | MUST-MAIN | FR-1.14, FR-1.18; R3; D8, D30 (P3) |

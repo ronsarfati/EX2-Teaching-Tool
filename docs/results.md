@@ -22,10 +22,10 @@ filled in only after the demo; nothing below is estimated.
 
 ## 3. Measured figures
 
-Automated tests (24/11, after D33): 913 passed, 2 skipped (the 2 skipped tests need the YuNet model file); statement
+Automated tests (23/11, after D33): 913 passed, 2 skipped (the 2 skipped tests need the YuNet model file); statement
 coverage of `app/` 98 % (1,228 statements).
 
-Scripted local trial (24/11, after D33, real server on the laptop, QR decoded from the projector image): wrong code refused (400), right 4-digit code accepted, second check-in from the same phone refused (409), 3-digit input refused, second phone accepted, removed allow-list page answers 404, no client address in the server log. Earlier trial scope (23/11): (check-in with QR and code, repeated check-in refused, wrong code
+Scripted local trial (23/11, after D33, real server on the laptop, QR decoded from the projector image): wrong code refused (400), right 4-digit code accepted, second check-in from the same phone refused (409), 3-digit input refused, second phone accepted, removed allow-list page answers 404, no client address in the server log. Earlier trial scope (before D33): (check-in with QR and code, repeated check-in refused, wrong code
 refused, expired or forged QR refused, live table API, poll, comments, CSV and XLSX exports, photo upload without the
 model answering 503, review without a key answering 503). This trial is not a class result.
 
@@ -50,7 +50,7 @@ Live class demo:
 
 - Design: all external services sit behind interfaces (`HeadCounter`, `LLMClient`, `RepoFetcher`, `Clock`), so the
   whole suite runs offline and F1-F3 work without any key.
-- Field findings before the demo (24/11): a campus-IP filter and Apple's Private Relay list were tested on site and
+- Field findings before the demo (23/11): a campus-IP filter and Apple's Private Relay list were tested on site and
   abandoned (D33, tools report 2.12); the check-in relies on the rotating QR and the 4-digit code instead.
 - Local trial: [to fill after the class demo] for observations from the real class.
 - F4 versus the Zoom example summary: [to fill after the class demo] / not applicable if F4 stays deferred (pending).
