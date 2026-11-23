@@ -9,9 +9,9 @@ from app.adapters.repo_fetcher import RepoExtract
 from app.errors import LLMUnavailableError
 from tests.fakes import FakeLLMClient, FakeRepoFetcher
 
-TARGET = "https://github.com/alice-dev/target-repo"
-PEER_B = "https://github.com/bobsmith/secret-project"
-PEER_C = "https://github.com/carolx/other-work"
+TARGET = "https://github.com/student-a-example/target-repo"
+PEER_B = "https://github.com/peer-b-example/secret-project"
+PEER_C = "https://github.com/peer-c-example/other-work"
 
 
 def ex(text="code", files=1, lines=2):
@@ -47,28 +47,28 @@ def login(client):
 
 def test_masks_mixed_case_in_prompt_and_output(config, clock):
     """Covers FR-5.4, D11."""
-    repos = {TARGET: ex(), PEER_B: ex("BobSmith and SECRET-Project and BOBSMITH/Secret-project")}
-    _, llm, _, rv = make(config, clock, repos, reply="see BOBSMITH, SeCrEt-PrOjEcT")
+    repos = {TARGET: ex(), PEER_B: ex("Peer-B-Example and SECRET-Project and PEER-B-EXAMPLE/Secret-project")}
+    _, llm, _, rv = make(config, clock, repos, reply="see PEER-B-EXAMPLE, SeCrEt-PrOjEcT")
     rv.set_peer_repos([PEER_B])
     result = rv.review(TARGET)
     p = llm.calls[0]["prompt"].lower()
-    assert "bobsmith" not in p and "secret-project" not in p
-    assert "bobsmith" not in result.review_text.lower()
+    assert "peer-b-example" not in p and "secret-project" not in p
+    assert "peer-b-example" not in result.review_text.lower()
     assert "secret-project" not in result.review_text.lower()
     assert result.review_text == "see Submission B, Submission B"
 
 
 def test_masks_full_url_and_git_url(config, clock):
     """Covers FR-5.4: full URL, .git URL and trailing slash variants."""
-    text = ("https://github.com/bobsmith/secret-project\n"
-            "HTTPS://GITHUB.COM/BobSmith/Secret-Project\n"
-            "https://github.com/bobsmith/secret-project.git\n"
-            "https://github.com/bobsmith/secret-project/\n")
+    text = ("https://github.com/peer-b-example/secret-project\n"
+            "HTTPS://GITHUB.COM/Peer-B-Example/Secret-Project\n"
+            "https://github.com/peer-b-example/secret-project.git\n"
+            "https://github.com/peer-b-example/secret-project/\n")
     _, llm, _, rv = make(config, clock, {TARGET: ex(), PEER_B: ex(text)},
-                         reply="clone https://github.com/bobsmith/secret-project.git now")
+                         reply="clone https://github.com/peer-b-example/secret-project.git now")
     rv.set_peer_repos([PEER_B + ".git"])
     result = rv.review(TARGET)
-    for bad in ("bobsmith", "secret-project", "github.com/bob"):
+    for bad in ("peer-b-example", "secret-project", "github.com/peer-b"):
         assert bad not in llm.calls[0]["prompt"].lower()
         assert bad not in result.review_text.lower()
     assert "Submission B" in result.review_text
@@ -76,12 +76,12 @@ def test_masks_full_url_and_git_url(config, clock):
 
 def test_peer_name_inside_other_peer_text_is_masked(config, clock):
     """Covers FR-5.4: peer C's name quoted in peer B's README is masked with C's label."""
-    repos = {TARGET: ex(), PEER_B: ex("forked from carolx/other-work"), PEER_C: ex("plain")}
+    repos = {TARGET: ex(), PEER_B: ex("forked from peer-c-example/other-work"), PEER_C: ex("plain")}
     _, llm, _, rv = make(config, clock, repos)
     rv.set_peer_repos([PEER_B, PEER_C])
     rv.review(TARGET)
     prompt = llm.calls[0]["prompt"]
-    assert "carolx" not in prompt and "other-work" not in prompt
+    assert "peer-c-example" not in prompt and "other-work" not in prompt
     assert "forked from Submission C/Submission C" in prompt
 
 
@@ -98,17 +98,17 @@ def test_only_whole_tokens_masked(config, clock):
 
 def test_target_name_not_masked(config, clock):
     """Covers FR-5.4: only peers are anonymised, the target's own text is untouched."""
-    repos = {TARGET: ex("alice-dev wrote target-repo"), PEER_B: ex()}
+    repos = {TARGET: ex("student-a-example wrote target-repo"), PEER_B: ex()}
     _, llm, _, rv = make(config, clock, repos)
     rv.set_peer_repos([PEER_B])
     rv.review(TARGET)
-    assert "alice-dev wrote target-repo" in llm.calls[0]["prompt"]
+    assert "student-a-example wrote target-repo" in llm.calls[0]["prompt"]
 
 
 # ---- peer selection ----
 
 @pytest.mark.parametrize("variant", [TARGET + ".git", TARGET + "/", TARGET.upper().replace("HTTPS", "https"),
-                                     "https://github.com/ALICE-dev/Target-Repo"])
+                                     "https://github.com/STUDENT-A-example/Target-Repo"])
 def test_target_variants_excluded_from_peers(config, clock, variant):
     """Covers FR-5.2 (target never its own peer)."""
     _, llm, fetcher, rv = make(config, clock, {TARGET: ex(), PEER_B: ex()})
@@ -138,7 +138,7 @@ def test_duplicate_peers_collapsed(config, clock):
 
 def test_more_than_two_peers_only_first_two(config, clock):
     """Covers FR-5.2 boundary: 3 listed -> 2 used."""
-    third = "https://github.com/dave/third"
+    third = "https://github.com/peer-d-example/third"
     repos = {TARGET: ex(), PEER_B: ex(), PEER_C: ex(), third: ex()}
     _, llm, fetcher, rv = make(config, clock, repos)
     rv.set_peer_repos([PEER_B, PEER_C, third])
@@ -238,7 +238,7 @@ def test_llm_error_does_not_leak_peer_names(config, clock):
     app, _, _, rv = make(config, clock, {TARGET: ex(), PEER_B: ex()}, llm=llm)
     rv.set_peer_repos([PEER_B])
     r = app.test_client().post("/review", data={"url": TARGET})
-    assert r.status_code == 503 and b"bobsmith" not in r.data
+    assert r.status_code == 503 and b"peer-b-example" not in r.data
 
 
 # ---- rendering ----
@@ -254,11 +254,11 @@ def test_script_in_output_escaped(config, clock):
 def test_page_shows_peer_metrics_without_names(config, clock):
     """Covers FR-5.4: page shows labels and metrics, never peer identity."""
     app, _, _, rv = make(config, clock, {TARGET: ex(files=3, lines=42), PEER_B: ex(files=7, lines=111)},
-                         reply="Compare with bobsmith/secret-project")
+                         reply="Compare with peer-b-example/secret-project")
     rv.set_peer_repos([PEER_B])
     r = app.test_client().post("/review", data={"url": TARGET})
     assert b"Submission B: 7 files, 111 lines" in r.data
-    assert b"bobsmith" not in r.data and b"secret-project" not in r.data
+    assert b"peer-b-example" not in r.data and b"secret-project" not in r.data
 
 
 # ---- storage ----

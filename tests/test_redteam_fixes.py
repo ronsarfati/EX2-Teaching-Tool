@@ -17,7 +17,7 @@ from tests.test_export import CAMPUS, check_in, lecturer, run_session, services 
 EMPTY_NICKNAME = "Please choose a nickname (not your real name or ID)."
 
 
-def peers(url="https://github.com/alice/hw1"):
+def peers(url="https://github.com/zed/hw1"):
     return [("Submission B", url, None)]
 
 
@@ -153,18 +153,18 @@ def test_device_cookie_samesite_lax(app, services):  # noqa: F811
 # ---- F-07: peer masking glued by - _ . ----
 
 @pytest.mark.parametrize("text", [
-    "alice-hw1 is good", "alice_hw1", "alice.dev", "ALICE-final", "hw1-final", "see Alice.", "x/alice/y",
+    "zed-hw1 is good", "zed_hw1", "zed.dev", "ZED-final", "hw1-final", "see Zed.", "x/zed/y",
 ])
 def test_peer_names_masked_when_glued(text):
     out = _redact(text, peers())
-    assert "alice" not in out.lower() and "hw1" not in out.lower()
+    assert "zed" not in out.lower() and "hw1" not in out.lower()
     assert "Submission B" in out
 
 
-@pytest.mark.parametrize("text", ["malice in wonderland", "Alicea", "chw1", "hw10"])
+@pytest.mark.parametrize("text", ["hazeda in wonderland", "Hazeda", "chw1", "hw10"])
 def test_unrelated_word_not_overmasked(text):
     assert _redact(text, peers()) == text
 
 
 def test_url_still_masked():
-    assert _redact("https://github.com/Alice/HW1 rocks", peers()) == "Submission B rocks"
+    assert _redact("https://github.com/Zed/HW1 rocks", peers()) == "Submission B rocks"

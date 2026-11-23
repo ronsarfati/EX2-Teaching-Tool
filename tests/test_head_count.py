@@ -95,16 +95,45 @@ def test_unknown_session_is_404(lecturer):
     assert upload(client, session_id=99).status_code == 404
 
 
-def test_photo_not_written_to_disk(lecturer, tmp_path):
+def test_photo_not_written_to_disk(lecturer, config, tmp_path, monkeypatch):
+    """Covers FR-1.16 (photo processed in memory only). Deterministic: private temp dir, write-open guard."""
+    import builtins
+
     client, _ = lecturer
+    private_tmp = tmp_path / "private-tmp"
+    private_tmp.mkdir()
+    monkeypatch.setattr(tempfile, "tempdir", str(private_tmp))
+    monkeypatch.setenv("TMPDIR", str(private_tmp))
+    db_prefix = os.path.abspath(config.database_path)
+    violations = []
+    real_open, real_os_open = builtins.open, os.open
+    write_flags = os.O_WRONLY | os.O_RDWR | os.O_CREAT | os.O_APPEND | os.O_TRUNC
 
-    def snapshot():
-        return {str(p) for root in (tmp_path, Path(tempfile.gettempdir())) for p in root.rglob("*")}
+    def allowed(path):
+        try:
+            path = os.path.abspath(os.fsdecode(path))
+        except TypeError:
+            return True  # file descriptor
+        return path.startswith(db_prefix)  # the SQLite DB and its -wal/-shm/-journal files
 
-    before = snapshot()
-    upload(client, b"\xff\xd8\xff" + os.urandom(2000))
-    new = {p for p in snapshot() - before if not p.endswith(("-wal", "-shm", ".db-journal"))}
-    assert new == set()
+    def guarded_open(file, mode="r", *args, **kwargs):
+        if any(c in str(mode) for c in "wax+") and not allowed(file):
+            violations.append(("open", str(file), mode))
+        return real_open(file, mode, *args, **kwargs)
+
+    def guarded_os_open(path, flags, *args, **kwargs):
+        if flags & write_flags and not allowed(path):
+            violations.append(("os.open", str(path), flags))
+        return real_os_open(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "open", guarded_open)
+    monkeypatch.setattr(os, "open", guarded_os_open)
+    try:
+        upload(client, b"\xff\xd8\xff" + os.urandom(2000))
+    finally:
+        monkeypatch.undo()
+    assert violations == []
+    assert list(private_tmp.rglob("*")) == []
 
 
 def test_service_has_no_manual_set_method(lecturer):

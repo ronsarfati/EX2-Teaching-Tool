@@ -7,9 +7,9 @@ from app.errors import LLMUnavailableError
 from app.services.homework import NO_PEER_SENTENCE
 from tests.fakes import FakeLLMClient, FakeRepoFetcher
 
-TARGET = "https://github.com/alice-dev/target-repo"
-PEER_B = "https://github.com/bobsmith/secret-project"
-PEER_C = "https://github.com/carolx/other-work"
+TARGET = "https://github.com/student-a-example/target-repo"
+PEER_B = "https://github.com/peer-b-example/secret-project"
+PEER_C = "https://github.com/peer-c-example/other-work"
 
 
 def extract(text="print('hi')", files=3, lines=42):
@@ -20,14 +20,14 @@ def extract(text="print('hi')", files=3, lines=42):
 def repos():
     return {
         TARGET: extract(files=3, lines=42),
-        PEER_B: extract("# secret-project by bobsmith\nx = 1", files=7, lines=111),
-        PEER_C: extract("carolx wrote other-work", files=5, lines=222),
+        PEER_B: extract("# secret-project by peer-b-example\nx = 1", files=7, lines=111),
+        PEER_C: extract("peer-c-example wrote other-work", files=5, lines=222),
     }
 
 
 @pytest.fixture
 def llm():
-    return FakeLLMClient(reply="Good. Compared with Submission B and bobsmith/secret-project, see carolx.")
+    return FakeLLMClient(reply="Good. Compared with Submission B and peer-b-example/secret-project, see peer-c-example.")
 
 
 @pytest.fixture
@@ -56,7 +56,7 @@ def test_prompt_labels_metrics_and_masks_peer_names(reviewer, llm):
     for label in ("Submission A", "Submission B", "Submission C"):
         assert label in call["prompt"]
     assert "7 files, 111 lines" in call["prompt"]
-    for secret in ("bobsmith", "secret-project", "carolx", "other-work", "github.com/bobsmith"):
+    for secret in ("peer-b-example", "secret-project", "peer-c-example", "other-work", "github.com/peer-b-example"):
         assert secret not in call["prompt"]
         assert secret not in result.review_text
     assert result.comparison_available
@@ -64,7 +64,7 @@ def test_prompt_labels_metrics_and_masks_peer_names(reviewer, llm):
 
 
 def test_target_excluded_from_peers_and_only_two_used(reviewer, fetcher):
-    reviewer.set_peer_repos([TARGET + "/", PEER_B, PEER_C, "https://github.com/dave/third"])
+    reviewer.set_peer_repos([TARGET + "/", PEER_B, PEER_C, "https://github.com/peer-d-example/third"])
     reviewer.review(TARGET)
     fetched = [url for url, _ in fetcher.calls]
     assert fetched == [TARGET, PEER_B, PEER_C]
