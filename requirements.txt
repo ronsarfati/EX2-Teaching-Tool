@@ -1,0 +1,15 @@
+# Runtime (versions tested in docs/tools_report.md)
+Flask==3.1.3
+qrcode==8.2
+Pillow==13.0.0
+opencv-python-headless==5.1.0.95
+numpy==2.5.5
+openpyxl==3.1.5
+anthropic==2.12.0
+faster-whisper==1.2.1
+# faster-whisper decodes audio with PyAV; versions 17+ were not tested
+av<17
+
+# Tests only
+pytest==9.2.0
+pytest-cov==7.1.0
