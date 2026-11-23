@@ -28,8 +28,8 @@ implementation is secondary and composes existing tools rather than coding from 
 first and most robust. Attendance follows D30: the lecturer opens a session and the projector shows a QR
 regenerated every 10 s and a 3-digit code regenerated every 5 s; students scan the QR with the phone's native
 camera; the QR is accepted if at most 15 s old on arrival, then the student has a 1-minute window to type the code
-(current or previous one, at most 5 attempts); check-in is accepted only from client IPs in a campus allow-list
-edited by the lecturer; one check-in per device per session; a student who cannot scan is added by the lecturer
+(current or previous one, at most 5 attempts); every check-in is accepted and classified as campus (allow-list edited by the lecturer), Apple relay or off campus,
+and non-campus origins are flagged (D32); one check-in per device per session; a student who cannot scan is added by the lecturer
 after class in the exported spreadsheet. A chain-of-trust design and a local Wi-Fi bubble were studied and
 rejected (D30). Identity is a nickname plus a random device token (D6); lecturer pages are protected by a single
 PIN (D22). F4 is designed
@@ -98,7 +98,8 @@ head count (D7).
 - KISS smartphone web app, few taps, no installation (R14); only implementable designs (R17).
 - Demo hosted on the student's laptop, exposed by a Cloudflare quick tunnel (D13).
 - Students in the room can join the university Wi-Fi; the university has no VPN, so an allow-listed IP means
-  "on the campus network" (not "in this room") (D30).
+  "on the campus network" (not "in this room") (D30). The Wi-Fi is not always reliable and isolates clients, so other
+  networks are accepted and flagged (D32).
 - An Anthropic API key is available for F4/F5; without it F1-F3 still run and F4/F5 show a plain error (D12, D23).
 - Individual work (D20); deadline 30/11/2026 (D16); the class demo date is still to be confirmed (D17).
 
@@ -107,9 +108,9 @@ head count (D7).
 | Risk | Mitigation | D |
 |---|---|---|
 | A phone cannot scan the QR (camera, old OS) | Native camera only, no in-page scanner or permission prompt; tested on real phones before the demo; otherwise the lecturer adds the student manually after class in the exported spreadsheet | D30 |
-| Classroom network or tunnel fails | Plan B: phone hotspot / LAN over HTTP (works, no in-page camera needed); plan C: recorded rehearsal; QR codes encode the configured base URL | D13 |
+| Classroom network or tunnel fails | Plan B: phone hotspot over HTTP (no in-page camera needed; a local LAN is impossible on the campus Wi-Fi, D32); plan C: recorded rehearsal; QR codes encode the configured base URL | D13 |
 | Check-in takes too long or distracts the class (lecturer's concern) | One click for the lecturer; every student scans the same projector QR in parallel; 1-minute window to type the code; whole-class duration measured live and reported | D17, D30 |
-| Campus public IP unknown until measured, or campus Wi-Fi down on demo day | Allow-list editable in the app by the lecturer (PIN); IP measured on site on 23/11; plan B: hotspot / LAN with its range added to the allow-list; the photo consistency alert stays as the global check | D7, D13, D22, D30 |
+| Campus public IP unknown until measured, or campus Wi-Fi down on demo day | Allow-list editable in the app by the lecturer (PIN); IP measured on site on 23/11; mobile data is accepted and flagged (D32); the photo consistency alert stays as the global check | D7, D13, D22, D30 |
 | A present student relays the QR and code live to an absent friend who is on campus | Code changes every 5 s and must be typed within the 1-minute window; one check-in per device; the photo consistency alert flags the gap (D7 limit applies) | D7, D30 |
 | Head count misses hidden faces | Measured recall ~94 %, precision ~96 % on 4 provided photos (tools report 2.5); asymmetric consistency alert; advice to shoot when students look up; limit stated (fraud under ~7 absent check-ins for N ≈ 45 stays in the noise) | D7 |
 | LLM API unavailable, slow or costly | Short capped inputs; one call per request; plain error message, no canned output; model configurable by env var | D11, D12, D23 |
@@ -119,7 +120,7 @@ head count (D7).
 
 | # | Criterion | R |
 |---|---|---|
-| A1 | A student on the campus network checks in from a phone browser (native camera, 3-digit code, no install) and appears in the lecturer's live list; a phone on 4G/5G is refused with a plain message | R1, R14, D30 |
+| A1 | A student on the campus network checks in from a phone browser (native camera, 3-digit code, no install) and appears in the lecturer's live list; a phone on 4G/5G is accepted and flagged "off campus network" in the lecturer's table and export | R1, R14, D30, D32 |
 | A2 | A class photo returns a head count and a consistent/anomaly status next to the number of check-ins; the photo is not stored | R2, R16, D7 |
 | A3 | The lecturer sees the attendance table online and downloads it as CSV/XLSX | R3, D8 |
 | A4 | A comment posted from a phone appears on the lecturer page within 5 s; a comment posted outside a session is visible later | R5, D4, D8 |

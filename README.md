@@ -35,8 +35,10 @@ most robust part (D1). F4 (video summary) is designed but its implementation is 
     the phone's **native camera**, which opens the check-in URL in the browser (no app, no in-page scanner). The QR
     is accepted only if it is **<= 15 s old when the request reaches the server**; the student then has a
     **1-minute window** to type, the first time only, a nickname (D6), then the 3-digit code (the current or the
-    previous one, at most 5 attempts), and tap "Confirm". Check-in is accepted only from the **campus network**: the client IP must be
-    in an allow-list of IP ranges edited by the lecturer (students on 4G/5G are asked to join the university Wi-Fi).
+    previous one, at most 5 attempts), and tap "Confirm". Every check-in is accepted and **classified by network origin** (D32): `campus` (client IP in the
+    allow-list of IP ranges edited by the lecturer), `apple_relay` (Apple iCloud Private Relay egress ranges for
+    Israel) or `off_campus` (mobile data, VPN...). Non-campus origins are shown with a marker in the live table and in
+    the export column "network"; the IP is never stored. Only an empty allow-list or a malformed IP is refused.
     One check-in per device per session. A student whose camera cannot scan is added manually by the lecturer after
     class in the exported spreadsheet. A chain-of-trust design (students validating each other) and a local Wi-Fi
     bubble were studied and rejected (D30).
@@ -86,7 +88,7 @@ most robust part (D1). F4 (video summary) is designed but its implementation is 
   rejected in the tools report), local transcription with `faster-whisper`, Anthropic Claude for summaries and
   reviews (model and API key from environment variables, never committed).
 - **Demo hosting** (D13): app on a laptop exposed with a Cloudflare quick tunnel (public HTTPS URL); plan B phone
-  hotspot / LAN (its range added to the allow-list); plan C recorded rehearsal.
+  hotspot (the campus Wi-Fi isolates clients, so a local-LAN mode is impossible there, D32); plan C recorded rehearsal.
 
 ### How to run
 
@@ -96,7 +98,7 @@ Prerequisites: Python 3.11+ (tested with 3.13) and, optionally, `cloudflared` (t
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env        # then edit .env (git-ignored)
-python -m app               # serves on 0.0.0.0, port $PORT (default 5000)
+python -m app               # serves on 0.0.0.0, port $PORT (default 5000; on macOS use PORT=5050, AirPlay takes 5000)
 ```
 
 In `.env` set:
@@ -104,6 +106,8 @@ In `.env` set:
 - `SECRET_KEY`: a long random string.
 - `LECTURER_PIN`: the lecturer PIN; use a long one (D22).
 - `BASE_URL`: the public URL phones will use (`http://localhost:5000` locally, the tunnel URL for the demo).
+- `PORT` (optional): on a Mac set `PORT=5050` and use the same port in `BASE_URL` (macOS AirPlay listens on 5000).
+- `RELAY_RANGES_PATH` (optional): Apple relay range file, default `data/apple_relay_ranges_IL.csv`.
 - `ANTHROPIC_API_KEY` (optional): enables the F5 homework review; without it the page shows an "unavailable" message.
 
 `python -m app` loads `.env` with a small standard-library loader; variables already set in the environment win.
@@ -112,12 +116,18 @@ Optional face model: for the photo head count, download the YuNet model `face_de
 the official OpenCV `opencv_zoo` repository and place it in `models/` (or set `YUNET_MODEL_PATH`). The model file
 is not bundled with this repository.
 
-First step for the lecturer: open the app, sign in with the PIN at `/lecturer/login` and enter the campus IP range on the allow-list
-page `/lecturer/allow-list`. An empty allow-list refuses every check-in (D30).
+Once before class (needs internet; D32): `python scripts/update_relay_ranges.py` downloads Apple's public iCloud Private
+Relay list and keeps the Israel ranges in `data/apple_relay_ranges_IL.csv` (git-ignored, not bundled). Without this file
+the app still runs, but iPhones using Private Relay are shown as "off campus".
+
+First step for the lecturer: open the app, sign in with the PIN at `/lecturer/login` and enter the campus IP range
+(measured value `192.114.52.0/24`) on `/lecturer/allow-list`, which also shows how many relay ranges are loaded. An
+empty allow-list refuses every check-in (D30, D31).
 
 Phones must reach the laptop. Either use a Cloudflare quick tunnel
 (`cloudflared tunnel --url http://localhost:5000`, then put the printed URL in `BASE_URL` and restart the app), or
-put the phones on the same LAN (add its range to the allow-list). See [docs/demo_script.md](docs/demo_script.md).
+a phone hotspot. A local-LAN mode does not work on the campus Wi-Fi, which isolates clients (D32). See
+[docs/demo_script.md](docs/demo_script.md).
 
 Tests: `python -m pytest -q`.
 

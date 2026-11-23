@@ -1,9 +1,9 @@
 # Test Strategy (To Do 9)
 
 Covers R32 ("a testing strategy that addresses the classes of To Do 7"). Built from the [design](design.md)
-(classes of section 3, exceptions of 3.8, tasks T1-T18 of section 7), the [SRS](srs.md) (FR-x.y, NFR-n, error table
-of section 5), the [use cases](use_cases.md) (UC-1 to UC-14), the validated decisions D1-D31
-([decisions.md](decisions.md); D25 = test tooling, D7 = consistency rule, D30 / D31 = check-in rules) and the
+(classes of section 3, exceptions of 3.8, tasks T1-T19 of section 7), the [SRS](srs.md) (FR-x.y, NFR-n, error table
+of section 5), the [use cases](use_cases.md) (UC-1 to UC-14), the validated decisions D1-D32
+([decisions.md](decisions.md); D25 = test tooling, D7 = consistency rule, D30 / D31 = check-in rules, D32 = network origin) and the
 [tools report](tools_report.md). Class, port, method and exception names are exactly those of `design.md`.
 
 ## 1. Approach
@@ -21,7 +21,7 @@ flowchart LR
 |---|---|---|---|---|
 | Unit | Every class and port of design section 3 (section 2 below) | `pytest`, fixtures, `FakeClock`, fakes of the ports, a temporary SQLite file per test (`tmp_path`) | Each task T1-T18, before its commit | D24, D25, NFR-12 |
 | Integration | Every route of design 2.1, grouped by use case (section 3 below) | Flask test client on `create_app(config, clock=..., head_counter=..., llm=..., fetcher=..., transcriber=...)`; client IP injected with `environ_base={"REMOTE_ADDR": ...}` and the `CF-Connecting-IP` header | Each task that adds a route (T5-T18) | D25, design 2.1 |
-| Manual end-to-end | Real phones on campus Wi-Fi and 4G, projector QR, tunnel, export in a spreadsheet tool | Checklist of section 5 (= tools report section 3, tests 1-9) | After T12 (design section 7), again before the demo | D25, NFR-1, NFR-11 |
+| Manual end-to-end | Real phones on campus Wi-Fi, 4G/5G and iPhone with Private Relay, projector QR, tunnel, export in a spreadsheet tool | Checklist of section 5 (= tools report section 3, tests 1-9) | After T12 (design section 7), again before the demo | D25, NFR-1, NFR-11 |
 | Live demo | The real class, 10 minutes, F1 first | Demo script (Phase 6); whole-class check-in duration and refusals measured | Demo day | R19, NFR-6, D17 |
 
 ### 1.2 Tools
@@ -140,11 +140,18 @@ Each subsection gives: responsibility, test type, doubles, key cases (input -> e
 | `198.51.100.7` | `192.0.2.10` | `198.51.100.7` (spoofing from a non-loopback peer ignored) |
 | `192.0.2.20` | none | `192.0.2.20` (plan B) |
 
-- **Key cases `ensure_allowed`** with ranges `192.0.2.0/24`, `2001:db8::/32`: `192.0.2.0` and `192.0.2.255` pass;
-  `192.0.1.255` and `192.0.3.0` -> `OffCampusError`; `2001:db8::1` passes, `2001:db9::1` -> `OffCampusError`;
-  `::ffff:192.0.2.10` passes (normalised); an IPv4 address against an IPv6-only list -> `OffCampusError` (no
-  exception from `ipaddress`); `"not-an-ip"` -> `OffCampusError` (fail closed, design 6.1).
-- **Boundaries:** empty list -> every address refused (D31); `save_ranges` then `ensure_allowed` without restart ->
+- **Key cases `classify`** (D32, T19) with campus `192.0.2.0/24`, `2001:db8::/32` and relay `198.51.100.0/25`,
+  `2001:db8:4000::/64` (the T19 acceptance list of design section 7 gives the full set; all offline):
+  `192.0.2.0` and `192.0.2.255` -> `CAMPUS`; `192.0.1.255` and `192.0.3.0` -> `OFF_CAMPUS` (accepted, not refused);
+  `2001:db8::1` -> `CAMPUS`, `2001:db9::1` -> `OFF_CAMPUS`; `::ffff:192.0.2.10` -> `CAMPUS` (normalised); relay
+  boundaries `198.51.100.0` / `.127` -> `APPLE_RELAY`, `.128` -> `OFF_CAMPUS`; IPv6 relay `2a02:26f7:df88:4000:6000::`
+  with `2a02:26f7:df88:4000::/64` -> `APPLE_RELAY`; address in both lists -> `CAMPUS`; an IPv4 address against an
+  IPv6-only list -> `OFF_CAMPUS` (no exception from `ipaddress`); no relay list (`NetworkPolicy(settings)`) -> relay
+  address `OFF_CAMPUS`, `relay_range_count() == 0`; `"not-an-ip"`, `""`, `"1.2.3.4, 5.6.7.8"` -> `OffCampusError`
+  (fail closed, design 6.1). `ensure_allowed` does not raise for `OFF_CAMPUS` / `APPLE_RELAY`.
+- **`NetworkOrigin`:** stored values `campus`, `apple_relay`, `off_campus`; `label()` -> `campus`, `Apple relay`,
+  `off campus`; `count_origins([])` has the three members at 0.
+- **Boundaries:** empty campus list -> every address refused, whatever its origin (D31, D32); `save_ranges` then `ensure_allowed` without restart ->
   new list used at once (FR-1.4).
 - **Key cases `save_ranges`:** `["192.0.2.1/24", "", "  ", "2001:db8::/32"]` -> stored `["192.0.2.0/24",
   "2001:db8::/32"]` (blank lines dropped, `strict=False` normalised); `"192.0.2.7"` -> `"192.0.2.7/32"`.
@@ -255,6 +262,24 @@ Type: unit on a temp DB (`db` fixture); doubles: none. All return frozen datacla
 - **Key cases:** result starts with `data:image/png;base64,`; the base64 PNG decoded with OpenCV `QRCodeDetector`
   gives back the input URL (a 100-character URL, tools report 2.3). **Trace:** FR-1.5; T6.
 
+#### `relay_ranges` module and `scripts/update_relay_ranges.py` (T19, D32)
+- **Type:** unit, no network. **Doubles:** in-test CSV lines, `tmp_path`, a fake `fetch`. Files `test_relay_ranges.py`,
+  `test_update_relay_ranges.py`.
+- **`parse_egress_csv`:** valid IPv4 and IPv6 rows kept for `IL`; an `FR` row ignored and not counted; `garbage`,
+  `999.1.1.0/24,IL,,,`, `2a02:zz::/64,IL,,,` counted in `skipped`; blank lines ignored; country case-insensitive and
+  trimmed; host bits normalised (`198.51.100.1/24` -> `198.51.100.0/24`); `country=None` keeps every valid country.
+- **`load_relay_ranges`:** missing path, directory or non-UTF-8 file -> `[]`, no exception, one WARNING; 3 valid and 2
+  malformed lines -> 3 networks; the log never holds a client address.
+- **Start-up:** `create_app` with a missing `RELAY_RANGES_PATH` still serves `/ping`; with a temp file,
+  `services["network"].relay_range_count()` equals its valid lines and the same instance serves the check-in route.
+- **Script** `main(argv, fetch=fake)`: only valid `IL` lines written, return 0; `--country fr` honoured; `fetch`
+  raising `OSError` or a CSV without the country -> return 1, existing output file byte-for-byte unchanged, no `.tmp`
+  left; output directory created if missing. `download` is not called by automated tests; one manual run is in the
+  tools report 2.12.
+- **Migration** (`Database.init_schema`): a pre-T19 `check_in` table with 2 rows gets `network_origin`, rows read as
+  `campus`; calling it twice is harmless; `'elsewhere'` violates the `CHECK`.
+- **Trace:** FR-1.19, D21, D32; T19.
+
 #### `AttendanceExporter`
 - **Responsibility:** CSV and XLSX of all sessions. **Type:** unit. **Doubles:** real repositories with 2 sessions
   of fictitious check-ins (one with D, one without).
@@ -264,6 +289,9 @@ Type: unit on a temp DB (`db` fixture); doubles: none. All return frozen datacla
   D and status empty for the session without a photo; `xlsx()` re-read with `openpyxl`: sheets "Check-ins" and
   "Summary" with the same rows as the CSV files, header row frozen (`freeze_panes == "A2"`).
 - **Boundaries:** no session -> header rows only; a nickname with a comma or quote survives the CSV round trip.
+- **Export column (T19, FR-1.19):** `checkins.csv` and sheet "Check-ins" have a 4th column "network" with `campus` /
+  `Apple relay` / `off campus`; `summary.csv` and sheet "Summary" end with "off campus" and "via Apple relay" counts equal
+  to the JSON counters; a campus-only session shows 0 / 0.
 - **Privacy:** no header contains `ip` or `token`; no device token value appears in any cell (FR-1.3, NFR-7).
 - **Trace:** FR-1.18, D8, D31 (OI-6), tools report 2.8; T12.
 
@@ -382,11 +410,11 @@ verbatim in the response body.
 | UC | Main path (expected) | Error / alternative paths (expected) | File |
 |---|---|---|---|
 | UC-1 Open session | `POST /lecturer/sessions` -> redirect to `/lecturer/projector`; `GET /api/projector` -> JSON with a PNG data URI decoding to `https://test.example/c/...` and a 3-digit code; FakeClock +10 s -> new QR, +5 s -> new code | session already open -> "A session is already open. Close it first."; no PIN -> redirect; no page contains `getUserMedia` (no camera access, FR-1.5) | `test_lecturer_sessions.py`, `test_projector.py` |
-| UC-2 Check in | `GET /c/<token>` (first device) -> page with nickname field, warning "Do not use your real name or ID", `inputmode="numeric"` code field, Confirm; `POST /checkin` -> "You are checked in"; second session, same cookie -> no nickname field, "Hello BlueFox"; scan + confirm each answered in < 1 s (`perf_counter`, NFR-4) | 4G address `198.51.100.7` -> off-campus message (403); QR +15.001 s -> expired message; window +60.001 s -> time ran out; wrong code -> wrong-code message; 6th attempt -> "Too many tries. Scan the QR code again."; empty / 31-char nickname -> nickname message; checked-in device scans again -> "You are already checked in for this class."; closed session -> "Attendance for this class is closed."; `GET /checkin` without token: no session -> `NoOpenSessionError` "There is no attendance check-in right now." (404), open session -> "Scan the QR code on the projector."; spoofed header from peer `198.51.100.7` -> refused | `test_checkin_routes.py` |
+| UC-2 Check in | `GET /c/<token>` (first device) -> page with nickname field, warning "Do not use your real name or ID", `inputmode="numeric"` code field, Confirm; `POST /checkin` -> "You are checked in"; second session, same cookie -> no nickname field, "Hello BlueFox"; scan + confirm each answered in < 1 s (`perf_counter`, NFR-4) | 4G address `198.51.100.7` -> accepted, row stored `off_campus` (T19, D32); relay address -> `apple_relay`; empty allow-list -> off-campus message (403); QR +15.001 s -> expired message; window +60.001 s -> time ran out; wrong code -> wrong-code message; 6th attempt -> "Too many tries. Scan the QR code again."; empty / 31-char nickname -> nickname message; checked-in device scans again -> "You are already checked in for this class."; closed session -> "Attendance for this class is closed."; `GET /checkin` without token: no session -> `NoOpenSessionError` "There is no attendance check-in right now." (404), open session -> "Scan the QR code on the projector."; spoofed header from peer `198.51.100.7` -> refused | `test_checkin_routes.py` |
 | UC-3 Close session | `POST /lecturer/sessions/close` -> `GET /api/projector` has no QR and no code | scan after close and confirm of a window opened before close -> "Attendance for this class is closed." | `test_lecturer_sessions.py` |
 | UC-4 Head count | `POST /lecturer/sessions/<id>/photo` (multipart, `FakeHeadCounter(40)`, N = 45) -> "checked in 45 / detected 40 / consistent"; page shows the "look up" advice; second photo replaces D | `FakeHeadCounter` raising -> "We could not read this photo. Please try another one." / "Head count is not available right now."; no file left on disk; no route edits D (route list check) | `test_photo_routes.py` |
 | UC-5 Table and export | after a check-in, `GET /api/sessions/<id>/attendance` lists it, N + 1, on the next poll; an open window without a right code leaves N unchanged; the three export routes return attachments whose rows equal the JSON | no PIN -> redirect; no route creates a check-in without scan and code (route list check, FR-1.18) | `test_live_table.py`, `test_export_routes.py` |
-| UC-6 Allow-list | `POST /lecturer/allow-list` with `192.0.2.0/24` and `2001:db8::/32` -> saved; the next `/c/<token>` from `2001:db8::5` accepted at once | invalid line -> "This is not a valid network range (e.g. 192.0.2.0/24)." and list unchanged; empty list -> page warning and every scan refused; no PIN -> redirect | `test_allow_list_routes.py` |
+| UC-6 Allow-list | `POST /lecturer/allow-list` with `192.0.2.0/24` and `2001:db8::/32` -> saved; the next `/c/<token>` from `2001:db8::5` accepted at once | invalid line -> "This is not a valid network range (e.g. 192.0.2.0/24)." and list unchanged; empty list -> page warning and every scan refused; page shows "Apple Private Relay list: N ranges loaded" or "not loaded"; no PIN -> redirect | `test_allow_list_routes.py` |
 | UC-7 Post comment | `POST /comments` without login and without session -> "Thanks, sent anonymously."; stored row has text and time only | blank -> "Please write something before sending."; 501 chars -> "Please keep your comment under 500 characters." | `test_comment_routes.py` |
 | UC-8 Read comments | `GET /api/comments` (PIN) lists the new comment first, no nickname in the JSON; comments still listed after re-creating the app on the same DB file | no PIN -> redirect | `test_comment_routes.py` |
 | UC-9 Create poll | `POST /lecturer/polls` with 2 options -> results page | 1 or 5 options / empty question -> "A poll needs a question and 2 to 4 options."; second poll -> "A poll is already open. Close it first." | `test_poll_routes.py` |
@@ -432,11 +460,11 @@ M10-M12 are added here. Results are written in `docs/results.md`.
 | M2 | Same with an Android phone (camera app, Google Lens if needed) | same as M1 | NFR-11 |
 | M3 | Scan-to-check-in time on campus Wi-Fi; a QR photo opened more than 15 s later | accepted within 15 s; the late one refused with the expired message | FR-1.6, NFR-4 |
 | M4 | Campus Wi-Fi reaches `*.trycloudflare.com` | page opens from a phone | D13, A2 |
-| M5 | Same phone on campus Wi-Fi, then on 4G/5G | campus accepted; 4G refused with the off-campus message | FR-1.2, FR-1.3 |
+| M5 | Same phone on campus Wi-Fi, then on 4G/5G, then iPhone with Private Relay | all accepted; labels `campus`, `off campus`, `Apple relay` in the live table and export | FR-1.2, FR-1.3, FR-1.19 |
 | M6 | IPv6 from campus Wi-Fi / 4G | IPv6 prefix noted; an IPv6 range in the allow-list matches | FR-1.2 |
 | M7 | Campus public IP measurement | range(s) entered via UC-6 (ranges only, D21) | D30, OI-3 |
 | M8 | Head count on a fresh photo of the real room with the lecturer's phone | D shown with the status in < 1 s; photo not stored | FR-1.15, NFR-3 |
-| M9 | Plan B: `http://<laptop-ip>` in the QR, LAN range in the allow-list, iPhone and Android | camera opens the plain-HTTP link; check-in works | NFR-9, D13 |
+| M9 | Plan B: phone hotspot, `http://<laptop-ip>` in the QR, its range in the allow-list, iPhone and Android | camera opens the plain-HTTP link; check-in works | NFR-9, D13 |
 | M10 | `attendance.xlsx`, `checkins.csv`, `summary.csv` opened in Excel or Numbers | two sheets, rows equal the live table, readable dates and nicknames | FR-1.18, UC-5 |
 | M11 | Rehearsal with several browser tabs and 2-3 phones: comment, poll, review | comment and vote visible on the lecturer page within 5 s; review shown | NFR-2, NFR-5, D25 |
 | M12 | One real LLM call and one real GitHub download (T15, T16) | answer received; download recorded in the tools report | D12, OI-13 |
@@ -481,9 +509,10 @@ Before the demo: full suite green, coverage report taken, M1-M12 done (or the fa
 | Requirement | Unit tests (section 2) | Integration / manual |
 |---|---|---|
 | FR-1.1 | `SessionService`, `SessionRepository` (one open) | UC-1 |
-| FR-1.2 | `NetworkPolicy.ensure_allowed`, `CheckInService` off-campus | UC-2, UC-6; M5, M6 |
+| FR-1.2 | `NetworkPolicy.classify`, `ensure_allowed`, `CheckInService` | UC-2, UC-6; M5, M6 |
 | FR-1.3 | `NetworkPolicy.resolve_client_ip`, `client_ip()`, `Database` column check | UC-2 spoofing; `test_privacy.py`; M5 |
 | FR-1.4 | `NetworkPolicy.save_ranges`, `SettingsRepository` | UC-6; M7 |
+| FR-1.19 | `NetworkOrigin`, `count_origins`, `relay_ranges`, update script, migration, `AttendanceExporter` column | UC-2, UC-5, UC-6; M5 |
 | FR-1.5 | `RotatingCredentials.qr_token`, `SessionService.projector_state`, `qr_png_data_uri` | UC-1; M1, M2 |
 | FR-1.6 | `RotatingCredentials.verify_qr`, `CheckInService` QR age | UC-2; M3 |
 | FR-1.7 | `CheckInService` window, `CheckInWindowRepository` | UC-2 |

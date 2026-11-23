@@ -6,8 +6,8 @@ filled in only after the demo; nothing below is estimated.
 ## 1. Setup
 
 - App: Python 3.13, Flask, SQLite, OpenCV YuNet (face count), Anthropic Claude (review); see the README.
-- Demo environment: laptop running the app; public HTTPS address from a Cloudflare quick tunnel (plan A) or LAN
-  (plan B); students on their own phones. Campus allow-list: [to fill after the class demo].
+- Demo environment: laptop running the app; public HTTPS address from a Cloudflare quick tunnel (plan A) or phone hotspot
+  (plan B); students on their own phones. Campus allow-list: `192.114.52.0/24` (measured 24/11, tools report 2.12).
 - Demo data: fictional only (`scripts/seed_demo.py`); no personal data in the repository (D21).
 
 ## 2. What was built (state of the code)
@@ -46,7 +46,7 @@ Live class demo:
 | Students who checked in (N) | [to fill after the class demo] |
 | Faces detected on the class photo (D) and alert status | [to fill after the class demo] |
 | Duration of the whole-class check-in (open to last row) | [to fill after the class demo] |
-| Refusals (off-campus, expired QR, expired window, wrong code) | [to fill after the class demo] |
+| Network origins (campus / Apple relay / off campus) and refusals (expired QR, expired window, wrong code) | [to fill after the class demo] |
 | Poll: participants and time to results | [to fill after the class demo] |
 | Comments received and delay before they appeared | [to fill after the class demo] |
 | F5 review: repository, time to answer, quality of the comparison | [to fill after the class demo] |
@@ -56,6 +56,9 @@ Live class demo:
 
 - Design: all external services sit behind interfaces (`HeadCounter`, `LLMClient`, `RepoFetcher`, `Clock`), so the
   whole suite runs offline and F1-F3 work without any key.
+- Field findings before the demo (24/11, D32): the campus Wi-Fi isolates clients (local-LAN mode impossible), iPhones with
+  iCloud Private Relay do not show the campus IP, and a phone fell back to 5G; hence every network is accepted and
+  labelled campus / Apple relay / off campus (tools report 2.12).
 - Local trial: [to fill after the class demo] for observations from the real class.
 - F4 versus the Zoom example summary: [to fill after the class demo] / not applicable if F4 stays deferred (pending).
 

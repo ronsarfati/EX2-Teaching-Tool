@@ -11,21 +11,23 @@ class photo and watches the clock.
 Run once on the demo laptop, from the repository root (`python -m app` loads `.env` itself; variables already set in the environment win).
 
 1. Environment: copy `.env.example` to `.env`, set a long random `SECRET_KEY`, a `LECTURER_PIN`, and `BASE_URL`
-   (the public tunnel URL, or `http://<laptop LAN IP>:5000` for plan B). Optional: `ANTHROPIC_API_KEY` (F5).
+   (the public tunnel URL, or `http://<laptop IP>:<port>` for the hotspot plan B). Optional: `ANTHROPIC_API_KEY` (F5).
 2. Demo data (optional, fictional only): `python scripts/seed_demo.py instance/app.db --force`
    fills 3 past sessions, a closed poll, a few comments and fake peer URLs so the export looks populated.
    **(pending)** Seeded or empty database for the live class: decide with the lecturer; with a seeded database the
    figures to report are those of the last (live) session only.
 3. YuNet model present at `YUNET_MODEL_PATH` (default `models/face_detection_yunet_2023mar.onnx`); check:
    `ls models/`. Prepare a **class photo** on the laptop (taken in the room, shown only live, never committed).
-4. Start the app: `python -m app` (port 5000, or `PORT`). Check `http://127.0.0.1:5000/ping` answers `ok`.
-5. Tunnel (plan A): `cloudflared tunnel --no-autoupdate --url http://127.0.0.1:5000`; copy the printed
+3b. Apple relay list (once, needs internet, D32): `python scripts/update_relay_ranges.py`; check it printed about 248 ranges
+   for Israel (value measured on 24/11, tools report 2.12) and that `data/apple_relay_ranges_IL.csv` exists.
+4. Start the app: `python -m app` (port 5000, or `PORT`; **on a Mac use `PORT=5050`**, AirPlay takes 5000, and set `BASE_URL`
+   and the commands below with 5050). Check `http://127.0.0.1:<port>/ping` answers `ok`.
+5. Tunnel (plan A): `cloudflared tunnel --no-autoupdate --url http://127.0.0.1:<port>`; copy the printed
    `https://<random>.trycloudflare.com` into `BASE_URL`, then **restart the app**. The URL changes at every run
    (phones then treat themselves as first-time visitors, D31/OI-4).
-6. Campus allow-list: on site, on the **campus Wi-Fi**, open a "what is my IP" page from a phone and note the public
-   IP **(pending: value measured on site)**. Log in at `/lecturer/login` (PIN), open `/lecturer/allow-list`, enter
-   that address as `a.b.c.d/32` (or the range if several exits), save. Plan B (LAN): add the LAN range, e.g.
-   `192.168.1.0/24`.
+6. Campus allow-list: log in at `/lecturer/login` (PIN), open `/lecturer/allow-list`, enter `192.114.52.0/24` (measured
+   on the campus Wi-Fi on 24/11 with ifconfig.me: exits `192.114.52.6` and `.10`, tools report 2.12), save. Check the
+   page says "Apple Private Relay list: N ranges loaded". Hotspot plan B: add the hotspot's range.
 7. Projector: log in on the laptop, open `/lecturer/projector` full-screen on the projector. Open a second browser tab on
    `/lecturer` (dashboard) for yourself. Leave **no session open** yet.
 8. Quick test with your own phone on campus Wi-Fi: scan, confirm, then check the row appears, then reset
@@ -36,10 +38,10 @@ Run once on the demo laptop, from the repository root (`python -m app` loads `.e
 
 | Time | Who | Action | Audience sees |
 |---|---|---|---|
-| 0:00-0:45 | Presenter | One-sentence problem; "five features, one phone browser, no install, nicknames only, no personal data". Announce: "please join the university Wi-Fi, not 4G/5G". | Slide or lecturer dashboard |
+| 0:00-0:45 | Presenter | One-sentence problem; "five features, one phone browser, no install, nicknames only, no personal data". Announce: "please use the university Wi-Fi if you can; any network works, the lecturer table shows which one you used". | Slide or lecturer dashboard |
 | 0:45-1:15 | Presenter | Dashboard: click **Open session** (PIN already entered). Page jumps to the projector. | Rotating QR (10 s) and a 3-digit code (5 s) |
 | 1:15-3:45 | Classmates | Scan the QR with the **native camera**, tap the link, type a nickname (first time), type the 3-digit code, **Confirm**. | Phones show "You are checked in" |
-| 1:15-3:45 | Presenter | Switch to the dashboard tab and watch N rise; note the time when N stops rising (this is the measured check-in duration, NFR-6). Count the refusals told by students (wrong code, expired QR, off-campus). | Live table: nickname + time, N counter |
+| 1:15-3:45 | Presenter | Switch to the dashboard tab and watch N rise; note the time when N stops rising (this is the measured check-in duration, NFR-6). Show the network markers ("Apple relay", "off campus network") and the header counters; count the refusals told by students (wrong code, expired QR). | Live table: nickname + time, N counter |
 | 3:45-5:00 | Helper + Presenter | Helper takes a photo of the room; Presenter uploads it in **Count heads on a class photo**. | "Checked in N / detected D / consistent or anomaly" |
 | 5:00-5:30 | Presenter | Say: the photo is counted then discarded, only D is kept (D7). If anomaly: say it is an alert, not an accusation. Click **Close session**. | Result page, then QR disappears |
 | 5:30-6:00 | Presenter | Dashboard: **Download XLSX**; open it. | Sheets "Check-ins" and "Summary" (past sessions if seeded) |
@@ -54,9 +56,10 @@ If time runs short, cut in this order: F5, comments, poll. Never cut check-in, p
 
 | Risk | Detect | Plan B |
 |---|---|---|
-| No Wi-Fi in the room | Phones cannot load the page | Presenter's phone hotspot is not usable (see tools report); use the plan C video and screenshots, show the pages from the laptop browser only. |
-| Tunnel down or URL not reachable | `cloudflared` exits, phones time out | Restart `cloudflared`, update `BASE_URL`, restart the app (1 min). If still down: plan B LAN: `BASE_URL=http://<LAN IP>:5000`, add the LAN range to the allow-list, students on the same Wi-Fi. |
-| Allow-list wrong (students get "Check-in only works on the university Wi-Fi") | Several refusals at once | Re-measure the public IP from a student phone on campus Wi-Fi; edit `/lecturer/allow-list` (no restart needed); ask students to scan again. Last resort: add the broader range for the demo only and say so. |
+| No Wi-Fi in the room | Phones cannot load the page | Wi-Fi down but phones on mobile data and the tunnel up: check-ins are still accepted and flagged "off campus network" (D32). Otherwise (no network at all, hotspot not usable, see tools report) use the plan C video and screenshots, show the pages from the laptop browser only. |
+| Tunnel down or URL not reachable | `cloudflared` exits, phones time out | Restart `cloudflared`, update `BASE_URL`, restart the app (1 min). If still down: plan B hotspot with `BASE_URL=http://<laptop IP>:<port>` and its range in the allow-list (a local LAN does not work on the campus Wi-Fi, which isolates clients, D32). |
+| Allow-list wrong or empty | Everyone shows "off campus network", or students get "Check-in only works on the university Wi-Fi" (empty list) | Re-enter `192.114.52.0/24` on `/lecturer/allow-list` (no restart needed); re-measure the public IP from a phone on campus Wi-Fi if it changed; ask refused students to scan again. |
+| Relay list missing (script not run) | Allow-list page says "not loaded" | iPhones with Private Relay are shown as "off campus network" instead of "Apple relay"; check-ins still work. Say so, or run the script and restart the app. |
 | YuNet model missing or corrupt | Upload shows "Head count is not available right now." | Show the message as the designed behaviour; continue; show the recorded photo-count screenshot (plan C) and give D from the rehearsal. Check `ls models/` during setup. |
 | No API key | F5 shows the unavailable message | Show the message (designed behaviour, 503); explain the key is an environment variable; show a rehearsal screenshot of a real review. |
 | LLM slow (> 30 s) | Spinner / no answer | Do F5 last; if no answer after 30 s, switch to the screenshot of the rehearsal review and move on. The call times out after 60 s with the same message. |
@@ -67,8 +70,7 @@ If time runs short, cut in this order: F5, comments, poll. Never cut check-in, p
 ## 4. What to say about known residual risks (neutral wording)
 
 - The check-in proves "a device on the campus network typed the code shown in the room", not that a person is
-  physically present. A QR code and code could in theory be relayed in real time to someone off-site who has
-  access to the campus Wi-Fi. The rotating QR (10 s), the 5 s code and the photo head count alert reduce this; they do not remove it.
+  physically present. A QR code and code could in theory be relayed in real time to someone off-site; such a check-in is flagged "off campus network" (D32). The rotating QR (10 s), the 5 s code and the photo head count alert reduce this; they do not remove it.
 - The identity is a nickname and a random device token in a cookie: clearing cookies or using a private tab gives a
   new device, and nicknames are not verified or unique.
 - The head count is an estimate (about 94 % recall and 96 % precision on the test photos, tools report); the alert
@@ -77,5 +79,5 @@ If time runs short, cut in this order: F5, comments, poll. Never cut check-in, p
 - Real-time is short polling every 1-3 s, not push; "offline" means a downloadable spreadsheet and comments posted
   later, not an offline-first app.
 - The quick-tunnel address changes at each run, so phones may ask for the nickname again.
-- Students on mobile data are refused by design.
+- Students on mobile data, VPN or Private Relay are accepted and flagged, not refused (D32). An off-campus student helped by an accomplice relaying the QR and code live is accepted but flagged; the photo alert (D7) remains the safety net.
 - F4 (video summary) status: **(pending)**.
