@@ -307,7 +307,7 @@ def test_t19_malformed_cf_header_refused(rapp, header):
         assert r.status_code == 200 or r.status_code == 403  # loopback itself: classified OFF_CAMPUS -> accepted
         return
     assert r.status_code == 403
-    assert "Check-in only works on the university Wi-Fi. Please connect to it and scan again." in r.get_data(as_text=True)
+    assert "Check-in is not available right now. Ask the lecturer." in r.get_data(as_text=True)
 
 
 def test_t19_empty_campus_list_through_routes(config, clock, tmp_path):
@@ -320,7 +320,7 @@ def test_t19_empty_campus_list_through_routes(config, clock, tmp_path):
         kw = {"environ_base": {"REMOTE_ADDR": ip}}
         r = c.get(scan_path(a), **kw)
         assert r.status_code == 403
-        assert "Check-in only works on the university Wi-Fi. Please connect to it and scan again." in r.get_data(as_text=True)
+        assert "Check-in is not available right now. Ask the lecturer." in r.get_data(as_text=True)
         r = c.post("/checkin", data={"nickname": "X", "code": code(a)}, **kw)
         assert r.status_code == 403
     sid = s["session_service"].current().id

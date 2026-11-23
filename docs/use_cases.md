@@ -159,8 +159,7 @@ name, so that my attendance is recorded.
   - 2a. Client IP outside the campus allow-list (e.g. 4G/5G, VPN): accepted, not refused (D32); the check-in is
     stored as `apple_relay` or `off_campus` and the lecturer sees a marker (UC-5). Same classification at step 6; the
     student sees the same success page.
-  - 2b. Campus allow-list empty or client IP malformed: "Check-in only works on the university Wi-Fi. Please connect
-    to it and scan again." No window, no record. Same check at step 6.
+  - 2b. Campus allow-list empty or client IP malformed: "Check-in is not available right now. Ask the lecturer." No window, no record. Same check at step 6.
   - 3a. QR older than 15 s on arrival or tampered: "This QR code has expired. Scan a fresh one."
   - 3b. Device already checked in for the session: "You are already checked in for this class." No window, no record.
   - 3c. No open session: "There is no attendance check-in right now."

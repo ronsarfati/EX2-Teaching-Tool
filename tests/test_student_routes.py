@@ -129,7 +129,7 @@ def test_off_campus_is_accepted(app, open_session):
 def test_malformed_client_address_refused(app, open_session):
     c, kw = phone(app, ip="127.0.0.1", headers={"CF-Connecting-IP": "not-an-ip"})
     response = c.get(scan_url(app), **kw)
-    assert response.status_code == 403 and b"Check-in only works on the university Wi-Fi." in response.data
+    assert response.status_code == 403 and b"Check-in is not available right now. Ask the lecturer." in response.data
 
 
 def test_header_used_from_loopback_tunnel(app, open_session):

@@ -212,7 +212,7 @@ def test_off_campus_is_accepted_and_labelled(app, session):
 def test_malformed_address_refused_with_message(app, session):
     r = Phone(app, ip="127.0.0.1", headers={"CF-Connecting-IP": "not-an-ip"}).scan()
     assert r.status_code == 403
-    assert "Check-in only works on the university Wi-Fi. Please connect to it and scan again." in text(r)
+    assert "Check-in is not available right now. Ask the lecturer." in text(r)
 
 
 def test_off_campus_post_without_window(app, session):

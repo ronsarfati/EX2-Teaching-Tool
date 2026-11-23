@@ -53,7 +53,7 @@ def test_fake_clock_moves_only_on_request():
 
 # (class name, group base name, status, SRS message)
 TABLE = [
-    ("OffCampusError", "CheckInError", 403, "Check-in only works on the university Wi-Fi. Please connect to it and scan again."),
+    ("OffCampusError", "CheckInError", 403, "Check-in is not available right now. Ask the lecturer."),
     ("QrExpiredError", "CheckInError", 400, "This QR code has expired. Scan a fresh one."),
     ("WindowExpiredError", "CheckInError", 400, "Your check-in time ran out. Scan the QR code again."),
     ("WrongCodeError", "CheckInError", 400, "Wrong code. Type the code shown under the QR now."),

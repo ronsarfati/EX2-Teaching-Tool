@@ -411,7 +411,7 @@ app/  tests/  demo_data/  .env.example  requirements.txt
 **Why the chain of trust (D5, D26) was dropped.** It is no more secure than a projector QR: a present student can screenshot their own rotating personal QR and send it on WhatsApp within the 15 s window, and any browser-only scheme can be defeated by a live video call. It was also far more complex (root slots, sponsor quotas, claims, tree, lecturer QR).
 
 **DECISION (student's design).** Session open/close by the lecturer (PIN, D22; one session at a time, D27) is unchanged.
-1. **Campus network filter.** A check-in request is accepted only if the client IP is in an **allow-list edited by the lecturer in the app** (IPv4 and IPv6 ranges in CIDR notation). Students on 4G/5G are refused with a plain message asking them to join the university Wi-Fi (D23) (*amended by D32: now accepted and flagged "off campus network"*). The university has no VPN (confirmed by the student). The student measures the campus public IP(s) on site on 23/11; until then the list holds placeholders, and for home testing the student's own IP is used.
+1. **Campus network filter.** A check-in request is accepted only if the client IP is in an **allow-list edited by the lecturer in the app** (IPv4 and IPv6 ranges in CIDR notation). Students on 4G/5G are refused with a plain message (D23) that asked them to join the university Wi-Fi (message replaced on 24/11, see D32) (*amended by D32: now accepted and flagged "off campus network"*). The university has no VPN (confirmed by the student). The student measures the campus public IP(s) on site on 23/11; until then the list holds placeholders, and for home testing the student's own IP is used.
    - *Technical note:* the app runs behind a Cloudflare quick tunnel (D13), so the real client IP is read from the `CF-Connecting-IP` header, **trusted only when the request comes through the tunnel (socket peer is localhost)**; otherwise the socket address is used. CIDR matching with stdlib `ipaddress`.
    - *Privacy:* the client IP is used only for the accept/refuse check and **never stored** with attendance records (D21).
    - *Honest limit:* the filter proves "on the campus network", not "in this room".
@@ -435,7 +435,7 @@ All rules are enforced server-side. The QR and the code are refreshed on the pro
 - *Design:* classes for the session, a signed rotating QR token (creation time), a rotating short code (5 s), a check-in window bound to a device token (1 min), a `NetworkPolicy`/allow-list (CIDR, IPv4+IPv6, client-IP resolution behind the tunnel), check-ins (session, nickname, time). No sponsor, slot, claim or tree classes. QR images generated server-side (`qrcode`); no QR-decoding library in the app.
 - *Use cases:* Open/close session; Show projector QR + code; Check in (scan -> [nickname, first time only] -> type code -> confirm); Edit campus allow-list (lecturer); View live list; Take photo / consistency alert; Download sheet.
 - *UI:* student check-in page has a nickname field on first use only, then a numeric code field (`inputmode="numeric"`), then a "Confirm" button; lecturer page has an allow-list editor.
-- *Errors (D23, wording indicative):* off-campus IP -> "Check-in only works on the university Wi-Fi. Please connect to it and scan again."; QR older than 15 s / bad signature -> "This QR code has expired. Scan a fresh one."; window over 1 min -> "Your check-in time ran out. Scan the QR code again."; wrong code -> "Wrong code. Type the code shown under the QR now."; (P2) too many attempts -> "Too many tries. Scan the QR code again."; already checked in, session closed, no open session: unchanged.
+- *Errors (D23, wording indicative):* off-campus IP -> "Check-in only works on the university Wi-Fi. Please connect to it and scan again." (message replaced on 24/11, see D32); QR older than 15 s / bad signature -> "This QR code has expired. Scan a fresh one."; window over 1 min -> "Your check-in time ran out. Scan the QR code again."; wrong code -> "Wrong code. Type the code shown under the QR now."; (P2) too many attempts -> "Too many tries. Scan the QR code again."; already checked in, session closed, no open session: unchanged.
 - *Tests (injectable clock and client IP, D25):* IPv4 and IPv6 inside/outside the allow-list; `CF-Connecting-IP` honoured from localhost and ignored from any other peer (spoofing); QR accepted at 15 s, rejected just after; window accepted at 1 min, rejected just after; current code accepted, stale code rejected (P1: previous code accepted, the one before rejected); (P2) 6th attempt rejected; double check-in from the same token rejected; check-in after close rejected; no IP column in the stored records/export.
 - *Hosting (D13):* allow-list must include the LAN range for plan B.
 - *Results (D17):* measure live the whole-class check-in duration and the number of refusals (off-campus, expired, wrong code).
@@ -528,7 +528,7 @@ on-campus non-attendees" no longer hold as written: a remote accomplice-assisted
   (more visible, warning style).
 - **An empty campus allow-list refuses every check-in** (D31 "fail closed" kept: the app is not configured, so no
   origin can be judged); a malformed client IP is refused too. These two cases are the only ones that still raise the
-  off-campus error, with its unchanged message (D23).
+  off-campus error, with the D23 message replaced on 24/11 (see the Impact paragraph below).
 - Shown to the lecturer: a marker per row in the live table, the origin per row in the JSON, header counters
   "N checked in (x off campus, y via Apple relay)"; in the export, a column "network" (`campus` / `Apple relay` /
   `off campus`) on the check-ins sheet and two counts per session (via Apple relay, off campus) on the summary sheet.
@@ -573,7 +573,7 @@ file, one extra range set, one text column, no new service.
 `classify(client_ip) -> NetworkOrigin` (`CAMPUS` / `APPLE_RELAY` / `OFF_CAMPUS`); new loader
 `app/adapters/relay_ranges.py`; script; `CheckIn.network_origin`; exporter and live table columns and counters; task
 T19. SRS: FR-1.2, FR-1.4, FR-1.14, FR-1.18 amended, new FR-1.19, error table row reworded. Tests: see T19 in
-`design.md`. Results (D17): report the numbers of off-campus and relay check-ins measured in class.
+`design.md`. Results (D17): report the numbers of off-campus and relay check-ins measured in class. **Message validated by the student (24/11):** the off-campus error now reads "Check-in is not available right now. Ask the lecturer."; it replaces the D23 wording.
 
 **Status:** VALIDATED by the student — 2026-11-24
 

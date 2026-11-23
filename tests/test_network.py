@@ -58,7 +58,7 @@ def test_outside_ranges_is_off_campus(policy, ip):
 def test_refused(policy, ip):
     with pytest.raises(OffCampusError) as err:
         policy.ensure_allowed(ip)
-    assert err.value.user_message.startswith("Check-in only works on the university Wi-Fi")
+    assert err.value.user_message.startswith("Check-in is not available right now. Ask the lecturer.")
 
 
 def test_ipv4_against_ipv6_only_list(settings):

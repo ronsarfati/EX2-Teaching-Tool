@@ -48,7 +48,7 @@ class LLMUnavailableError(AppError):
 
 
 class OffCampusError(CheckInError):
-    user_message = "Check-in only works on the university Wi-Fi. Please connect to it and scan again."
+    user_message = "Check-in is not available right now. Ask the lecturer."
     http_status = 403
 
 

@@ -927,7 +927,7 @@ classDiagram
 
 | Exception | Raised by | `user_message` (SRS section 5) | HTTP |
 |---|---|---|---|
-| `OffCampusError` | `NetworkPolicy.classify` (also via `ensure_allowed`), only when the campus allow-list is empty or the client address is malformed (D32) | Check-in only works on the university Wi-Fi. Please connect to it and scan again. | 403 |
+| `OffCampusError` | `NetworkPolicy.classify` (also via `ensure_allowed`), only when the campus allow-list is empty or the client address is malformed (D32) | Check-in is not available right now. Ask the lecturer. | 403 |
 | `QrExpiredError` | `RotatingCredentials.verify_qr` | This QR code has expired. Scan a fresh one. | 400 |
 | `WindowExpiredError` | `CheckInService.confirm` | Your check-in time ran out. Scan the QR code again. | 400 |
 | `WrongCodeError` | `CheckInService.confirm` | Wrong code. Type the code shown under the QR now. | 400 |
@@ -1047,7 +1047,7 @@ sequenceDiagram
   alt campus list empty (app not configured) or malformed client IP
     NP-->>CS: OffCampusError
     CS-->>SR: OffCampusError
-    SR-->>P: "Check-in only works on the university Wi-Fi. Please connect to it and scan again."
+    SR-->>P: "Check-in is not available right now. Ask the lecturer."
   else CAMPUS (wins), APPLE_RELAY or OFF_CAMPUS (e.g. 4G/5G): all accepted
     CS->>RC: verify_qr(qr_token)
     alt bad signature or older than 15 s on arrival
@@ -1082,7 +1082,7 @@ sequenceDiagram
   alt campus list empty or malformed client IP
     NP-->>CS: OffCampusError
     CS-->>SR: OffCampusError
-    SR-->>P: "Check-in only works on the university Wi-Fi. Please connect to it and scan again."
+    SR-->>P: "Check-in is not available right now. Ask the lecturer."
   else accepted
   NP-->>CS: origin (CAMPUS, APPLE_RELAY or OFF_CAMPUS)
   Note over CS: everything below runs in one Database.transaction()

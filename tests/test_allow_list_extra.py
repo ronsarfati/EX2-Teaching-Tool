@@ -3,7 +3,7 @@ import pytest
 
 URL = "/lecturer/allow-list"
 INVALID = "This is not a valid network range (e.g. 192.0.2.0/24)."
-OFF_CAMPUS = "Check-in only works on the university Wi-Fi. Please connect to it and scan again."
+OFF_CAMPUS = "Check-in is not available right now. Ask the lecturer."
 WARNING = "Nobody can check in until you add the campus network."
 
 

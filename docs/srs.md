@@ -409,7 +409,7 @@ Every case is covered by a test (D23). Messages are indicative wording.
 
 | Situation | User-facing message |
 |---|---|
-| Campus allow-list still empty (app not configured), or malformed client IP (D32: an IP outside the list is no longer refused, it is labelled, FR-1.19) | "Check-in only works on the university Wi-Fi. Please connect to it and scan again." |
+| Campus allow-list still empty (app not configured), or malformed client IP (D32: an IP outside the list is no longer refused, it is labelled, FR-1.19) | "Check-in is not available right now. Ask the lecturer." |
 | QR older than 15 s on arrival, or invalid signature | "This QR code has expired. Scan a fresh one." |
 | Check-in window older than 1 minute | "Your check-in time ran out. Scan the QR code again." |
 | Wrong check-in code | "Wrong code. Type the code shown under the QR now." |
