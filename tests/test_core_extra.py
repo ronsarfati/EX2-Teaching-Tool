@@ -326,11 +326,17 @@ def test_ping_body_and_static_css(client):
     css.close()
 
 
-def test_main_exits_on_bad_config(monkeypatch):
-    """Covers FR-6.3: start-up refuses to run without the required variables."""
+def test_main_exits_on_bad_config(monkeypatch, tmp_path):
+    """Covers FR-6.3: start-up refuses to run without the required variables.
+
+    main() calls load_env_file() on the CWD: run from an empty temp dir so a real `.env`
+    cannot fill the variables back in (it would start the server / leak into os.environ).
+    """
     from app import __main__ as entry
+    monkeypatch.chdir(tmp_path)
     for n in ("LECTURER_PIN", "SECRET_KEY", "BASE_URL"):
-        monkeypatch.delenv(n, raising=False)
+        monkeypatch.setenv(n, "x")  # registers restore-on-teardown even if main() mutates os.environ
+        monkeypatch.delenv(n)
     with pytest.raises(SystemExit) as info:
         entry.main()
     assert "Configuration error" in str(info.value)
