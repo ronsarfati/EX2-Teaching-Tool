@@ -16,6 +16,7 @@ from app.repositories.sessions import SessionRepository
 from app.repositories.settings import SettingsRepository
 from app.repositories.windows import CheckInWindowRepository
 from app.services.checkin import CheckInService
+from app.services.export import AttendanceExporter
 from app.services.credentials import RotatingCredentials
 from app.services.network import NetworkPolicy
 from app.services.sessions import SessionService
@@ -56,6 +57,7 @@ def create_app(config: Config, *, clock: Clock | None = None,
         "checkin_service": CheckInService(
             NetworkPolicy(settings), credentials, sessions, check_ins, windows, db, clock
         ),
+        "exporter": AttendanceExporter(sessions, check_ins),
         "head_counter": head_counter,
         "check_ins": check_ins,
         "windows": windows,

@@ -1,7 +1,7 @@
 """Lecturer pages: login, dashboard, open / close session (FR-1.1, FR-1.13, FR-6.1)."""
 from __future__ import annotations
 
-from flask import Blueprint, current_app, redirect, render_template, request, session, url_for
+from flask import Blueprint, Response, current_app, redirect, render_template, request, session, url_for
 
 from app.errors import InvalidNetworkRangeError, UnreadablePhotoError, WrongPinError
 from app.services.network import NetworkPolicy
@@ -83,3 +83,29 @@ def photo(session_id: int):
             raise UnreadablePhotoError()
         summary = _services()["session_service"].record_head_count(session_id, upload.read())
     return render_template("photo.html", session_id=session_id, summary=summary)
+
+
+def _download(content: bytes, filename: str, mimetype: str) -> Response:
+    return Response(content, mimetype=mimetype, headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+
+
+@bp.get("/export/checkins.csv")
+@lecturer_required
+def export_checkins_csv():
+    """All check-ins of all sessions as CSV (FR-1.18, UC-5)."""
+    return _download(_services()["exporter"].checkins_csv(), "checkins.csv", "text/csv")
+
+
+@bp.get("/export/summary.csv")
+@lecturer_required
+def export_summary_csv():
+    """Per-session N, D and status as CSV (FR-1.18)."""
+    return _download(_services()["exporter"].summary_csv(), "summary.csv", "text/csv")
+
+
+@bp.get("/export.xlsx")
+@lecturer_required
+def export_xlsx():
+    """Both tables as the sheets "Check-ins" and "Summary" of one workbook (FR-1.18)."""
+    return _download(_services()["exporter"].xlsx(), "attendance.xlsx",
+                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
