@@ -26,8 +26,8 @@ any smartphone browser with no installation (R14):
 
 ### In scope
 
-All five features are designed. F1, F2, F3 and F5 are implemented in the demo app; F1 is built first and is the
-most robust part (D1). F4 (video summary) is designed but its implementation is deferred (D10, decision pending).
+All five features are designed and implemented in the demo app; F1 is built first and is the most robust part (D1).
+F4 (video summary) was first deferred (D10) and is implemented since D34 (23/11).
 
 - **F1 Attendance (main)**
   - *Projector check-in* (D30): the lecturer opens a session (one click, PIN) and the projector shows a **QR**
@@ -49,8 +49,13 @@ most robust part (D1). F4 (video summary) is designed but its implementation is 
 - **F2 Comments** (D8): real time (visible on the lecturer page within a few seconds, D4) and asynchronous (posted
   outside class, read later).
 - **F3 Polls** (D9): one question, 2-4 options, one vote per device, live results, closed by the lecturer.
-- **F4 Video summary** (D10, deferred): uploaded video, local transcription, structured LLM summary (topics, key
-  points, action items, questions), aiming to beat the Zoom automatic summary (R8); no pre-computed output (D1).
+- **F4 Video summary** (D34, closes D10): on the PIN-protected page "Video summary" the lecturer uploads a recording
+  (video or audio, up to 2 GB, this page only). `ffmpeg` extracts the audio, `faster-whisper` (`small`) transcribes it
+  on the laptop in **one background job at a time**, and Claude writes a structured summary in four sections (topics
+  covered, key notions, definitions and examples, what to review) in the language of the lecture. A status page
+  shows the step; the result is shown and downloadable as `.md` and `.txt` (R7, R8). The recording and its audio
+  are deleted right after transcription, the transcript is never stored, only the summary text is kept (R16, D21).
+  No pre-computed output (D1).
 - **F5 Homework review** (D11): public repository URL, capped text extract, LLM review against a short rubric,
   comparison with 1-2 other submissions shown **anonymised** ("Submission B, C"); runs live, no pre-computed output.
 - Student identity = self-chosen **nickname** entered once, remembered by a random device token (D6). Lecturer pages
@@ -58,7 +63,7 @@ most robust part (D1). F4 (video summary) is designed but its implementation is 
 
 ### Out of scope
 
-- Integration with Moodle, Zoom, Meet or Google Classroom; the video is an uploaded file (R15).
+- Integration with Moodle, Zoom, Meet or Google Classroom; the recording is an uploaded file (R15).
 - Personal data: no real names, student IDs, e-mails, face recognition or location; nicknames only (R16, D6, D21).
 - User accounts and sign-up (D6, D22).
 - Native mobile app (R14).
@@ -83,15 +88,15 @@ most robust part (D1). F4 (video summary) is designed but its implementation is 
 - **Attendance** (D30): rotating signed QR tokens (stdlib `hmac`), QR images generated server-side with `qrcode`;
   no QR-decoding library in the app (the phone's native camera scans); projected 4-digit code (D33); no IP-based
   check.
-- **ML / LLM** (D7, D10, D12): local face detector OpenCV YuNet, threshold 0.4 (Ultralytics YOLO tested and
-  rejected in the tools report), local transcription with `faster-whisper`, Anthropic Claude for summaries and
+- **ML / LLM** (D7, D12, D34): local face detector OpenCV YuNet, threshold 0.4 (Ultralytics YOLO tested and
+  rejected in the tools report), local audio extraction with `ffmpeg` and transcription with `faster-whisper` (`small`, one background thread), Anthropic Claude for summaries and
   reviews (model and API key from environment variables, never committed).
 - **Demo hosting** (D13): app on a laptop exposed with a Cloudflare quick tunnel (public HTTPS URL); plan B phone
   hotspot; plan C recorded rehearsal.
 
 ### How to run
 
-Prerequisites: Python 3.11+ (tested with 3.13) and, optionally, `cloudflared` (to expose the app to phones).
+Prerequisites: Python 3.11+ (tested with 3.13) and, optionally, `cloudflared` (to expose the app to phones) and `ffmpeg` (F4 only, for example `brew install ffmpeg`).
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
@@ -105,14 +110,25 @@ In `.env` set:
 - `SECRET_KEY`: a long random string.
 - `LECTURER_PIN`: the lecturer PIN; use a long one (D22).
 - `BASE_URL`: the public URL phones will use (`http://localhost:5000` locally, the tunnel URL for the demo).
+- `WHISPER_MODEL` (default `small`), `WHISPER_LANGUAGE` (empty = detect the language), `VIDEO_MAX_BYTES` (default 2 GB,
+  F4 upload page only) and `VIDEO_WORK_DIR` (temporary files, outside the repository; empty = system temp folder), D34.
 - `PORT` (optional): on a Mac set `PORT=5050` and use the same port in `BASE_URL` (macOS AirPlay listens on 5000).
-- `ANTHROPIC_API_KEY` (optional): enables the F5 homework review; without it the page shows an "unavailable" message.
+- `ANTHROPIC_API_KEY` (optional): enables the F5 homework review and the F4 summary; without it the page shows an "unavailable" message.
 
 `python -m app` loads `.env` with a small standard-library loader; variables already set in the environment win.
 
 Optional face model: for the photo head count, download the YuNet model `face_detection_yunet_2023mar.onnx` from
 the official OpenCV `opencv_zoo` repository and place it in `models/` (or set `YUNET_MODEL_PATH`). The model file
 is not bundled with this repository.
+
+F4 video summary (D34): install `ffmpeg`. The Whisper `small` model (about 460 MB) is downloaded **once, at the first
+summary**, into the Hugging Face cache of the user's home (not in the repository), so the first job is slower and needs
+internet. Upload large recordings on `http://localhost:<port>/lecturer/video`, **not through the tunnel**: the free
+Cloudflare plan limits a request body to about 100 MB (per its documentation). Measured on a MacBook M3 (T18f,
+23/11/2026): a 244 s Hebrew lecture clip took about 70 s (audio 2 s, Whisper `small` about 54 s, Claude 14 s); at the
+measured real-time factor of 0.17-0.22 a 90-minute lecture takes roughly 15-20 minutes. Do not start a long
+recording during a check-in (shared CPU). Optional integration test: `RUN_F4_INTEGRATION=1 python -m pytest -q
+tests/test_t18b_integration.py` (needs `ffmpeg` and the cached model).
 
 First step for the lecturer: open the app and sign in with the PIN at `/lecturer/login`.
 
@@ -131,7 +147,7 @@ Optional demo data (fictional nicknames only, no network, no API key; existing f
 | To Do | Deliverable | Location | Status |
 |---|---|---|---|
 | — | Requirements R1-R37 | [docs/requirements.md](docs/requirements.md) | Done |
-| — | Validated decisions D1-D33 | [docs/decisions.md](docs/decisions.md) | Done |
+| — | Validated decisions D1-D34 | [docs/decisions.md](docs/decisions.md) | Done |
 | 1 | Repository, problem and scope | this README | Done |
 | 2 | Repository link submitted via the course form | (by the student) | Planned |
 | 3 | Tools report, every tool tested for real | [docs/tools_report.md](docs/tools_report.md) | Done |
@@ -159,4 +175,4 @@ Optional demo data (fictional nicknames only, no network, no API key; existing f
 This project was designed and built with the help of **Claude Code** (Anthropic) AI agents, working under the
 student's direction. The agents drafted the requirements, decisions, documents and code; the student defined the
 key design choices (e.g. the projector QR + 4-digit code check-in, D30, D33) and reviewed and validated every decision before it was
-applied. Third-party libraries and services used by the app are listed in the tools report.
+applied. The F4 video-summary feature was tried on a public lecture clip that stays local and is not in the repository. Third-party libraries and services used by the app are listed in the tools report.

@@ -2,7 +2,7 @@
 
 Covers R24 (technical tools report) and R25 (every suggested tool is tested for real, with evidence).
 It follows the validated decisions: D2 (Flask stack), D6 (nicknames), D30 (check-in with a
-projector QR and a typed code, 4 digits since D33), D7 (photo head count), D8 (spreadsheet), D10 (video summary), D11/D12 (LLM),
+projector QR and a typed code, 4 digits since D33), D7 (photo head count), D8 (spreadsheet), D34 (video summary, closes D10), D11/D12 (LLM),
 D13 (hosting), D25 (pytest). The tests below were run on 22/11 for the earlier chain-of-trust design (D5); a chain of
 trust and a local Wi-Fi bubble were then studied and rejected (D30). A campus-IP filter and Apple's relay list were tested on 23/11 and abandoned (D33, 2.11-2.12). The tested tools are the same; only the
 parameters change (see 2.2).
@@ -24,13 +24,14 @@ parameters change (see 2.2).
 | 3 | QR generation (server) (R1, D30) | `qrcode` | 8.2 | 3/3 QR codes decoded back identically (OpenCV) | ADOPT |
 | 4 | QR scanning on the student's phone (R1, D30) | Phone's **native camera app** (QR encodes the check-in URL; no library on the phone) | iOS / Android built-in | not testable by an agent (needs real phones, Section 3); alternative jsQR evaluated: 3/3 clean + 5/5 degraded QR decoded under Node | ADOPT native camera, phone test pending (manual); jsQR not adopted |
 | 5 | Photo head count (R2, D7) | OpenCV YuNet face detector, full image, threshold 0.4 | OpenCV 5.1.0.95, model 2023mar | on 4 photos checked box by box: recall 94 %, precision 96 %, mean count error 2.5 people, < 0.1 s/photo; tiling tested and rejected | ADOPT YuNet + alert tolerance (2.5.3); YOLO rejected |
-| 6 | Video transcription (R7, D10) | faster-whisper (`small` for Hebrew, `base` for speed) | 1.2.1 (CTranslate2 4.9.1) | m21.mp4: Hebrew detected (p=0.94-0.96); 150 s English test audio: WER 1.5 % (`small`), 25 s | ADOPT (pin `av<17`) |
+| 6 | Video transcription (R7, D34) | faster-whisper `small` (default since D34; `base` for speed) | 1.2.1 (CTranslate2 4.9.1) | m21.mp4: Hebrew detected (p=0.94-0.96); 150 s English test audio: WER 1.5 % (`small`), 25 s; T18f: 244 s Hebrew lecture clip transcribed in about 54 s (`small`) | ADOPT (pin `av<17`) |
 | 7 | LLM summary / homework review (R7-R10, D12) | Anthropic Python SDK + Claude | anthropic 2.12.0 | 1 real call: 3.5 s, 107 in / 92 out tokens | ADOPT |
 | 8 | Offline spreadsheet (R3, D8) | `openpyxl` (XLSX) + stdlib `csv` | 3.1.5 | XLSX and CSV written and read back identically | ADOPT |
 | 9 | Public HTTPS URL for the live demo (R13, D13) | Cloudflare quick tunnel (`cloudflared`) | 2026.11.1 | public `https://<random>.trycloudflare.com/ping` returned HTTP 200 (3/3, 0.96-1.99 s) | ADOPT, plan B needed |
 | 10 | Tests (R32, D25) | pytest + Flask test client | 9.2.0 | 3 passed in 0.09 s (5 runs); caught a real intermittent token bug | ADOPT |
 | 11 | Network origin of a check-in (R1, R13, D30, D32) | stdlib `ipaddress` + `CF-Connecting-IP` header behind cloudflared | Python stdlib / cloudflared 2026.11.1 | tested on site 23/11 (2.11) | ABANDONED (D33) |
 | 12 | Apple iCloud Private Relay egress list (R1, D32) | public CSV published by Apple | file downloaded 23/11 | tested on site 23/11 (2.12) | ABANDONED (D33) |
+| 13 | Audio extraction from any recording (R7, R15, D34) | `ffmpeg` (subprocess, argument list) | 9.0.2 | T18f: 244 s Hebrew clip, mono 16 kHz WAV extracted in about 2 s; unreadable or audio-less input refused | ADOPT |
 
 Other building blocks that need no separate test: SQLite (Python stdlib `sqlite3`, D3), short polling with
 `fetch()` every 2-3 s (1 s on the projector page, D31) (D4; also compatible with the quick tunnel, which does not support Server-Sent Events).
@@ -251,7 +252,7 @@ photos). YOLO: rejected (worse counts: 70 % at 1280 px, AGPL, torch). First comp
 Command: `python tools_tests/head_count.py <yunet.onnx> <yolo11n.pt|yolov8n.pt|none> <photos...>`. YOLO11n runtime
 35-38 ms @640 and 125-134 ms @1280 (first call 9.6 s with model load); YOLOv8n gave similar or lower counts.
 
-### 2.6 Video transcription - faster-whisper (R7, R8, R15, D10)
+### 2.6 Video transcription - faster-whisper (R7, R8, R15, D34)
 
 | Candidate | Licence | Cost | Privacy | Notes |
 |---|---|---|---|---|
@@ -284,12 +285,34 @@ Command: `python tools_tests/head_count.py <yunet.onnx> <yolo11n.pt|yolov8n.pt|n
 - **Issue found and fixed:** faster-whisper 1.2.1 crashes with PyAV 19 (`TypeError: open() got an unexpected keyword
   argument 'metadata_errors'`). **Pin `av<17`** (tested with av 16.1.0).
 - **Estimate for a real 90-minute lecture** (from the RTF above, CPU): about 6 min with `base`, about 15 min with
-  `small`, which is too long for a 10-minute demo. F4 is **deferred** (D10) and must run live, with no pre-computed
-  output. The candidate is a live demo on a **short 2-3 min clip**. From the measured real-time factors, transcribing
-  such a clip takes about 7-11 s with `base` (RTF 0.06) or 20-30 s with `small` (RTF 0.17), plus model loading
-  (1-2 s once the model is cached) and one Claude call (3.5 s measured in 2.7).
-- **Verdict:** ADOPT faster-whisper; `small` for Hebrew lectures (quality), `base` for a quick live demo.
-  Hebrew accuracy could not be measured (5.7 s of speech only, no reference text). Fallback: openai-whisper.
+  `small`. D10 first deferred F4 because of this duration; **D34 (23/11) closes it**: the transcription runs in a
+  background job with a status page, and `small` is the default for Hebrew quality.
+- **T18f real run (23/11/2026, same MacBook M3, full HTTP stack, upload on localhost):** a 244 s Hebrew lecture clip
+  (a public university lecture, kept local only, never committed) took about 70 s in total: audio extraction 2 s,
+  transcription with `small` about 54 s (real-time factor about 0.22, within the 0.17-0.22 measured range), Claude
+  summary 14 s. The summary was faithful, in four sections with headings in Hebrew; `.md` and `.txt` downloads worked;
+  the work directory was empty afterwards; the database kept only the summary text. A 90-minute lecture
+  therefore takes roughly 15-20 minutes (extrapolation, not measured).
+- **Verdict:** ADOPT faster-whisper `small` (Hebrew and English); `base` remains a faster option through
+  `WHISPER_MODEL`. The model (about 460 MB) is downloaded once at first use. Hebrew accuracy was judged on the
+  summary of one clip, not measured as a WER. Fallback: openai-whisper.
+
+### 2.13 Audio extraction - ffmpeg (R7, R15, D34)
+
+| Candidate | Licence | Cost | Notes |
+|---|---|---|---|
+| **ffmpeg** (command line) | LGPL/GPL | free, local | Reads every format a lecturer records (MP4, MOV, MKV, WebM, M4A, MP3, ...); one external binary (`brew install ffmpeg`). |
+| PyAV (already a dependency of faster-whisper) | BSD | free | In-process, no binary; would need its own error handling per format. Not tested; kept as the fallback behind the same `AudioExtractor` port (design OI-21). |
+
+- **Command (as run by the app):** `ffmpeg` called with an argument list (no shell), video dropped, mono, 16 kHz WAV
+  output in a temporary file, with a timeout.
+- **Result:** ffmpeg 9.0.2 (Homebrew); on the 244 s Hebrew clip of 2.6 the extraction took about 2 s (T18f). A file
+  that ffmpeg cannot read, or that has no audio track, is refused with "We could not read this video file."; a missing
+  binary gives the "transcription service is unavailable" message (unit tests with a patched `subprocess.run`;
+  opt-in integration test `RUN_F4_INTEGRATION=1`).
+- **Limit:** the free Cloudflare plan limits a request body to about 100 MB (per its documentation, not measured by
+  us), so large recordings are uploaded on `localhost`, not through the tunnel (2.9).
+- **Verdict:** ADOPT.
 
 ### 2.7 LLM - Anthropic Claude via the Python SDK (R7-R11, D11, D12)
 
@@ -391,9 +414,8 @@ These need a real phone, a camera or the classroom, so they could not be run by 
 6. **Plan B without HTTPS (hotspot / LAN):** repeat test 1 with an `http://<laptop-ip>` URL in the QR (iPhone and
    Android) and check that the camera app opens plain-HTTP links without
    blocking.
-7. **Longer lecture recording:** the provided `m21.mp4` is 5.7 s, which is too short to judge the summary against
-    the Zoom example (R8). If a longer recording is available, run `tools_tests/transcribe.py` on it with `small`
-    and `language` set, then the LLM summary.
+7. **Longer lecture recording (F4, D34):** done for a 244 s clip in T18f (2.6); a 60-90 minute recording is
+   optional and would confirm the 15-20 minute estimate.
 
 ## 4. Reproduce
 
@@ -403,7 +425,7 @@ python3.13 -m venv .venv
 .venv/bin/pip install ultralytics   # only to reproduce the YOLO comparison (pulls PyTorch)
 # YuNet model: https://github.com/opencv/opencv_zoo/raw/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx
 # Node decoder test: npm install jsqr pngjs (in a temporary folder), then NODE_PATH=<folder>/node_modules
-brew install cloudflared
+brew install cloudflared ffmpeg   # ffmpeg: F4 audio extraction (D34)
 ```
 Model files (`*.onnx`, `*.pt`) and the `.env` file are git-ignored; keep them outside the repository or in a
 git-ignored folder.

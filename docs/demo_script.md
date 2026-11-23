@@ -1,7 +1,7 @@
 # Live demo script (To Do 11) - 10 minutes
 
 Goal: show the main feature (F1 attendance) working with the real class on their own phones, then F3, F2 and F5,
-in 10 minutes. Items marked **(pending)** depend on a choice not yet made.
+in 10 minutes. Items marked **(pending)** depend on a choice not yet made. F4 (video summary, D34) runs as a background job during the polls.
 
 Roles: **Presenter** = lecturer-side laptop (projected). **Classmates** = phones. **Helper** (optional) = takes the
 class photo and watches the clock.
@@ -11,7 +11,7 @@ class photo and watches the clock.
 Run once on the demo laptop, from the repository root (`python -m app` loads `.env` itself; variables already set in the environment win).
 
 1. Environment: copy `.env.example` to `.env`, set a long random `SECRET_KEY`, a `LECTURER_PIN`, and `BASE_URL`
-   (the public tunnel URL, or `http://<laptop IP>:<port>` for the hotspot plan B). Optional: `ANTHROPIC_API_KEY` (F5).
+   (the public tunnel URL, or `http://<laptop IP>:<port>` for the hotspot plan B). Optional: `ANTHROPIC_API_KEY` (F5 and F4).
 2. Demo data (optional, fictional only): `python scripts/seed_demo.py instance/app.db --force`
    fills 3 past sessions, a closed poll, a few comments and fake peer URLs so the export looks populated.
    **(pending)** Seeded or empty database for the live class: decide with the lecturer; with a seeded database the
@@ -28,7 +28,10 @@ Run once on the demo laptop, from the repository root (`python -m app` loads `.e
    `/lecturer` (dashboard) for yourself. Leave **no session open** yet.
 8. Quick test with your own phone: scan, confirm, then check the row appears, then reset
    (`--force` re-seed) or close the session. Do not leave test rows if the figures are to be reported.
-9. Have the plan C material ready: the recorded rehearsal video and screenshots (**pending**: record at rehearsal).
+9. F4 (D34): install `ffmpeg` (`ffmpeg -version`) and run one real summary beforehand, so the Whisper `small` model
+   (about 460 MB) is already in the cache (the first use downloads it). Keep a short lecture clip (about 4 minutes,
+   local only, never committed) on the laptop, and keep the finished summary (`.md`) of that clip for plan B.
+10. Have the plan C material ready: the recorded rehearsal video and screenshots (**pending**: record at rehearsal).
 
 ## 2. Timeline
 
@@ -41,12 +44,12 @@ Run once on the demo laptop, from the repository root (`python -m app` loads `.e
 | 3:45-5:00 | Helper + Presenter | Helper takes a photo of the room; Presenter uploads it in **Count heads on a class photo**. | "Checked in N / detected D / consistent or anomaly" |
 | 5:00-5:30 | Presenter | Say: the photo is counted then discarded, only D is kept (D7). If anomaly: say it is an alert, not an accusation. Click **Close session**. | Result page, then QR disappears |
 | 5:30-6:00 | Presenter | Dashboard: **Download XLSX**; open it. | Sheets "Check-ins" and "Summary" (past sessions if seeded) |
-| 6:00-7:30 | Presenter + classmates | **Polls**: create "Which topic next?" with 2-3 options; classmates open the menu page of the app, tap **Poll**, vote; watch the bars rise, then **Close**. | Live counts, closed poll |
+| 6:00-7:30 | Presenter + classmates | **F4 start (about 20 s):** in a second tab open `http://localhost:<port>/lecturer/video` (**localhost, not the tunnel**: the free Cloudflare plan limits a request to about 100 MB per its documentation), upload the clip; the job runs in the background (about 70 s measured for a 244 s clip, T18f). Then **Polls**: create "Which topic next?" with 2-3 options; classmates open the menu page of the app, tap **Poll**, vote; watch the bars rise, then **Close**. | Live counts, closed poll; the video page shows the step |
 | 7:30-8:30 | Classmates + Presenter | Classmates open **Comments** and post a suggestion; Presenter opens `/lecturer/comments`; comments appear within a few seconds. | Newest comments first, no names |
 | 8:30-9:30 | Presenter | **F5 Homework review**: with a key, paste one public repository URL **(pending: which repository)** and show the review with anonymised "Submission B/C" comparison. Without a key, submit anyway and show the clear message "The review service is unavailable right now. Please try again later." | Review text and metrics, or the unavailable message |
-| 9:30-10:00 | Presenter | Wrap-up: what was measured today (N, D, duration), F4 video summary **(pending: deferred, state its status)**, known limits (section 4). | Dashboard |
+| 9:30-10:00 | Presenter | Wrap-up: what was measured today (N, D, duration), open the finished **Video summary** page (four sections, `.md`/`.txt` download; no recording or transcript is kept, D34), known limits (section 4). | Dashboard |
 
-If time runs short, cut in this order: F5, comments, poll. Never cut check-in, photo count or export.
+If time runs short, cut in this order: F5, comments, poll, F4 display. Never cut check-in, photo count or export.
 
 ## 3. Plan B for each risk
 
@@ -57,6 +60,7 @@ If time runs short, cut in this order: F5, comments, poll. Never cut check-in, p
 | Code typed wrongly by many students | Many "Wrong code" messages | Remind them to type the code shown now (the current or previous one is accepted); after 5 attempts they scan again (D30, D33). |
 | YuNet model missing or corrupt | Upload shows "Head count is not available right now." | Show the message as the designed behaviour; continue; show the recorded photo-count screenshot (plan C) and give D from the rehearsal. Check `ls models/` during setup. |
 | No API key | F5 shows the unavailable message | Show the message (designed behaviour, 503); explain the key is an environment variable; show a rehearsal screenshot of a real review. |
+| F4 not finished or failed (slow CPU, no key, model missing) | Status page not "done" at 9:30, or a plain failure message | Open the pre-made summary of the same clip (plan B file or an earlier finished job) and say it is the result of the same pipeline; never promise a time (NFR-13). |
 | LLM slow (> 30 s) | Spinner / no answer | Do F5 last; if no answer after 30 s, switch to the screenshot of the rehearsal review and move on. The call times out after 60 s with the same message. |
 | Student phone cannot scan | One student blocked | Nothing in the app (by design, D30): the lecturer adds the student by hand in the exported spreadsheet after class. |
 | App crashes or laptop freezes | Page unreachable | Restart `python -m app` (data persists in SQLite); worst case plan C video. |
@@ -76,4 +80,4 @@ If time runs short, cut in this order: F5, comments, poll. Never cut check-in, p
 - Real-time is short polling every 1-3 s, not push; "offline" means a downloadable spreadsheet and comments posted
   later, not an offline-first app.
 - The quick-tunnel address changes at each run, so phones may ask for the nickname again.
-- F4 (video summary) status: **(pending)**.
+- F4 (video summary): the summary is a model output, not a transcript check; the 244 s clip took about 70 s but a 90-minute lecture takes roughly 15-20 minutes (R7, NFR-13); a long recording slows the check-in, so it is started after it.

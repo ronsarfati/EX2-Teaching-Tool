@@ -18,12 +18,12 @@ filled in only after the demo; nothing below is estimated.
 | F2 Comments (real-time and later) | Implemented, tested |
 | F3 Polls (one vote per device, live results, close) | Implemented, tested |
 | F5 Homework review with anonymised comparison (public GitHub URL, Claude) | Implemented, tested with fakes; live call needs an API key [to fill after the class demo] |
-| F4 Video summary | Not implemented (T18 deferred, pending decision) |
+| F4 Video summary (upload, ffmpeg, Whisper `small`, Claude, background job, status page, `.md`/`.txt` download; D34) | Implemented, tested with fakes; one real end-to-end trial (section 3) |
 
 ## 3. Measured figures
 
-Automated tests (23/11, after D33): 913 passed, 2 skipped (the 2 skipped tests need the YuNet model file); statement
-coverage of `app/` 98 % (1,228 statements).
+Automated tests (23/11, after D34, `python -m pytest -q --cov=app`): 1136 passed, 1 skipped (the opt-in F4 integration test,
+`RUN_F4_INTEGRATION=1`); statement coverage of `app/` 99 %.
 
 Scripted local trial (23/11, after D33, real server on the laptop, QR decoded from the projector image): wrong code refused (400), right 4-digit code accepted, second check-in from the same phone refused (409), 3-digit input refused, second phone accepted, removed allow-list page answers 404, no client address in the server log. Earlier trial scope (before D33): (check-in with QR and code, repeated check-in refused, wrong code
 refused, expired or forged QR refused, live table API, poll, comments, CSV and XLSX exports, photo upload without the
@@ -31,6 +31,14 @@ model answering 503, review without a key answering 503). This trial is not a cl
 
 Photo head count accuracy (from the tools report, 4 provided class photos checked box by box, threshold 0.4): recall
 94 %, precision 96 %, mean error 2.5 people, under 0.1 s per photo. These photos are not in the repository.
+
+F4 real trial (T18f, 23/11/2026, MacBook M3, full HTTP stack, upload on localhost): a 244 s Hebrew lecture clip (a public
+university lecture, kept local only, not in the repository) was summarised in about 70 s: audio extraction 2 s,
+transcription with Whisper `small` about 54 s, Claude summary 14 s. The summary was faithful to the lecture, in four
+sections with headings in the lecture language (Hebrew); the `.md` and `.txt` downloads worked; the work directory was
+empty afterwards and the database kept only the summary text (FR-4.5). Earlier measure (tools report 2.6): real-time
+factor of `small` about 0.17-0.22, so a 90-minute lecture takes roughly 15-20 minutes (NFR-13); this 90-minute
+figure is an extrapolation, not a measured run.
 
 Live class demo:
 
@@ -44,6 +52,7 @@ Live class demo:
 | Poll: participants and time to results | [to fill after the class demo] |
 | Comments received and delay before they appeared | [to fill after the class demo] |
 | F5 review: repository, time to answer, quality of the comparison | [to fill after the class demo] |
+| F4 summary: clip length, processing time, plan B used? | [to fill after the class demo] |
 | Plan B used? Incidents | [to fill after the class demo] |
 
 ## 4. Observations
@@ -53,7 +62,11 @@ Live class demo:
 - Field findings before the demo (23/11): a campus-IP filter and Apple's Private Relay list were tested on site and
   abandoned (D33, tools report 2.12); the check-in relies on the rotating QR and the 4-digit code instead.
 - Local trial: [to fill after the class demo] for observations from the real class.
-- F4 versus the Zoom example summary: [to fill after the class demo] / not applicable if F4 stays deferred (pending).
+- F4 versus the Zoom example summary (R8, qualitative; the Zoom example is local only and its content is not reproduced):
+  the Zoom example is a quick recap plus next steps; ours gives four study sections (topics covered, key notions,
+  definitions and examples, what to review) in the lecture language. Ours works on any recording, offline from Zoom
+  (no Zoom integration, R15), and the audio stays on the laptop (R16). No quantitative comparison was made, and the
+  quality judgement comes from one trial on one clip.
 
 ## 5. Limits
 
@@ -65,4 +78,4 @@ Live class demo:
 - The homework review page has no PIN in the demo; peers are anonymised in the prompt and the output.
 - Real time is polling (1-3 s); there is no offline-first mode.
 - With the quick tunnel, the address changes at each start.
-- F4 is not implemented (pending).
+- F4: a 90-minute lecture takes about 15-20 minutes (extrapolated, NFR-13); one job at a time; the summary is a model output checked on one clip only; the first use downloads the `small` model (about 460 MB); uploads above about 100 MB must go through localhost, not the free tunnel.

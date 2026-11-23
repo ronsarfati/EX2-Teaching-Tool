@@ -1,9 +1,9 @@
 # Test Strategy (To Do 9)
 
 Covers R32 ("a testing strategy that addresses the classes of To Do 7"). Built from the [design](design.md)
-(classes of section 3, exceptions of 3.8, tasks T1-T21 of section 7), the [SRS](srs.md) (FR-x.y, NFR-n, error table
-of section 5), the [use cases](use_cases.md) (UC-1 to UC-14), the validated decisions D1-D33
-([decisions.md](decisions.md); D25 = test tooling, D7 = consistency rule, D30 / D31 = check-in rules, D33 = no network filter, 4-digit code) and the
+(classes of section 3, exceptions of 3.8, tasks T1-T21 of section 7 (T18 = T18a-T18f)), the [SRS](srs.md) (FR-x.y, NFR-n, error table
+of section 5), the [use cases](use_cases.md) (UC-1 to UC-14), the validated decisions D1-D34
+([decisions.md](decisions.md); D25 = test tooling, D7 = consistency rule, D30 / D31 = check-in rules, D33 = no network filter, 4-digit code, D34 = F4 video summary) and the
 [tools report](tools_report.md). Class, port, method and exception names are exactly those of `design.md`.
 
 ## 1. Approach
@@ -19,7 +19,7 @@ flowchart LR
 
 | Level | What | How | When | Trace |
 |---|---|---|---|---|
-| Unit | Every class and port of design section 3 (section 2 below) | `pytest`, fixtures, `FakeClock`, fakes of the ports, a temporary SQLite file per test (`tmp_path`) | Each task T1-T21, before its commit | D24, D25, NFR-12 |
+| Unit | Every class and port of design section 3 (section 2 below) | `pytest`, fixtures, `FakeClock`, fakes of the ports, a temporary SQLite file per test (`tmp_path`) | Each task T1-T21 (T18a-T18e for F4), before its commit | D24, D25, NFR-12 |
 | Integration | Every route of design 2.1, grouped by use case (section 3 below) | Flask test client on `create_app(config, clock=..., head_counter=..., llm=..., fetcher=..., transcriber=...)` | Each task that adds a route (T5-T18) | D25, design 2.1 |
 | Manual end-to-end | Real phones (iPhone, Android), projector QR, tunnel, export in a spreadsheet tool | Checklist of section 5 (= tools report section 3, tests 1-6) | After T12 (design section 7), again before the demo | D25, NFR-1, NFR-11 |
 | Live demo | The real class, 10 minutes, F1 first | Demo script (Phase 6); whole-class check-in duration and refusals measured | Demo day | R19, NFR-6, D17 |
@@ -40,7 +40,8 @@ flowchart LR
 | `FakeHeadCounter` | `HeadCounter` | Returns a preset count, or raises a preset `UnreadablePhotoError` / `DetectorUnavailableError`; records the call count |
 | `FakeLLMClient` | `LLMClient` | Returns a preset text (or a function of the prompt), or raises `LLMUnavailableError`; records `system`, `prompt`, `max_tokens` |
 | `FakeRepoFetcher` | `RepoFetcher` | Real `normalize_url` rules; `fetch` returns a preset `RepoExtract` per URL or raises `RepoUnavailableError`; records `(url, max_chars)` |
-| `FakeTranscriber` | `Transcriber` | Returns a preset transcript or raises `UnreadableVideoError` (T18 only) |
+| `FakeTranscriber` | `Transcriber` | Returns a preset `Transcript` or raises `UnreadableVideoError` / `TranscriptionUnavailableError`; reports progress (T18) |
+| `FakeAudioExtractor` | `AudioExtractor` | Writes a small WAV file or raises `UnreadableVideoError` (T18) |
 
 ### 1.3 What is not automated, and why
 
@@ -50,7 +51,7 @@ flowchart LR
 | YuNet accuracy on the provided class photos | The photos are personal data: never in the repository or in tests (R16, D21); measured locally only (tools report 2.5: recall 94 %, precision 96 % on 4 photos) | Unit tests with `FakeHeadCounter`; one real-model test on a non-personal image with a tolerance (D25), skipped when the model file is absent |
 | Real Anthropic call | Needs the key and costs money; the suite must run offline with no key (NFR-12) | `FakeLLMClient` and a mocked SDK; one manual smoke test with the key from the environment (`python tools_tests/llm_call.py <text_file_outside_repo> claude-sonnet-5-5`, T15) |
 | Real GitHub download | Network | In-memory zip built in the test; one manual real download recorded in the tools report (T16, OI-13) |
-| Real faster-whisper transcription (F4, deferred) | Model download, CPU time | `FakeTranscriber`; manual run of `tools_tests/transcribe.py` (tools report 2.6) |
+| Real `ffmpeg` and faster-whisper (F4) | Needs `ffmpeg`, a ~460 MB model download and CPU time | `FakeAudioExtractor`, `FakeTranscriber`; opt-in `tests/test_t18b_integration.py` (`RUN_F4_INTEGRATION=1`, needs `ffmpeg` and the cached `small` model, else skipped); one real end-to-end run on a local-only clip (M11, tools report 2.6 and 2.13) |
 | Whole-class check-in time | Only measurable live (NFR-6) | Measured in the demo, reported in `docs/results.md` |
 
 Rules for every test: no sleeping (time comes from `FakeClock`, D25); no network; no `ANTHROPIC_API_KEY` needed;
@@ -67,7 +68,7 @@ Each subsection gives: responsibility, test type, doubles, key cases (input -> e
 #### `Config`
 - **Responsibility:** read all settings from environment variables. **Type:** unit. **Doubles:** a plain `dict` as `environ`.
 - **Key cases:** all three required variables set -> `Config` with defaults `database_path="instance/app.db"`,
-  `face_score_threshold=0.4`, `anthropic_model="claude-sonnet-5-5"`, `whisper_model="base"`; `FACE_SCORE_THRESHOLD="0.5"`
+  `face_score_threshold=0.4`, `anthropic_model="claude-sonnet-5-5"`, `whisper_model="small"` (D34), `video_max_bytes=2_147_483_648`; `FACE_SCORE_THRESHOLD="0.5"`
   -> `0.5`; no `ANTHROPIC_API_KEY` -> `anthropic_api_key is None` and no error (NFR-9).
 - **Boundaries / errors:** each of `LECTURER_PIN`, `SECRET_KEY`, `BASE_URL` missing or empty -> `ConfigError`
   (3 parametrised cases); `ConfigError` is not an `AppError`.
@@ -327,19 +328,64 @@ Type: unit on a temp DB (`db` fixture); doubles: none. All return frozen datacla
 - **Peer list:** `set_peer_repos([...])` then `peer_repos()` -> same list (kind `peer_repo`), used by the next review.
 - **Trace:** FR-5.3-FR-5.5, D11, D31 (OI-1, OI-9, OI-12); T17.
 
-### 2.7 F4 video summary (T18, only after the D10 revisit)
+### 2.7 F4 video summary (T18a-T18e, D34)
 
-#### `Transcriber` (port), `WhisperTranscriber`, `VideoSummarizer`
-- **Type:** unit. **Doubles:** `FakeTranscriber`, `FakeLLMClient`.
-- **Key cases:** `summarize(path)` with an LLM answer holding the four headings -> `VideoSummary.sections` with
-  topics, key points, homework / action items, questions raised, and `transcript_words` equal to the fake
-  transcript's word count; an answer missing a heading -> the whole text under "Summary"; the configured language
-  is passed to `transcribe`.
-- **Errors:** `b"not a video"` written to a temp file -> `WhisperTranscriber` raises `UnreadableVideoError` "We could
-  not read this video file." (marked `model`, skipped without the whisper model); `LLMUnavailableError` -> message
-  with "summary".
-- **Privacy:** only text reaches `FakeLLMClient` (the prompt holds no bytes of the file) (FR-4.2).
-- **Trace:** FR-4.1-FR-4.4, D10; T18.
+All automated cases are offline: `FakeAudioExtractor`, `FakeTranscriber`, `FakeLLMClient`, an inline runner, a
+`tmp_path` work directory and a temporary SQLite file. Classes and exceptions as in `design.md` 3.7-3.8.
+
+#### `JobStatus`, `SummaryRepository` (T18a: `test_t18a_summary_storage.py`; extra cases in `test_t18_extra.py`)
+- **Type:** unit on a temporary SQLite file.
+- **Key cases:** `Config` defaults (`small`, 2 GB, work directory); create a job, move it forward, finish it with the
+  summary text, read it back; the status table of legal moves (all 6 x 6 pairs checked in `test_t18_extra.py`).
+- **Boundaries / errors:** moves are forward only, an illegal move is refused; a second active job is refused by the
+  repository and by the database constraint; a bad `VIDEO_MAX_BYTES` is refused; progress is clamped to 0-100 and only
+  for an active job; an old database gains the `summary_job` table idempotently.
+- **Privacy:** the table has no transcript, file name or personal column (FR-4.5, NFR-7).
+- **Trace:** FR-4.5-FR-4.7, D34; T18a.
+
+#### `FfmpegAudioExtractor`, `FasterWhisperTranscriber`, `ThreadJobRunner` (T18b: `test_t18b_adapters.py`, `test_t18b_integration.py`)
+- **Type:** unit with `subprocess.run` monkeypatched and a fake `faster_whisper` module in `sys.modules`; one opt-in
+  integration test.
+- **Key cases:** the `ffmpeg` command is an argument list (no `shell`, mono 16 kHz, a timeout, the original file name
+  absent); the model is loaded lazily, once, with `small`, CPU, int8; `beam_size=1`, voice-activity filter on, the
+  language passed through; progress values are non-decreasing; `ThreadJobRunner` runs the task in a named daemon
+  thread.
+- **Errors:** ffmpeg exit code 1, timeout, missing or empty WAV -> `UnreadableVideoError`; `ffmpeg` not installed or
+  model load failure -> `TranscriptionUnavailableError`, and the failure is not cached; building the app imports no
+  `faster_whisper`.
+- **Opt-in integration:** `RUN_F4_INTEGRATION=1 python -m pytest -q tests/test_t18b_integration.py`; skipped by
+  default and when `ffmpeg` or the cached model is missing; it generates a 3 s test MP4 and runs the two real adapters.
+- **Trace:** FR-4.2, FR-4.3, D25, D34; T18b.
+
+#### `LectureSummariser` (T18c: `test_t18c_summariser.py`)
+- **Type:** unit. **Doubles:** `FakeLLMClient`.
+- **Key cases:** `split_transcript` invariants (non-empty parts, each within the limit, order kept); chunking boundary
+  at 40,000 characters (1 call at the limit, `n + 1` calls above it: n map calls then one merge); the four sections
+  requested; the transcript sits inside delimiters that the transcript itself cannot close (prompt injection);
+  the lecturer's language wins over the detected one; the prompt carries the untrusted-content and no-personal-data rules.
+- **Errors:** `LLMUnavailableError("summary")` propagates; an empty reply is refused; `is_available()` mirrors the client.
+- **Trace:** FR-4.4, R8, D12, D34; T18c.
+
+#### `VideoSummaryService` (T18d: `test_t18d_video_service.py`)
+- **Type:** unit with an inline runner. **Doubles:** the three fakes above.
+- **Key cases:** success -> the summary is stored and every job file is deleted; statuses are observed in order
+  (`queued`, `extracting_audio`, `transcribing`, `summarising`, `done`); every accepted extension in both cases; a name
+  with a path or Hebrew letters is accepted and not stored; start-up recovery marks active jobs failed with the
+  interrupted message and removes their directories.
+- **Errors:** wrong extension or empty upload creates nothing; no LLM key refuses before any job; a second upload while
+  a job is queued is refused and writes nothing; every failure path (unreadable, no speech, transcriber down, LLM down,
+  runner error) ends `failed` with the exact SRS section 5 message and a clean work directory.
+- **Privacy:** a marker word of the transcript appears in no table, file or log record (FR-4.5).
+- **Trace:** FR-4.1-FR-4.9, D34; T18d.
+
+#### F4 routes (T18e: `test_t18e_video_routes.py`)
+- **Type:** integration with the Flask test client. **Doubles:** the fakes, deferred or inline runner.
+- **Key cases:** every F4 page and API needs the PIN; the finished summary is shown as escaped text with download links;
+  `/api/video/jobs/<id>` returns the status keys; `.md` and `.txt` are UTF-8 attachments (Hebrew kept); the `.txt` has no
+  Markdown marks.
+- **Errors:** an unfinished summary is refused with "This summary is not ready yet."; a file above `VIDEO_MAX_BYTES` is
+  refused on this route only while the global 25 MB limit stays for other routes.
+- **Trace:** FR-4.1, FR-4.6-FR-4.8, FR-6.1, D22, D34; T18e.
 
 ### 2.8 Web helpers (T5, T8)
 
@@ -366,7 +412,7 @@ verbatim in the response body.
 | UC-9 Create poll | `POST /lecturer/polls` with 2 options -> results page | 1 or 5 options / empty question -> "A poll needs a question and 2 to 4 options."; second poll -> "A poll is already open. Close it first." | `test_polls.py`, `test_polls_extra.py` |
 | UC-10 Vote | fresh client (no nickname) `GET /api/poll/current` -> open poll; `POST /poll/vote` -> "Thank you, your vote is counted." | second vote -> "You have already voted."; closed poll -> "This poll is closed." | `test_polls.py`, `test_polls_extra.py` |
 | UC-11 Results and close | `GET /api/polls/<id>/results` reflects the vote on the next poll; `POST /lecturer/polls/<id>/close` -> final counts still shown | vote after close refused, counts unchanged | `test_polls.py`, `test_polls_extra.py` |
-| UC-12 Video (deferred) | upload -> four sections displayed; temporary file deleted | unreadable file -> "We could not read this video file."; `FakeLLMClient` failing -> "The summary service is unavailable right now. Please try again later."; temp file deleted on error too | none (F4 deferred, no test file yet) |
+| UC-12 Video summary | upload (fakes) -> `queued`, then the statuses in order, `done`; four-section summary displayed; `.md` / `.txt` downloads; work directory empty | unreadable file -> "We could not read this video file."; second upload -> "A video is already being summarised. Please wait until it is finished."; no key / failing `FakeLLMClient` -> "The summary service is unavailable right now. Please try again later."; files deleted on every failure | `test_t18a_summary_storage.py`, `test_t18b_adapters.py`, `test_t18c_summariser.py`, `test_t18d_video_service.py`, `test_t18e_video_routes.py`, `test_t18_extra.py` |
 | UC-13 Review | `POST /review` without PIN, `FakeRepoFetcher` + `FakeLLMClient` -> review with Submission B / C and metrics, no peer owner or repo name in the page; `/lecturer/peers` (PIN) saves the list used by the next review | malformed URL / unavailable repo / LLM failure -> the three SRS messages; no peer -> "No other submission was available for comparison."; `/lecturer/peers` without PIN -> redirect | `test_review.py`, `test_review_extra.py` |
 | UC-14 Unlock | `POST /lecturer/login` with the right PIN -> redirect to `/lecturer`, later pages open | wrong PIN -> "Wrong PIN." (401); every PIN route without PIN -> redirect | `test_lecturer_routes.py` |
 
@@ -394,13 +440,13 @@ Cross-cutting integration checks (there is no dedicated `test_t20_no_network.py`
   image is committed, test (b) is skipped and NFR-3 is timed on the manual photo of M7.
 - **F5:** zip archives built in memory in each test (`zipfile` + `io.BytesIO`) with fictitious README and source
   files; no real repository of the provided list (`ex1_repo_links.pdf` stays local, D21).
-- **F4:** fake transcripts (text in the test); no class video in the repository.
+- **F4:** fake transcripts and a tiny generated WAV (text and bytes in the test); no class video or recording in the repository; the real trial clip stays local (D21, D34).
 - **Database:** a new SQLite file under `tmp_path` per test; never `instance/app.db`.
 
 ## 5. Manual test checklist
 
 Run after T12 (design section 7) and again before the demo. M1-M4, M6 and M7 come from
-[tools report section 3](tools_report.md) (its test 7, a longer recording, belongs to the deferred F4); M5 and M8-M10
+[tools report section 3](tools_report.md) (its test 7, a longer recording, is covered by M11); M5 and M8-M10
 are added here. Results are written in `docs/results.md`.
 
 | # | Test | Expected | Trace |
@@ -415,6 +461,7 @@ are added here. Results are written in `docs/results.md`.
 | M8 | `attendance.xlsx`, `checkins.csv`, `summary.csv` opened in Excel or Numbers | two sheets, rows equal the live table, readable dates and nicknames | FR-1.18, UC-5 |
 | M9 | Rehearsal with several browser tabs and 2-3 phones: comment, poll, review | comment and vote visible on the lecturer page within 5 s; review shown | NFR-2, NFR-5, D25 |
 | M10 | One real LLM call and one real GitHub download (T15, T16) | answer received; download recorded in the tools report | D12, OI-13 |
+| M11 | F4 on a real lecture clip (local only), uploaded on `localhost`, `ffmpeg` installed, model cached (T18f) | status steps in order; four sections in the lecture language; `.md` and `.txt` download; work directory empty; database holds only the summary text; timings noted (244 s clip: about 70 s on the demo laptop, `docs/results.md`) | FR-4.1-FR-4.9, NFR-13, UC-12 |
 
 ## 6. Coverage and exit criteria
 
@@ -443,7 +490,8 @@ are added here. Results are written in `docs/results.md`.
 | T15 | `test_llm.py`, `test_llm_extra.py` | mocked cases pass; manual call done once (M10) |
 | T16 | `test_repo_fetcher.py`, `test_repo_fetcher_extra.py` | URL table and zip cases pass; manual download recorded (M10) |
 | T17 | `test_review.py`, `test_review_extra.py` | redaction, peer rules, no storage, UC-13 row pass |
-| T18 | none (F4 deferred by D10, no video test file exists yet) | UC-12 row passes (only after the D10 revisit) |
+| T18a-e | `test_t18a_summary_storage.py`, `test_t18b_adapters.py`, `test_t18b_integration.py` (opt-in), `test_t18c_summariser.py`, `test_t18d_video_service.py`, `test_t18e_video_routes.py`, `test_t18_extra.py` | cases of design 7.1 pass; UC-12 row passes |
+| T18f | none (manual, M11) | real run recorded in the tools report and `docs/results.md` |
 | hardening | `test_redteam_fixes.py` | `strip_invisible` and invisible-only nickname refused; XLSX export survives a control character; photo above 40 MP refused before decoding; 25 MB upload cap; werkzeug log silenced; `X-Frame-Options` / `nosniff` on every response; `SameSite=Lax` cookies; glued peer names masked, unrelated words not (T4, T7-T9, T11, T12, T17; design 2.1) |
 | T20 | `test_t20_no_network.py` | acceptance tests 1-12 of design section 7 pass (no IP read, allow-list gone, new schema, old database untouched) |
 | T21 | `test_t21_four_digit_code.py` | acceptance tests 1-8 of design section 7 pass (format, strict input, rotation, P1, P2) |
@@ -473,7 +521,10 @@ Before the demo: full suite green, coverage report taken, M1-M10 done (or the fa
 | FR-1.18 | `AttendanceExporter` | UC-5; M8 |
 | FR-2.1-FR-2.4 | `CommentService`, `CommentRepository` | UC-7, UC-8; M9 |
 | FR-3.1-FR-3.4 | `PollService`, `PollRepository` | UC-9, UC-10, UC-11; M9 |
-| FR-4.1-FR-4.4 | `VideoSummarizer`, `WhisperTranscriber` (deferred) | UC-12 |
+| FR-4.1, FR-4.6-FR-4.8 | `VideoSummaryService`, F4 routes | UC-12; M11 |
+| FR-4.2, FR-4.3 | `FfmpegAudioExtractor`, `FasterWhisperTranscriber`, `ThreadJobRunner` | UC-12; M11 |
+| FR-4.4 | `LectureSummariser` | UC-12 |
+| FR-4.5, FR-4.9 | `SummaryRepository`, `JobStatus`, `VideoSummaryService` | UC-12 |
 | FR-5.1, FR-5.2 | `GitHubRepoFetcher` | UC-13; M10 |
 | FR-5.3 | `ClaudeClient`, `HomeworkReviewer` | UC-13; M10 |
 | FR-5.4, FR-5.5 | `HomeworkReviewer` (redaction, peers), `SettingsRepository` | UC-13 |
