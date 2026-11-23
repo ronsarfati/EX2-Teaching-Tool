@@ -10,6 +10,7 @@ import io
 from datetime import datetime, timezone
 
 from openpyxl import Workbook
+from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
 
 from app.repositories.checkins import CheckInRepository
 from app.repositories.sessions import SessionRepository
@@ -21,7 +22,11 @@ FORMULA_TRIGGERS = ("=", "+", "-", "@", "\t", "\r")  # characters that make Exce
 
 
 def _safe(text: str) -> str:
-    """Neutralise formula injection: nicknames are typed by students, so `=HYPERLINK(...)` must stay text."""
+    """Neutralise formula injection (`=HYPERLINK(...)` must stay text) and drop characters XLSX cannot hold.
+
+    Rows saved before nicknames were cleaned may still contain them; one such row must not break the export.
+    """
+    text = ILLEGAL_CHARACTERS_RE.sub("", text)  # newline and tab are legal and kept
     return "'" + text if text.startswith(FORMULA_TRIGGERS) else text
 
 

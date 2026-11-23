@@ -19,6 +19,7 @@ from app.repositories.sessions import SessionRepository
 from app.repositories.windows import CheckInWindowRepository
 from app.services.credentials import RotatingCredentials
 from app.services.network import NetworkPolicy
+from app.services.text import strip_invisible
 
 
 class CheckInService:
@@ -81,7 +82,7 @@ class CheckInService:
         if session is None or not session.is_open():
             return SessionClosedError()
         stored = self._check_ins.nickname_of(device_token)
-        chosen = stored if stored is not None else (nickname or "").strip()
+        chosen = stored if stored is not None else strip_invisible(nickname or "").strip()
         if not 1 <= len(chosen) <= self.NICKNAME_MAX_LEN:
             return EmptyNicknameError()  # not counted as an attempt (D31)
         if self._windows.increment_attempts(session_id, device_token) > self.MAX_ATTEMPTS:

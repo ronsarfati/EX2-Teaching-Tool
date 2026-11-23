@@ -95,11 +95,12 @@ def _section(label: str, extract: RepoExtract) -> str:
 def _redact(text: str, peers: list[tuple[str, str, RepoExtract]]) -> str:
     """Replace every peer URL, then its owner and repository names, by the peer's label (FR-5.4).
 
-    Case-insensitive and whole-token, so a name inside a longer word is left alone.
+    Case-insensitive. A name glued to other text by '-', '_' or '.' is masked; one inside a longer run of
+    letters or digits ("malice" for "alice") is left alone.
     """
     for label, url, _ in peers:
         text = re.sub(re.escape(url), label, text, flags=re.IGNORECASE)
         for name in url.rstrip("/").split("/")[-2:]:  # owner, repository
-            text = re.sub(rf"(?<![A-Za-z0-9_.-]){re.escape(name)}(?![A-Za-z0-9_-])", label, text,
+            text = re.sub(rf"(?<![A-Za-z0-9]){re.escape(name)}(?![A-Za-z0-9])", label, text,
                           flags=re.IGNORECASE)
     return text

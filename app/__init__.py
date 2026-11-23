@@ -44,7 +44,7 @@ def create_app(config: Config, *, clock: Clock | None = None,
     `fakes` is where later tasks add the transcriber; tests inject doubles there.
     """
     app = Flask(__name__)
-    app.config.update(SECRET_KEY=config.secret_key, DEBUG=False, MAX_CONTENT_LENGTH=MAX_PHOTO_BYTES)  # NFR-8: never debug
+    app.config.update(SECRET_KEY=config.secret_key, DEBUG=False, SESSION_COOKIE_SAMESITE="Lax", MAX_CONTENT_LENGTH=MAX_PHOTO_BYTES)  # NFR-8: never debug
     db = Database(config.database_path)
     db.init_schema()
     clock = clock or SystemClock()
@@ -77,6 +77,15 @@ def create_app(config: Config, *, clock: Clock | None = None,
         "settings": settings,
         **fakes,
     }
+
+    # Werkzeug's access log prints the peer address and the QR token in the URL (D21: never logged).
+    logging.getLogger("werkzeug").setLevel(logging.ERROR)
+
+    @app.after_request
+    def add_security_headers(response):
+        response.headers["X-Frame-Options"] = "DENY"  # no clickjacking of the lecturer's forms
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        return response
 
     @app.get("/ping")
     def ping() -> str:
