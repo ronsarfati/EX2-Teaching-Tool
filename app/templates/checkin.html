@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Check in{% endblock %}
+{% block content %}
+<h1>Check in</h1>
+<form method="post" action="/checkin">
+  {% if needs_nickname %}
+  <label>Nickname
+    <input type="text" name="nickname" maxlength="30" required autocomplete="off">
+  </label>
+  <small>Choose any nickname - do not use your real name or ID.</small>
+  {% endif %}
+  <label>Code shown under the QR
+    <input type="text" name="code" inputmode="numeric" pattern="[0-9]{3}" maxlength="3" required autocomplete="off">
+  </label>
+  <button type="submit">Confirm</button>
+</form>
+{% endblock %}

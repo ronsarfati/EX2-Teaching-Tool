@@ -20,6 +20,7 @@ from app.services.network import NetworkPolicy
 from app.services.sessions import SessionService
 from app.web.api_routes import bp as api_bp
 from app.web.lecturer_routes import bp as lecturer_bp
+from app.web.student_routes import bp as student_bp
 
 GENERIC_MESSAGE = "Something went wrong. Please try again."
 logger = logging.getLogger(__name__)
@@ -63,6 +64,7 @@ def create_app(config: Config, *, clock: Clock | None = None, **fakes: object) -
 
     app.register_blueprint(lecturer_bp)
     app.register_blueprint(api_bp)
+    app.register_blueprint(student_bp)
     _register_error_handlers(app)
     return app
 
