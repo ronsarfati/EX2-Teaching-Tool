@@ -2,7 +2,7 @@
 
 Resolutions of the open questions (OQ1-OQ14 in `docs/requirements.md`) and of the technical choices left open by
 the statement. Proposed by the ambiguity analysis, **validated by the student on 2026-11-22** (D31: 2026-11-23;
-D32: 2026-11-24).
+D32 and D33: 2026-11-24).
 Requirements are cited as R<n>, statement locators as F/Req/G/TD/QA (see `docs/requirements.md`).
 
 Guiding rule: the **simplest option that fully satisfies the requirements** (KISS, Req2), that can really be
@@ -29,7 +29,7 @@ old text is kept below for history only and must not be used for design.
 | D10 | Video summary F4 (OQ6) | No pre-computed summary; to revisit after F1-F3; candidate: live demo on a short 2-3 min clip (faster-whisper + Claude) | DEFERRED |
 | D11 | Homework review F5 (OQ6) | Public repo URL -> capped text extract -> Claude review + anonymised comparison with 1-2 other repos (source, masking: D31); runs live, no pre-computed fallback | VALIDATED (amended by D31) |
 | D12 | LLM provider and secrets | Anthropic (Claude); model from `ANTHROPIC_MODEL`, default `claude-sonnet-5-5` (to confirm by a real call); key in `.env` | VALIDATED |
-| D13 | Demo hosting (OQ7) | Laptop + Cloudflare quick tunnel; plan B hotspot/LAN over plain HTTP (works: no in-page camera); plan C recorded run | VALIDATED |
+| D13 | Demo hosting (OQ7) | Laptop + Cloudflare quick tunnel; plan B hotspot/LAN over plain HTTP (works: no in-page camera); plan C recorded run | VALIDATED (IP notes obsolete since D33) |
 | D14 | Documents format and layout (OQ11) | Markdown in `docs/`, one file per deliverable, Mermaid, README links all | VALIDATED |
 | D15 | Tools report (OQ12) | Every tool we suggest, tested for real with command, input, result, date, version | VALIDATED |
 | D16 | Deadline (OQ8) | Extended by the lecturer: submission by 30/11/2026 | VALIDATED |
@@ -37,7 +37,7 @@ old text is kept below for history only and must not be used for design.
 | D18 | Submission channel (OQ10) | Google Form, filled by the student only; check Moodle for an extra upload | VALIDATED [ASK] |
 | D19 | Live statement (OQ13) | Re-read the live Google Doc at Phase 2 and before submission | VALIDATED |
 | D20 | Individual vs team (OQ14) | Individual work | VALIDATED |
-| D21 | Personal data (R16) | Fictitious data in repo/demo; provided files local only, aggregate results only | VALIDATED |
+| D21 | Personal data (R16) | Fictitious data in repo/demo; provided files local only, aggregate results only; no client IP read for attendance (D33) | VALIDATED (amended by D33) |
 | D22 | Lecturer access | Single lecturer PIN from an env var; no accounts | VALIDATED |
 | D23 | Error messages | Plain user messages, no internal identifiers/stack traces; details in server log | VALIDATED |
 | D24 | Git practice | Frequent small commits until submission, conventional messages, no `Co-Authored-By` trailer, agents never push | VALIDATED |
@@ -46,9 +46,10 @@ old text is kept below for history only and must not be used for design.
 | D27 | Attendance sessions | One session open at a time (sponsor-limit part SUPERSEDED by D30) | VALIDATED (partly superseded) |
 | D28 | Polls: concurrency and voting | One poll open at a time; one vote per device token per poll; no nickname needed | VALIDATED |
 | D29 | Comments anonymity and timing (F2) | Anonymous (text + time only, no nickname); live (D4) and after class; max 500 chars (D31) | VALIDATED (amended by D31) |
-| D30 | Attendance check-in flow (replaces D5 chain and D26) | Campus-network IP allow-list + projector QR (10 s, accepted <= 15 s old) + 3-digit code (5 s) typed in a 1-min window + one check-in per device per session; D7 photo alert as safety net | VALIDATED (details: D31) |
+| D30 | Attendance check-in flow (replaces D5 chain and D26) | ~~Campus-network IP allow-list~~ (removed by D33) + projector QR (10 s, accepted <= 15 s old) + ~~3-digit~~ 4-digit (D33) code (5 s) typed in a 1-min window + one check-in per device per session; D7 photo alert as safety net | VALIDATED (details: D31; point 1 network filter SUPERSEDED by D33) |
 | D31 | Design-level choices validated with `design.md` (OI-1-OI-13) | F5 peer list page, nickname rules, cookie-only token, export format, polling 1 s on projector, etc. | VALIDATED (23/11) |
-| D32 | Network origin of a check-in (field findings 24/11; amends D30 point 1) | Every network accepted and classified: campus ranges (measured `192.114.52.0/24`) -> `campus`; Apple Private Relay egress ranges for IL -> `apple_relay` (marker); anything else -> `off_campus` (visible warning marker); empty allow-list still refuses all; origin shown live and in the export; IP never stored; no GPS | VALIDATED (24/11) |
+| D32 | Network origin of a check-in (field findings 24/11; amends D30 point 1) | ~~Every network accepted and classified campus / Apple relay / off campus, shown live and in the export~~ | SUPERSEDED by D33 (24/11) |
+| D33 | Remove the IP / network part entirely (supersedes D32 and point 1 of D30); projected code 4 digits (amends D30 point 3) | No client IP read for attendance, no allow-list, no relay list, no origin label; anti-cheat = rotating QR (10 s / 15 s) + projected **4-digit** code (0000-9999, 5 s, P1) + the unchanged D30 rules; D7 photo alert is the room-level check. Code brute force by rescanning: ~500 -> ~5,000 expected tries, residual risk recorded | VALIDATED (24/11) |
 
 "VALIDATED" = "VALIDATED by the student — 2026-11-22" unless stated otherwise. "DEFERRED" = "DEFERRED by the
 student — 2026-11-22".
@@ -97,7 +98,7 @@ student — 2026-11-22".
 
 ## D4 — Real-time mechanism (R5, R6)
 
-**DECISION:** short polling every 2-3 s (fetch JSON). Rejected: SSE (flaky through tunnels), WebSockets (extra dependency, more failure modes live). "Real time" = visible within a few seconds. Also used to refresh the projector QR (10 s) and the 3-digit code (5 s) of D30 (originally: the rotating QR codes of D5, superseded).
+**DECISION:** short polling every 2-3 s (fetch JSON). Rejected: SSE (flaky through tunnels), WebSockets (extra dependency, more failure modes live). "Real time" = visible within a few seconds. Also used to refresh the projector QR (10 s) and the projected code (5 s; 4 digits since D33) of D30 (originally: the rotating QR codes of D5, superseded).
 
 **Impact.** Sequence diagrams show a polling loop; SRS NFR "update visible within 5 s".
 
@@ -168,7 +169,7 @@ Identity of each node = the nickname and device token of D6 (no personal data). 
 
 **Options.** 1. *Self-chosen nickname + random device token.* 2. *Anonymous token only* (sheet unreadable). 3. *Pick a name from the course list* (personal data; violates G1, QA6).
 
-**DECISION: option 1, "Moodle-like" simplicity without accounts.** The student enters a self-chosen nickname **once** (first use); the phone remembers a random token (cookie + localStorage). At every later check-in the student is recognised automatically, with no typing of the nickname (the 3-digit code of D30 is still typed). The UI warns "do not use your real name or ID". No name/ID/e-mail field anywhere. Spreadsheet columns: session date, nickname, check-in time (the former "sponsor" column is dropped: SUPERSEDED by D30); per-session summary: check-ins, faces detected, consistency status (D7).
+**DECISION: option 1, "Moodle-like" simplicity without accounts.** The student enters a self-chosen nickname **once** (first use); the phone remembers a random token (cookie + localStorage). At every later check-in the student is recognised automatically, with no typing of the nickname (the projected code of D30, 4 digits since D33, is still typed). The UI warns "do not use your real name or ID". No name/ID/e-mail field anywhere. Spreadsheet columns: session date, nickname, check-in time (the former "sponsor" column is dropped: SUPERSEDED by D30); per-session summary: check-ins, faces detected, consistency status (D7).
 
 **Justification.** G1 "No need integrate with ... מידע אישי"; QA6 the lecturer removed IDs from the list.
 
@@ -250,10 +251,14 @@ Identity of each node = the nickname and device token of D6 (no personal data). 
 
 **Note added with D30 (22/11).** With the campus-network filter of D30, plan A reads the client IP from the `CF-Connecting-IP` header (trusted only on requests arriving from the local tunnel); in plan B the client IP is the direct socket address, so the allow-list must also contain the LAN/hotspot range used (e.g. a private `/24`).
 
-**Field note added with D32 (24/11).** On the campus Wi-Fi "Ariel-University", a phone could not reach the laptop
+**Field note added with D32 (24/11).** On the campus Wi-Fi, a phone could not reach the laptop
 on its LAN address (client isolation, same subnet, laptop firewall off): plan B **on the campus Wi-Fi** is not
 usable. Plan B on a phone hotspot was not re-tested (and is limited to a few clients, see D30 rejections). Plan A
 (tunnel) is the plan for the class demo.
+
+**Note added with D33 (24/11).** The app no longer reads any client IP: the `CF-Connecting-IP` note above and the
+"allow-list for each plan" no longer apply. Switching between plans A and B only changes the base URL encoded in
+the QR codes. The field note on client isolation (plan B unusable on the campus Wi-Fi) still holds.
 
 **Impact.** README "Run the demo" (including how to set the base URL encoded in the QR codes for plans A and B, and the allow-list for each plan); tools report tests cloudflared from a real phone on mobile data (now expected to be **refused** by the D30 filter) and on the campus Wi-Fi.
 
@@ -280,7 +285,7 @@ app/  tests/  demo_data/  .env.example  requirements.txt
 
 ## D15 — Tools report scope and evidence (OQ12; R24, R25)
 
-**DECISION:** every tool we suggest is actually run; each entry: purpose, alternatives, exact command/code, input (no personal content), observed result, date, version, verdict. Tools: Flask, qrcode, QR scanning with the phone's native camera app (adopted in D5, kept in D30; the in-page scanner approach tested earlier is documented as rejected), OpenCV YuNet, Ultralytics YOLO, faster-whisper, Anthropic API, cloudflared, openpyxl. With D30: also the client-IP check behind cloudflared (`CF-Connecting-IP` value seen from a phone on campus Wi-Fi vs on 4G/5G) and stdlib `ipaddress` for CIDR matching.
+**DECISION:** every tool we suggest is actually run; each entry: purpose, alternatives, exact command/code, input (no personal content), observed result, date, version, verdict. Tools: Flask, qrcode, QR scanning with the phone's native camera app (adopted in D5, kept in D30; the in-page scanner approach tested earlier is documented as rejected), OpenCV YuNet, Ultralytics YOLO, faster-whisper, Anthropic API, cloudflared, openpyxl. With D30: also the client-IP check behind cloudflared (`CF-Connecting-IP` value seen from a phone on campus Wi-Fi vs on 4G/5G) and stdlib `ipaddress` for CIDR matching (*since D33 these two are field evidence for the decision to drop the network check, no longer tools used by the app*).
 
 **Status:** VALIDATED by the student — 2026-11-22
 
@@ -321,14 +326,14 @@ app/  tests/  demo_data/  .env.example  requirements.txt
 - Demo DB and `demo_data/`: fictitious nicknames; non-personal test images.
 - Provided files used locally only; only aggregate numbers reported.
 - Live demo photo processed in memory and discarded (D7).
-- Client IP addresses are used only for the D30 accept/refuse check and never stored with attendance records; the campus allow-list holds network ranges only (no individual addresses). With D32 (24/11) a check-in stores only its network origin label (`campus` / `apple_relay` / `off_campus`), never the address.
-- `.gitignore` covers `.env`, `instance/`, uploads, model files, and the downloaded Apple relay range file (D32).
+- ~~Client IP addresses are used only for the D30 accept/refuse check and never stored with attendance records; the campus allow-list holds network ranges only (no individual addresses). With D32 (24/11) a check-in stores only its network origin label (`campus` / `apple_relay` / `off_campus`), never the address.~~ **Amended by D33 (24/11):** no client IP address is read for attendance any more (no allow-list, no `CF-Connecting-IP`, no origin label). The werkzeug access log stays off, so the app neither stores nor logs client addresses.
+- `.gitignore` covers `.env`, `instance/`, uploads, and model files (the Apple relay file line of D32 was removed with D33, together with the local file).
 
 **Status:** VALIDATED by the student — 2026-11-22
 
 ## D22 — Lecturer access
 
-**DECISION:** single lecturer PIN from an env var, kept in the session cookie. Rejected: no protection (students could close sessions), accounts (personal data, over-design). The PIN also protects editing the D30 campus allow-list.
+**DECISION:** single lecturer PIN from an env var, kept in the session cookie. Rejected: no protection (students could close sessions), accounts (personal data, over-design). ~~The PIN also protects editing the D30 campus allow-list.~~ (The allow-list is removed by D33.)
 
 **Status:** VALIDATED by the student — 2026-11-22
 
@@ -346,7 +351,7 @@ app/  tests/  demo_data/  .env.example  requirements.txt
 
 ## D25 — Test tooling (R32)
 
-**DECISION:** `pytest` + Flask test client; unit tests per class from `docs/design.md`; `LLMClient` and `Transcriber` replaced by fakes (no network, no key); `HeadCounter` tested on non-personal images with a tolerance (e.g. ±20 %), plus the local-only accuracy measurement on the provided photos (reported, not automated); the D7 consistency rule tested exhaustively at its boundaries (pure function). Time-dependent logic of D30 (10 s QR regeneration, 15 s acceptance window checked on request arrival, 5 s code rotation, 1-minute check-in window) tested with an injectable clock; the client IP is injectable too (allow-list tests). (Originally: D5's 2-minute claim, superseded.) Manual end-to-end rehearsal with several browser tabs and 2-3 phones before the demo.
+**DECISION:** `pytest` + Flask test client; unit tests per class from `docs/design.md`; `LLMClient` and `Transcriber` replaced by fakes (no network, no key); `HeadCounter` tested on non-personal images with a tolerance (e.g. ±20 %), plus the local-only accuracy measurement on the provided photos (reported, not automated); the D7 consistency rule tested exhaustively at its boundaries (pure function). Time-dependent logic of D30 (10 s QR regeneration, 15 s acceptance window checked on request arrival, 5 s code rotation, 1-minute check-in window) tested with an injectable clock; ~~the client IP is injectable too (allow-list tests)~~ (no client IP since D33). (Originally: D5's 2-minute claim, superseded.) Manual end-to-end rehearsal with several browser tabs and 2-3 phones before the demo.
 
 **Status:** VALIDATED by the student — 2026-11-22
 
@@ -406,6 +411,15 @@ app/  tests/  demo_data/  .env.example  requirements.txt
 
 ## D30 — Attendance check-in flow (replaces D5 chain and D26) (OQ2; R1, R13, R14, R16)
 
+> **Partly SUPERSEDED by D33 (24/11).** Point 1 (campus network filter), its technical/privacy notes, the
+> allow-list editor, the `CF-Connecting-IP` handling, the off-campus error, the IP tests and the D32 amendment below
+> are **removed**: no client IP is read for attendance any more. Point 3 is **amended**: the projected code has
+> **4 digits** (0000-9999) instead of 3, still new every 5 s with the previous one accepted (P1). Points 2, 4, 5 and
+> P1-P3 are unchanged, as are the D31 details that do not concern the network (new scan = new window with 0
+> attempts, empty nickname not counted, QR creation time = start of its 10 s slice). The text below is kept as
+> history; its argument "combined with the campus-network filter the relay must come from someone on campus" no
+> longer holds (see D33, consequences).
+
 **Question.** How does a student check in from a phone, as simply as possible, without personal data, while making it hard to check in an absent friend?
 
 **Why the chain of trust (D5, D26) was dropped.** It is no more secure than a projector QR: a present student can screenshot their own rotating personal QR and send it on WhatsApp within the 15 s window, and any browser-only scheme can be defeated by a live video call. It was also far more complex (root slots, sponsor quotas, claims, tree, lecturer QR).
@@ -416,7 +430,7 @@ app/  tests/  demo_data/  .env.example  requirements.txt
    - *Privacy:* the client IP is used only for the accept/refuse check and **never stored** with attendance records (D21).
    - *Honest limit:* the filter proves "on the campus network", not "in this room".
 2. **Projector QR.** The projector shows a QR (a URL, scanned with the phone's **native camera**, no in-page scanner), **regenerated every 10 s**, HMAC-signed with its creation time. The request must reach the server **at most 15 s after the QR's creation** (covers slow Wi-Fi). Once accepted, the student gets a **1-minute window** bound to that browser's device token (D6) to finish the check-in.
-3. **Short code.** Under the QR, the projector shows a **3-digit numeric code regenerated every 5 s**. On the check-in page, before confirming, the student types their nickname (first time only, D6) and then this code (numeric keypad), and taps "Confirm" (order clarified by the student on 23/11). A screenshot relayed by WhatsApp is useless because the code changes before a remote friend can type it.
+3. **Short code.** Under the QR, the projector shows a **3-digit numeric code regenerated every 5 s** (*4 digits since D33*). On the check-in page, before confirming, the student types their nickname (first time only, D6) and then this code (numeric keypad), and taps "Confirm" (order clarified by the student on 23/11). A screenshot relayed by WhatsApp is useless because the code changes before a remote friend can type it.
 4. **One device = one check-in per session** (device token, D6).
 5. **Safety net: photo head count (D7), unchanged.** The lecturer takes a class photo; the app compares the face count with the number of check-ins and flags "anomaly". This catches non-attendees helped by a live relay (e.g. video call), on campus or (since D32) off campus, where the off-campus marker also shows them.
 
@@ -424,7 +438,7 @@ All rules are enforced server-side. The QR and the code are refreshed on the pro
 
 **Additional rules (validated by the student on 22/11).**
 - **P1 — Code tolerance (VALIDATED 22/11).** The server accepts the code currently displayed **or the immediately previous one** (~10 s of slack for slow typing / slow Wi-Fi).
-- **P2 — Attempt limit (VALIDATED 22/11).** At most **5 code attempts per 1-minute window** (3 digits = 1000 combinations; prevents guessing).
+- **P2 — Attempt limit (VALIDATED 22/11).** At most **5 code attempts per 1-minute window** (3 digits = 1000 combinations; prevents guessing). (*D33: 4 digits = 10,000 combinations; the limit is per window and a new scan resets it, see the D33 residual risk.*)
 - **P3 — Student whose camera cannot scan the QR (VALIDATED 22/11).** No in-app fallback; the lecturer records them manually after class in the exported spreadsheet (D8).
 
 **Alternatives considered and rejected.** The **chain of trust** (D5/D26: no more secure than a projector QR, far more complex, see above); a **local Wi-Fi bubble with a travel router** (iPhone/Android hotspots are limited to ~5-10 clients and iOS 18+ hotspots block IPv4 between clients; a router must be bought, and 60 clients cannot be verified before class; the range leaks into the corridor); a **random seat + printed desk QR** (a static QR can be photographed; 60 stickers per room); **server-assigned mutual pairs** (finding an anonymous partner among 60 is harder than the chain); **camera gesture liveness** (films students: personal data, G1). The D5 list of earlier rejections (GPS, face recognition, ultrasound, AirDrop/Bluetooth, in-page scanner, static QR) still applies. D5's rejection of a typed code is reversed here: a 5 s code alone would be relayable, but combined with the campus-network filter the relay must come from someone on campus, and the photo alert covers that case. (*Amended by D32, 24/11:* the network check now only labels the check-in, so a relayed code can be used off campus; such a check-in is marked "off campus network" for the lecturer, and D7 still flags an inflated N.)
@@ -440,13 +454,9 @@ All rules are enforced server-side. The QR and the code are refreshed on the pro
 - *Hosting (D13):* allow-list must include the LAN range for plan B.
 - *Results (D17):* measure live the whole-class check-in duration and the number of refusals (off-campus, expired, wrong code).
 
-**Amended by D32 (24/11):** point 1 is no longer a filter but a **classification**: every network is accepted and
-each check-in is labelled `campus`, `apple_relay` (iCloud Private Relay egress ranges for IL) or `off_campus`
-(visible warning marker for the lecturer, live and in the export). Only an empty allow-list (app not configured) or
-a malformed client IP is still refused. The campus value measured on site is `192.114.52.0/24`. Consequently the
-sentences above "Students on 4G/5G are refused", "the relay must come from someone on campus" and "This catches
-on-campus non-attendees" no longer hold as written: a remote accomplice-assisted check-in is possible, but it is
-**visible** (off-campus marker) and an inflated N is flagged by D7. Points 2-5 and P1-P3 are otherwise unchanged.
+**Amended by D32 (24/11), then removed by D33 (24/11):** point 1 first became a classification (campus / Apple
+relay / off campus labels), then was removed entirely. Points 2-5 and P1-P3 are unchanged, except the code length
+(4 digits, D33).
 
 **Details fixed by D31 (23/11):** the allow-list is runtime data entered by the lecturer (UC-6), nothing hard-coded, and an empty list refuses everyone (OI-3); a new scan opens a new 1-minute window and resets the attempts to 0 (OI-7); an empty-nickname rejection is not counted as an attempt; the QR creation time is the start of its 10 s slice; `CF-Connecting-IP` is trusted only from a loopback peer.
 
@@ -483,99 +493,114 @@ on-campus non-attendees" no longer hold as written: a remote accomplice-assisted
 
 **Impact.** `docs/design.md` section 9 marked VALIDATED; SRS FR/NFR and error table, use cases aligned.
 
+**Partly obsolete since D33 (24/11):** OI-3 and the design rows "`CF-Connecting-IP` trusted only from a loopback
+peer" and "Empty allow-list refuses everyone" no longer apply (no network check). The other rows are unchanged.
+
 **Status:** VALIDATED by the student — 2026-11-23
 
 ## D32 — Network origin of a check-in: campus, Apple relay or off campus, flagged (amends D30 point 1; closes open item 8) (R1, R13, R14, R16)
 
-**Context (field findings measured on campus by the student, 24/11).**
-- The campus Wi-Fi "Ariel-University" leaves the campus through several public IPv4 addresses (a Mac showed
-  `192.114.52.6`, an iPhone `192.114.52.10`). The campus range is therefore **`192.114.52.0/24`**; it is runtime
-  data entered on `/lecturer/allow-list` (UC-6), not code.
-- iPhones with **iCloud Private Relay** (part of iCloud+) do **not** show the campus address: Safari leaves through
-  Apple's relay (seen: `2a02:26f7:df88:4000:6000::`), so D30 point 1 refuses them with the off-campus message.
-  Turning the relay off showed `192.114.52.10` (cause confirmed). Many students have iCloud+, so this is not a corner
-  case.
-- **Local-LAN mode was tested and is impossible:** the campus Wi-Fi isolates clients (the phone could not reach the
-  laptop at its LAN address on the same subnet, laptop firewall off).
-- Apple publishes the Private Relay egress ranges at `https://mask-api.icloud.com/egress-ip-ranges.csv`, lines
-  `range,country,region,city,` (e.g. `2a02:26f7:df88:4000::/64,IL,,Tel Aviv,`). Whole file about 12 MB / 285k lines;
-  country `IL` = 248 ranges (187 IPv6, 61 IPv4), about 9 KB. Region and city are unreliable (178 IL rows have no
-  region, Ariel never appears, the student's relay at Ariel is labelled Tel Aviv), so only the **country** column can
-  be used.
-- Android has no built-in relay, but some phones leave through a VPN (Samsung Secure Wi-Fi, VPN by Google on Pixel,
-  Opera VPN, a personal VPN) and do not show the campus address either.
-- **The campus Wi-Fi is not reliable:** on 24/11 a classmate's phone fell back to 5G on its own. Refusing mobile data
-  would lock real, present students out, and the lecturer may not ask students to change phone settings.
+> **SUPERSEDED by D33 (24/11).** Short history only; must not be used for design.
+
+**What was tried (24/11).** Field tests on campus showed that the D30 filter refused present students: iPhones with
+iCloud Private Relay reach the app from Apple relay addresses, some phones leave through a VPN, and the campus Wi-Fi
+is not reliable (a phone fell back to 5G on its own). D32 therefore accepted every network and **labelled** each
+check-in `campus` (in the campus public range, measured on site, several exit addresses), `apple_relay` (Apple's
+published Private Relay egress ranges for Israel, downloaded by a script) or `off_campus`, with markers and counters
+for the lecturer and a column in the export. Rejected at the time: asking students to turn the relay off (no right to
+require a setting change), local-LAN mode (the campus Wi-Fi isolates clients), GPS (personal data), refusing mobile
+data (locks present students out).
+
+**Why it was removed.** It was built (task T19) and tested on real phones: the campus and off-campus labels worked,
+one relay case stayed unexplained. Since most students are on mobile data, most rows would read "off campus", so the
+label did not single anybody out (noise) while costing a downloaded file, a script, a column and a migration. D33
+removes it entirely.
+
+**Status:** ~~VALIDATED by the student — 2026-11-24~~ **SUPERSEDED by D33 (24/11)**
+
+## D33 — Remove the IP / network part entirely; 4-digit projected code (supersedes D32 and point 1 of D30; amends D30 point 3, D13, D21, D22, D25) (R1, R13, R14, R16)
+
+**Question.** After the field tests of 24/11, does the network check (D30 filter, then D32 labels) still tell the
+lecturer anything about who is in the room?
+
+**Field findings (24/11, measured on campus by the student).**
+- The campus public range is **shared by the whole campus** (several exit addresses), not by a room: at best the
+  check proved "on campus", never "in this room".
+- **Most students use 4G/5G**, whose IP says nothing about location (carrier-grade NAT, national egress pools; an IP
+  geolocation lookup placed a phone on campus in another city). iPhones with **iCloud Private Relay** show Apple
+  addresses.
+- **LAN mode is impossible** (the campus Wi-Fi isolates clients), **GPS is personal data** (R16, D5), and students
+  **may not be asked to change phone settings**.
+- **D32 was built and tested on real phones:** campus and off-campus labels worked, one relay case stayed
+  unexplained; the labels were judged **noise** (most rows would read "off campus").
 
 **Options.**
-1. *Ask students to turn Private Relay off (per network or globally).* **Rejected by the student:** the lecturer has
-   no right to require a phone setting change, and it is too slow for a whole class.
-2. *Local-LAN mode (students reach the laptop directly on the campus Wi-Fi, IP = private address).* **Tested,
-   impossible** (client isolation, see above).
-3. *GPS / browser geolocation for non-campus IPs.* **Rejected:** location is personal data (R16, G1) and was already
-   rejected in D5/D30; it also needs a permission prompt and is unreliable indoors.
-4. *Accept the campus and Apple relay ranges only, refuse everything else (mobile data, VPN).* **Rejected:** the
-   campus Wi-Fi is unreliable (a phone fell back to 5G on 24/11), so real students in the room would be refused.
-5. *Accept every network, and tell the lecturer which one was used: campus / Apple relay / off campus, flagged.*
+1. *Keep D32 (accept everything, label campus / Apple relay / off campus).* **Rejected:** mostly "off campus" labels
+   on present students, i.e. noise; and it costs a downloaded Apple file, a script, a column, a migration, markers and
+   counters (KISS, R17).
+2. *Return to the D30 filter (refuse anything but the campus range).* **Rejected:** locks out present students on
+   4G/5G or behind Private Relay (D32 options 1 and 4).
+3. *Data-over-sound token (a classmate's approach, considered 24/11).* **Rejected:** no stronger than the projected
+   code (a sound can be relayed by a phone call just like a code by message), fragile in a noisy room, needs the
+   microphone permission; already rejected in D5 ("ultrasound").
+4. *Google sign-in (same classmate's approach).* **Rejected:** identifies students (personal data, R16, G1), and
+   Google cannot restrict sign-in to a room.
+5. *GPS / geolocation.* **Rejected** (R16, D5, D32 option 3).
+6. *Remove the network part entirely and rely on the rotating QR, the projected code and the photo check.*
    **Chosen** (student, 24/11).
 
-**DECISION: option 5.** The network check no longer refuses; it **classifies** the check-in.
-- Client IP in a **campus range** of the lecturer's allow-list -> accepted, origin `campus` (no marker). When a range
-  is in both lists, **campus wins**.
-- Else in **Apple's iCloud Private Relay egress ranges for country `IL`** -> accepted, origin `apple_relay`, marker
-  **"Apple relay"** (discreet).
-- Else (4G/5G, VPN, home network, anything else) -> accepted, origin `off_campus`, marker **"off campus network"**
-  (more visible, warning style).
-- **An empty campus allow-list refuses every check-in** (D31 "fail closed" kept: the app is not configured, so no
-  origin can be judged); a malformed client IP is refused too. These two cases are the only ones that still raise the
-  off-campus error, with the D23 message replaced on 24/11 (see the Impact paragraph below).
-- Shown to the lecturer: a marker per row in the live table, the origin per row in the JSON, header counters
-  "N checked in (x off campus, y via Apple relay)"; in the export, a column "network" (`campus` / `Apple relay` /
-  `off campus`) on the check-ins sheet and two counts per session (via Apple relay, off campus) on the summary sheet.
-- All other D30 checks are **unchanged**: rotating QR 10 s / accepted <= 15 s old, 1-minute window, projected 3-digit
-  code (5 s, P1), 5 attempts (P2), one check-in per device per session, device cookie flow, D7 photo consistency as
-  safety net.
-- **Privacy (D21):** the client IP is still only compared, never stored or logged; a check-in stores one text value
-  `network_origin` (`campus` | `apple_relay` | `off_campus`). Apple's file holds Apple network ranges only, no
-  personal data. No location is ever asked.
+**DECISION: option 6.**
+- **No client IP is read for attendance.** Removed: the campus allow-list and its lecturer page, the
+  `CF-Connecting-IP` handling, the Apple relay range list, its download script and loader, the stored origin label,
+  the live markers and counters, the export columns, and the off-campus error message.
+- **Attendance anti-cheat keeps only** the rotating QR (new every 10 s, accepted if at most 15 s old on arrival) and
+  the projected code, plus the unchanged rules of that flow: 1-minute window bound to the device cookie, at most 5
+  code attempts per window (P2), a new scan opens a new window with 0 attempts (D31), nickname 1-30 characters (D31),
+  one check-in per device per session, P3 (no in-app fallback), and the photo head-count consistency alert (D7,
+  separate feature, unchanged).
+- **The projected code has 4 digits (amendment, student, 24/11).** Range `0000`-`9999` (leading zeros kept, always
+  exactly 4 characters), still regenerated every 5 s, the current or the immediately previous code accepted (P1).
+  The student must type exactly 4 digits; anything else is a wrong code (counted as an attempt, like today).
+  5 attempts per window and the reset on a new scan are unchanged.
+- **No "surprise call" or other new feature** is added (not requested).
+- **Hosting (D13):** plans A and B differ only by the base URL; no network configuration is needed before class.
 
-**Implementation defaults (proposed by the orchestrator, adopted in `design.md` T19).**
-- Apple's data is **not committed** (unknown licence, changes over time; same policy as the YuNet model). A script
-  `scripts/update_relay_ranges.py [--country IL] [--output PATH]` downloads the CSV (stdlib `urllib`, timeout),
-  keeps the rows of the chosen country, validates every range, and writes the small CSV **atomically**; on a download
-  error or zero valid rows it exits non-zero and leaves the existing file untouched. Default output
-  `data/apple_relay_ranges_IL.csv`, git-ignored. Config variable `RELAY_RANGES_PATH` (optional, that default), listed
-  in `.env.example`.
-- The file is **loaded once at start-up** (it is static); malformed lines are skipped and counted in the server log.
-  Missing or unreadable file -> no relay ranges: iPhones behind the relay are then still accepted but marked
-  `off campus` (a louder marker, nobody is refused); the app still starts. The campus ranges are still read at every
-  call (FR-1.4).
-- The allow-list page shows "Apple Private Relay list: N ranges loaded" or "not loaded" (with the command to run).
-- Storage: column `check_in.network_origin TEXT NOT NULL DEFAULT 'campus'` (one of `campus`, `apple_relay`,
-  `off_campus`); an existing database without the column gets it at start-up (add-column-if-missing), its old rows
-  read as `campus` (they were all accepted by the campus filter).
+**Consequences (written honestly).**
+- The network no longer limits **where** a relayed QR and code can be used. A remote student with a **live
+  accomplice** in the room (video call, or a message within the 5-10 s code tolerance) can check in from anywhere,
+  and nothing marks that row any more.
+- The **photo consistency alert (D7) is the room-level check**: it flags an inflated N (beyond about 7 absent
+  check-ins for N about 45, documented limit of D7).
+- What still holds: a forwarded screenshot alone is useless (the code changes every 5 s and the QR expires after
+  15 s); one device = one check-in per session.
+- **Code brute force (red-team finding F-02).** A new scan resets the attempts to 0 (D31), so a script holding one
+  relayed QR image (valid for 15 s) can open window after window and guess the code without seeing it. Before D33
+  this attacker had to be on the campus network (D30) or was labelled "off campus" (D32); now it can be anywhere.
+  Options proposed to the student: (a) count wrong codes per device for the whole session (e.g. 10 -> blocked), (b) a
+  4-digit code. **The student chose (b); (a) is not adopted.** Effect: with 2 valid codes at any time (P1) the
+  expected number of guesses goes from about 500 (3 digits) to about **5,000** (4 digits), i.e. **x10**. This slows a
+  script, it does **not** stop it. **Residual risk accepted and recorded** (to be reported in `docs/results.md` and
+  the defence notes); the D7 photo alert remains the safety net for an inflated N.
 
-**Known weakness (written honestly).** The network check is now **information, not a barrier**. An absent student
-can check in from anywhere (mobile data, home) if an accomplice in the room relays the QR and the code live (video
-call, or a quick message within the 5-10 s code tolerance); an iCloud+ user anywhere in Israel even gets the discreet
-"Apple relay" marker. What remains: the rotating QR (<= 15 s), the projected code (5 s, P1) typed within the
-1-minute window, one device = one check-in, the **visible off-campus marker** (live, so the lecturer can ask "who is
-off campus?" in class, and in the export), and the photo consistency alert (D7), which flags an inflated N. The
-relay list's only role is now to keep the loud marker meaningful: without it, every iPhone with iCloud+ would be
-marked "off campus".
+**Justification.** R1 "as simple as possible"; R14 (no setting to change, no student locked out); R16 / G1 (no
+location, no identity, and now no IP read at all); R17 KISS (a whole mechanism removed because, measured in the
+field, it did not inform the lecturer); D7 kept as the statement's own control (R2).
 
-**Justification.** R1 "as simple as possible" and R14 (phone, no setting to change, no student locked out by a
-flaky Wi-Fi); R16 / D5 (no location); D30 keeps its other proofs; D21 respected (origin label only); KISS: one static
-file, one extra range set, one text column, no new service.
+**Impact.**
+- D30 point 1 and the D32 amendment removed; D30 point 3 amended (4 digits); D13 and D22 notes obsolete; D21: no
+  client IP read for attendance; D25: no injectable client IP; open item 8 obsolete; question 5 to the lecturer
+  obsolete.
+- *Design (`design.md`):* `NetworkPolicy`, `NetworkOrigin`, `count_origins`, `relay_ranges`, `ParsedRanges`, the
+  update script, `client_ip()`, the allow-list route and page, `OffCampusError`, `InvalidNetworkRangeError`,
+  `Config.relay_ranges_path`, `CheckIn.network_origin`, `SessionSummary.origin_counts` and the migration helper
+  removed; `RotatingCredentials` gives 4-digit codes; tasks T4, T9 and T19 marked "removed by D33"; new tasks T20
+  (remove the network part) and T21 (4-digit code). An existing database keeps its `network_origin` column and its
+  `campus_range` rows untouched and unused (KISS, no migration).
+- *SRS:* FR-1.2-FR-1.4 and FR-1.19 removed (numbering kept); FR-1.8, FR-1.14, FR-1.18, error table, glossary and NFRs
+  updated; "3-digit" becomes "4-digit".
+- *Results (D17):* report the check-in duration and refusals; no network counts any more.
 
-**Impact.** D30 point 1 and its "relay must come from someone on campus" argument amended; open item 8 closed
-(`192.114.52.0/24`); D13 note (LAN mode unusable on campus Wi-Fi). Design: `NetworkPolicy` gets the relay ranges and
-`classify(client_ip) -> NetworkOrigin` (`CAMPUS` / `APPLE_RELAY` / `OFF_CAMPUS`); new loader
-`app/adapters/relay_ranges.py`; script; `CheckIn.network_origin`; exporter and live table columns and counters; task
-T19. SRS: FR-1.2, FR-1.4, FR-1.14, FR-1.18 amended, new FR-1.19, error table row reworded. Tests: see T19 in
-`design.md`. Results (D17): report the numbers of off-campus and relay check-ins measured in class. **Message validated by the student (24/11):** the off-campus error now reads "Check-in is not available right now. Ask the lecturer."; it replaces the D23 wording.
-
-**Status:** VALIDATED by the student — 2026-11-24
+**Status:** VALIDATED by the student — 2026-11-24 (including the 4-digit amendment for F-02, option (b))
 
 ---
 
@@ -585,12 +610,14 @@ T19. SRS: FR-1.2, FR-1.4, FR-1.14, FR-1.18 amended, new FR-1.19, error table row
 2. Date of the class demo; must the results description include it (D17)?
 3. Is there a Moodle upload in addition to the Form (D18)?
 4. Optional: is a nickname-based attendance sheet acceptable under "no personal information" (D6), and may anonymised comparisons with other students' repos be shown in class (D11)?
-5. Optional: does the campus Wi-Fi share its public IP range with other networks (e.g. dormitories, eduroam guests), which would widen what the D30 filter accepts?
+5. ~~Optional: does the campus Wi-Fi share its public IP range with other networks (e.g. dormitories, eduroam guests), which would widen what the D30 filter accepts?~~ Obsolete since D33 (no network check).
 
 ## Items still OPEN — to be decided by the student
 
 6. ~~OPEN — F5 comparison source (D11).~~ **CLOSED by D31 (23/11):** list pasted by the lecturer on `/lecturer/peers`.
 7. ~~OPEN — Nickname rules (D6).~~ **CLOSED by D31 (23/11):** 1-30 characters, not unique.
-8. ~~OPEN (value only) — Campus IP allow-list (D30).~~ **CLOSED by D32 (24/11):** measured on site, the campus
-   range is `192.114.52.0/24` (entered at runtime on `/lecturer/allow-list`, not in code); iPhones behind iCloud
-   Private Relay and phones on mobile data are handled by D32 (accepted, flagged).
+8. ~~OPEN (value only) — Campus IP allow-list (D30).~~ **CLOSED by D32 (24/11)** (campus public range measured on
+   site), then **obsolete since D33 (24/11):** the allow-list no longer exists.
+9. ~~OPEN — Brute force of the projected code through rescans (red-team F-02).~~ **CLOSED by D33 (24/11):** the
+   student chose a 4-digit code (option (b)); the per-device session-wide error count (option (a)) is not adopted.
+   Residual risk recorded in D33 (about 5,000 expected guesses instead of about 500: slower, not stopped).
