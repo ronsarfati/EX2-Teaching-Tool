@@ -8,11 +8,10 @@ class photo and watches the clock.
 
 ## 1. Setup checklist (before class, 20 min before)
 
-Run once on the demo laptop, from the repository root (the app does not read `.env` by itself: export it).
+Run once on the demo laptop, from the repository root (`python -m app` loads `.env` itself; variables already set in the environment win).
 
 1. Environment: copy `.env.example` to `.env`, set a long random `SECRET_KEY`, a `LECTURER_PIN`, and `BASE_URL`
    (the public tunnel URL, or `http://<laptop LAN IP>:5000` for plan B). Optional: `ANTHROPIC_API_KEY` (F5).
-   Load it: `set -a; source .env; set +a`.
 2. Demo data (optional, fictional only): `python scripts/seed_demo.py instance/app.db --force`
    fills 3 past sessions, a closed poll, a few comments and fake peer URLs so the export looks populated.
    **(pending)** Seeded or empty database for the live class: decide with the lecturer; with a seeded database the

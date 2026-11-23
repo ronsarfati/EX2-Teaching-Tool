@@ -26,8 +26,8 @@ any smartphone browser with no installation (R14):
 
 ### In scope
 
-All five features are designed **and** implemented in the demo app; F1 is built first and is the most robust
-part (D1). F4 is designed but its implementation is deferred until F1-F3 are done (D10).
+All five features are designed. F1, F2, F3 and F5 are implemented in the demo app; F1 is built first and is the
+most robust part (D1). F4 (video summary) is designed but its implementation is deferred (D10, decision pending).
 
 - **F1 Attendance (main)**
   - *Projector check-in* (D30): the lecturer opens a session (one click, PIN) and the projector shows a **QR**

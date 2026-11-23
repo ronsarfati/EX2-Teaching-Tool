@@ -17,14 +17,14 @@ implementation is secondary and composes existing tools rather than coding from 
 | O1 | Attendance (main feature): check-in from the phone on the campus network (projector QR + 3-digit code), automatic photo head count with a consistency alert, online table + offline CSV/XLSX | R1-R4, D6-D8, D30 |
 | O2 | Comments and suggestions, real time and asynchronous | R5, D4, D8 |
 | O3 | On-the-spot KISS polls | R6, D9 |
-| O4 | ML summary of a recorded class video, better than the Zoom automatic summary | R7, R8, D10 |
+| O4 | ML summary of a recorded class video, better than the Zoom automatic summary | R7, R8, D10 (designed; implementation deferred, decision pending) |
 | O5 | LLM homework review with anonymised comparison to other submissions | R9, R10, D11 |
 | O6 | Complete design documentation (tools report, SoW, SRS, use cases, components, class and sequence diagrams, test strategy) | R24-R32, D14 |
 | O7 | A 10-minute live demo in class and a short results description | R19, R34, R35, D17 |
 
 ## 3. Scope
 
-**In scope** (D1): all five features designed and implemented in one Flask app (D2) with SQLite storage (D3); F1
+**In scope** (D1): all five features designed; F1, F2, F3 and F5 implemented in one Flask app (D2) with SQLite storage (D3); F1
 first and most robust. Attendance follows D30: the lecturer opens a session and the projector shows a QR
 regenerated every 10 s and a 3-digit code regenerated every 5 s; students scan the QR with the phone's native
 camera; the QR is accepted if at most 15 s old on arrival, then the student has a 1-minute window to type the code
@@ -124,7 +124,7 @@ head count (D7).
 | A3 | The lecturer sees the attendance table online and downloads it as CSV/XLSX | R3, D8 |
 | A4 | A comment posted from a phone appears on the lecturer page within 5 s; a comment posted outside a session is visible later | R5, D4, D8 |
 | A5 | The lecturer creates a poll, students vote from phones, live results are shown | R6, D9 |
-| A6 | A video file produces a structured summary, compared with the Zoom example in the results | R7, R8, D10 |
+| A6 | A video file produces a structured summary, compared with the Zoom example in the results | R7, R8, D10 (designed; implementation deferred, decision pending) |
 | A7 | A public repository URL produces an LLM review with an anonymised comparison to at least one other submission when one is available (otherwise the review says so, D31) | R9, R10, D11, D31 |
 | A8 | Every document of To Do 3-9 and 12 exists in `docs/` and is linked from the README | R24-R32, R35, D14 |
 | A9 | The app runs from a fresh clone following the README; the pytest suite passes | R33, R37, D25 |
