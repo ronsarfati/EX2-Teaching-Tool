@@ -1,6 +1,8 @@
 """Application settings, read once from environment variables (NFR-8: no secret in code)."""
 from __future__ import annotations
 
+import os
+import tempfile
 from dataclasses import dataclass
 from typing import Mapping, Optional
 
@@ -23,8 +25,11 @@ class Config:
     face_score_threshold: float = 0.4
     anthropic_api_key: Optional[str] = None
     anthropic_model: str = "claude-sonnet-5-5"
-    whisper_model: str = "base"
-    whisper_language: Optional[str] = None
+    whisper_model: str = "small"  # D34: chosen for Hebrew quality
+    whisper_language: Optional[str] = None  # None = Whisper detects the language
+    video_max_bytes: int = 2 * 1024**3  # upload limit of the F4 route only (2 GiB)
+    # Outside the repository, so a recording can never be committed by accident (D34).
+    video_work_dir: str = os.path.join(tempfile.gettempdir(), "ex2-video-summary")
 
     @classmethod
     def from_env(cls, environ: Mapping[str, str]) -> "Config":
@@ -47,5 +52,21 @@ class Config:
             anthropic_api_key=environ.get("ANTHROPIC_API_KEY", "").strip() or None,
             anthropic_model=environ.get("ANTHROPIC_MODEL") or defaults["anthropic_model"].default,
             whisper_model=environ.get("WHISPER_MODEL") or defaults["whisper_model"].default,
-            whisper_language=environ.get("WHISPER_LANGUAGE") or None,
+            whisper_language=(environ.get("WHISPER_LANGUAGE", "").strip().lower() or None),
+            video_max_bytes=_positive_int(environ, "VIDEO_MAX_BYTES", defaults["video_max_bytes"].default),
+            video_work_dir=environ.get("VIDEO_WORK_DIR") or defaults["video_work_dir"].default,
         )
+
+
+def _positive_int(environ: Mapping[str, str], name: str, default: int) -> int:
+    """Read an integer > 0 from `environ[name]` (empty or missing = `default`), else raise ConfigError."""
+    raw = environ.get(name, "").strip()
+    if not raw:
+        return default
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise ConfigError(f"{name} must be a whole number of bytes") from exc
+    if value < 1:
+        raise ConfigError(f"{name} must be greater than 0")
+    return value

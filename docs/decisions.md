@@ -2,7 +2,7 @@
 
 Resolutions of the open questions (OQ1-OQ14 in `docs/requirements.md`) and of the technical choices left open by
 the statement. Proposed by the ambiguity analysis, **validated by the student on 2026-11-22** (D31: 2026-11-23;
-D32 and D33: 2026-11-23).
+D32, D33 and D34: 2026-11-23).
 Requirements are cited as R<n>, statement locators as F/Req/G/TD/QA (see `docs/requirements.md`).
 
 Guiding rule: the **simplest option that fully satisfies the requirements** (KISS, Req2), that can really be
@@ -17,7 +17,7 @@ old text is kept below for history only and must not be used for design.
 
 | D | Topic | Decision | Status |
 |---|---|---|---|
-| D1 | Demo scope (OQ1) | All 5 features fully implemented and working live (no pre-computed outputs); F1 first and most robust; F4 deferred (D10) | VALIDATED |
+| D1 | Demo scope (OQ1) | All 5 features fully implemented and working live (no pre-computed outputs); F1 first and most robust; F4 ~~deferred (D10)~~ implemented for real recordings of any length (D34) | VALIDATED (F4 part: D34) |
 | D2 | Tech stack | Python 3.11+ / Flask, server-rendered mobile-first HTML + small vanilla JS | VALIDATED |
 | D3 | Storage | SQLite (stdlib `sqlite3`), one local file, git-ignored | VALIDATED |
 | D4 | Real time | Short polling (2-3 s; projector 1 s, D31); no websockets | VALIDATED (amended by D31) |
@@ -26,7 +26,7 @@ old text is kept below for history only and must not be used for design.
 | D7 | Photo head count (OQ3) | YuNet, whole image, score threshold 0.4 (recall ~94 %, precision ~96 %); no manual correction; automatic consistency alert (asymmetric tolerance); photo discarded after counting; a new photo replaces D (D31) | VALIDATED (amended by D31) |
 | D8 | Spreadsheet online/offline; offline comments (OQ5) | Live in-app table + CSV/XLSX download (format: D31); F2 offline = asynchronous | VALIDATED (amended by D31) |
 | D9 | Polls (F3) | One question, 2-4 options, one vote per token, live results | VALIDATED |
-| D10 | Video summary F4 (OQ6) | No pre-computed summary; to revisit after F1-F3; candidate: live demo on a short 2-3 min clip (faster-whisper + Claude) | DEFERRED |
+| D10 | Video summary F4 (OQ6) | No pre-computed summary; to revisit after F1-F3; candidate: live demo on a short 2-3 min clip (faster-whisper + Claude) | ~~DEFERRED~~ CLOSED by D34 (23/11) |
 | D11 | Homework review F5 (OQ6) | Public repo URL -> capped text extract -> Claude review + anonymised comparison with 1-2 other repos (source, masking: D31); runs live, no pre-computed fallback | VALIDATED (amended by D31) |
 | D12 | LLM provider and secrets | Anthropic (Claude); model from `ANTHROPIC_MODEL`, default `claude-sonnet-5-5` (to confirm by a real call); key in `.env` | VALIDATED |
 | D13 | Demo hosting (OQ7) | Laptop + Cloudflare quick tunnel; plan B hotspot/LAN over plain HTTP (works: no in-page camera); plan C recorded run | VALIDATED (IP notes obsolete since D33) |
@@ -50,6 +50,7 @@ old text is kept below for history only and must not be used for design.
 | D31 | Design-level choices validated with `design.md` (OI-1-OI-13) | F5 peer list page, nickname rules, cookie-only token, export format, polling 1 s on projector, etc. | VALIDATED (23/11) |
 | D32 | Network origin of a check-in (field findings 23/11; amends D30 point 1) | ~~Every network accepted and classified campus / Apple relay / off campus, shown live and in the export~~ | SUPERSEDED by D33 (23/11) |
 | D33 | Remove the IP / network part entirely (supersedes D32 and point 1 of D30); projected code 4 digits (amends D30 point 3) | No client IP read for attendance, no allow-list, no relay list, no origin label; anti-cheat = rotating QR (10 s / 15 s) + projected **4-digit** code (0000-9999, 5 s, P1) + the unchanged D30 rules; D7 photo alert is the room-level check. Code brute force by rescanning: ~500 -> ~5,000 expected tries, residual risk recorded | VALIDATED (23/11) |
+| D34 | Video summary F4 for real recordings (closes D10) | PIN page, upload up to 2 GB (configurable, this route only) streamed to a temp file; ffmpeg -> mono 16 kHz audio; faster-whisper `small` (CPU int8, VAD, language auto unless `WHISPER_LANGUAGE`) in **one background thread, one job at a time**; Claude structured summary (map-reduce above a safe size, transcript treated as untrusted); status page polled; video and audio deleted right after transcription (also on failure), transcript never stored, only the summary text + timestamps kept in SQLite; demo on a local-only 4-min Hebrew clip | VALIDATED (23/11) |
 
 "VALIDATED" = "VALIDATED by the student — 2026-11-22" unless stated otherwise. "DEFERRED" = "DEFERRED by the
 student — 2026-11-22".
@@ -67,7 +68,7 @@ student — 2026-11-22".
 - F1 (R1-R3: check-in flow D30 (formerly the D5 chain, superseded 22/11), photo head count D7, live table + CSV/XLSX D8, check-ins vs counted comparison) is built **first** and is the most robust part.
 - F2 (D8), F3 (D9), F4 (D10), F5 (D11) are real implementations.
 - **No pre-computed outputs** for F4/F5: every feature must work live on demo day (student's principle). Network/hosting failures are covered by the hosting plans of D13, not by canned results.
-- F4 is **deferred** (D10): revisited after F1-F3 are done.
+- F4 is **deferred** (D10): revisited after F1-F3 are done. **Revisited by D34 (23/11):** F4 is implemented for real recordings of any length (background job).
 - No extra features (no accounts, no analytics, no notifications, no PWA offline mode).
 
 **Justification.** F1 "is the main (most important) feature"; Req1 "should work in this class"; G2 "only design what can be implemented"; reuse of existing libraries (Note) keeps the full scope feasible.
@@ -227,7 +228,10 @@ Identity of each node = the nickname and device token of D6 (no personal data). 
 
 **Impact.** Design keeps `VideoSummarizer` = `Transcriber` + `LLMClient` (D12) so F4 can be added without redesign; F4 is last in the task order (D1).
 
-**Status:** DEFERRED by the student — to revisit after F1-F3; candidate: live demo on a short 2-3 min clip (faster-whisper base/small measured in tools report) — 2026-11-22
+**Status:** DEFERRED by the student — to revisit after F1-F3; candidate: live demo on a short 2-3 min clip (faster-whisper base/small measured in tools report) — 2026-11-22.
+**CLOSED by D34 (23/11):** F4 is implemented for real class recordings of any length (background job), not only a
+short clip; the direction above (local faster-whisper + Claude, no pre-computed summary, no Zoom/Meet integration) is
+kept. The "short 2-3 min clip" candidate and the `base` model default are replaced by D34.
 
 ## D11 — Homework review with comparison F5 (OQ6; R9, R10, R16)
 
@@ -328,6 +332,7 @@ app/  tests/  demo_data/  .env.example  requirements.txt
 - Live demo photo processed in memory and discarded (D7).
 - ~~Client IP addresses are used only for the D30 accept/refuse check and never stored with attendance records; the campus allow-list holds network ranges only (no individual addresses). With D32 (23/11) a check-in stores only its network origin label (`campus` / `apple_relay` / `off_campus`), never the address.~~ **Amended by D33 (23/11):** no client IP address is read for attendance any more (no allow-list, no `CF-Connecting-IP`, no origin label). The werkzeug access log stays off, so the app neither stores nor logs client addresses.
 - `.gitignore` covers `.env`, `instance/`, uploads, and model files (the Apple relay file line of D32 was removed with D33, together with the local file).
+- **Added by D34 (23/11):** an uploaded recording and its extracted audio live only in temporary files outside the repository and are deleted right after transcription (also on failure); the transcript is never stored; only the summary text, status and timestamps are kept; the original file name is not stored. The demo lecture clip stays local only in `docs/supplementary/`.
 
 **Status:** VALIDATED by the student — 2026-11-22
 
@@ -352,6 +357,9 @@ app/  tests/  demo_data/  .env.example  requirements.txt
 ## D25 — Test tooling (R32)
 
 **DECISION:** `pytest` + Flask test client; unit tests per class from `docs/design.md`; `LLMClient` and `Transcriber` replaced by fakes (no network, no key); `HeadCounter` tested on non-personal images with a tolerance (e.g. ±20 %), plus the local-only accuracy measurement on the provided photos (reported, not automated); the D7 consistency rule tested exhaustively at its boundaries (pure function). Time-dependent logic of D30 (10 s QR regeneration, 15 s acceptance window checked on request arrival, 5 s code rotation, 1-minute check-in window) tested with an injectable clock; ~~the client IP is injectable too (allow-list tests)~~ (no client IP since D33). (Originally: D5's 2-minute claim, superseded.) Manual end-to-end rehearsal with several browser tabs and 2-3 phones before the demo.
+**Added by D34 (23/11):** F4 is tested with `FakeTranscriber`, a fake audio extractor, `FakeLLMClient` and an inline
+job runner (no ffmpeg, Whisper model or network); one optional integration test is skipped unless `ffmpeg` and the
+cached model are present; tests never trigger a model download.
 
 **Status:** VALIDATED by the student — 2026-11-22
 
@@ -601,6 +609,96 @@ field, it did not inform the lecturer); D7 kept as the statement's own control (
 - *Results (D17):* report the check-in duration and refusals; no network counts any more.
 
 **Status:** VALIDATED by the student — 2026-11-23 (including the 4-digit amendment for F-02, option (b))
+
+## D34 — Video summary F4 for real class recordings, background job (closes D10) (R7, R8, R15, R16; amends D1, D21, D25)
+
+**Question.** D10 deferred F4 with a candidate "live demo on a short 2-3 min clip". F1-F3 and F5 are done. Should F4
+only show a short clip in class, or give the lecturer a real summary of the recordings they actually make
+(Zoom / Meet / Classroom files, 60-90 minutes)?
+
+**Facts.** Measured in the tools report (2.6) on the demo laptop (Apple M3, CPU, int8, `beam_size=1`, VAD on):
+real-time factor 0.06 (`base`) and 0.17 (`small`); Hebrew detected on `m21.mp4` (p = 0.94-0.96); a 90-minute lecture
+therefore takes about **6 min (`base`) to 15 min (`small`)** to transcribe, far longer than an HTTP request (and the
+quick tunnel cuts requests at 100 s, tools report 2.9). `faster-whisper` 1.2.1 needs `av<17`. The provided `m21.mp4`
+is only 5.7 s long. The `small` model (~460 MB) is downloaded once from Hugging Face at its first use.
+
+**Options.**
+1. *Short-clip-only demo (D10 candidate): transcribe inside the request, clip of 2-3 min.* **Rejected:** it shows the
+   pipeline but does not serve the lecturer's real need (R7: "their class video"); a real recording would time out.
+2. *Full recordings of any length, processed by a background job with a status page.* **Chosen** (student, 23/11).
+3. *Pre-computed summary shown in class.* **Rejected:** against D1 and the spirit of D10 (everything runs live).
+4. *Cloud transcription API (OpenAI, Google, ...).* **Rejected:** the audio of the class (voices, possibly students)
+   would leave the laptop (R16), and it needs another account and key; local faster-whisper is fast enough.
+5. *Job queue (Celery / RQ + Redis) or a separate worker process.* **Rejected:** a second service to install and run
+   live for one job at a time (R17 KISS); one Python thread + SQLite status is enough.
+
+**DECISION: option 2.**
+1. **Page "Video summary"** in the lecturer area (PIN, D22): upload one recording (video or audio: mp4, m4v, mov,
+   mkv, webm, avi, m4a, mp3, wav, aac, ogg, opus, flac). The upload limit is raised **for this route only** to
+   `VIDEO_MAX_BYTES` (default 2 GB); the global limit stays 25 MB. The upload is streamed to a temporary file, never
+   held entirely in memory.
+2. **Audio extraction** with `ffmpeg` (subprocess, argument list, mono 16 kHz WAV) into a temporary file; a file that
+   ffmpeg cannot read, or that has no audio track, is refused with `UnreadableVideoError` ("We could not read this
+   video file.").
+3. **Transcription** with faster-whisper behind the port `Transcriber` (adapter `FasterWhisperTranscriber`): default
+   model **`small`** (Hebrew quality), language auto-detected unless `WHISPER_LANGUAGE` is set, CPU, int8, VAD on.
+   It runs in **one background thread, one job at a time**; a second upload while a job is running is refused with a
+   plain message.
+4. **Summary** with the existing `LLMClient` (Claude, D12): structured (topics covered, key notions, definitions and
+   examples, what to review), in the transcript's language unless the lecturer asks for another one (the four section headings are translated into that language, and no remark about the instructions or the transcript is allowed outside them; real trial, 23/11); a transcript
+   above a safe size is summarised by **map-reduce** (chunks summarised, then merged). The prompt states that the
+   transcript is untrusted content (prompt injection) and must not be obeyed.
+5. **Status page** polled every few seconds (D4): queued / extracting audio / transcribing / summarising / done /
+   failed, in plain words (D23); the lecturer can leave and come back. The finished summary is shown and downloadable
+   as `.md` and `.txt`.
+6. **Privacy (R16, D21):** the uploaded file and the audio are deleted right after transcription (and on every
+   failure path, in a `finally`); the transcript is never written to disk or the database and is dropped after
+   summarising; only the summary text, the job status and timestamps are kept (SQLite table `summary_job`; a lecture
+   summary is not personal data). The original file name is not stored. Nothing is written inside the repository
+   except the SQLite database in `instance/` (temporary files go to the system temp directory, the model to the
+   Hugging Face cache in the user's home).
+7. **Failures:** LLM unavailable (no key, network or API error) -> `LLMUnavailableError("summary")`, job failed,
+   files deleted (with no key, the upload is refused at once, before 15 minutes of transcription). Whisper model
+   missing or not loadable, or `ffmpeg` missing -> a plain "transcription unavailable" message. The model download
+   happens only at the first real use, never in tests.
+8. **Demo:** a 4-minute Hebrew lecture clip (Technion, "Introduction to graph theory 1", standard YouTube licence),
+   kept **local only** in `docs/supplementary/` and never committed; `m21.mp4` (5.7 s) is too short to show a summary.
+   R8: `docs/results.md` compares our summary with the provided Zoom example qualitatively.
+9. **Tests (D25 amended):** `FakeTranscriber`, a fake audio extractor, `FakeLLMClient` and an inline job runner: no
+   ffmpeg, model or network needed; one optional integration test runs only if `ffmpeg` and the cached model exist.
+
+**Consequences.**
+- One background thread exists (the only one in the app); its status lives in SQLite, so a page reload or another
+  browser shows it. If the app stops during a job, the job is marked failed at the next start and its temporary files
+  are deleted.
+- The `WHISPER_MODEL` default changes from `base` to `small`; new settings `VIDEO_MAX_BYTES` and `VIDEO_WORK_DIR`.
+- The transcript (text only) is sent to the Anthropic API, as already allowed by D12; voices are never sent.
+- New system dependency: the `ffmpeg` command line tool (to be installed and recorded in the tools report, D15).
+
+**Risks (written honestly).**
+- **Long processing time:** about 15 min for a 90-minute lecture with `small` (6 min with `base`, set by
+  `WHISPER_MODEL`); no promise is made beyond the measured real-time factors.
+- **CPU load during class:** transcription uses the laptop's CPU; a long job started during the attendance check-in
+  may slow the server. Advice: start long recordings outside the check-in; the class demo uses the 4-minute clip
+  (about 40 s of transcription with `small`).
+- **Model download ~460 MB, once**, at the first real use (needs network); to be done before class.
+- **Upload through the tunnel:** Cloudflare's free plan documents a 100 MB request-body limit (not measured here)
+  and the tunnel cuts requests at 100 s: large recordings are uploaded on the laptop itself (`http://localhost`).
+- **Demo clip licence:** standard YouTube licence: used locally for the class demo only, never committed or
+  redistributed; no output derived from it is committed unless checked free of personal data (D21).
+- **Personal data spoken in a recording** (e.g. a student's name said aloud) may reach the transcript and the LLM;
+  the prompt asks the model not to name students; residual risk accepted.
+
+**Justification.** R7 (the lecturer's own recordings), R8 (structured summary beats the Zoom example), R15 (file
+upload, no Zoom/Meet API), R16 (media deleted, transcript not kept, no file name), R17/R18 (reuse ffmpeg,
+faster-whisper, Claude; one thread instead of a queue), D1 (live, no pre-computed output).
+
+**Impact.** D10 closed; D1 summary row updated; D21 and D25 extended as above. *Design:* `VideoSummaryService`,
+`LectureSummariser`, `SummaryRepository`, `SummaryJob` / `JobStatus`, ports `Transcriber`, `AudioExtractor`,
+`JobRunner` with adapters `FasterWhisperTranscriber`, `FfmpegAudioExtractor`, `ThreadJobRunner`; table
+`summary_job`; task T18 rewritten (T18a-T18f). *SRS:* section 3.4 FR-4.1-FR-4.9, error table, NFR-13.
+
+**Status:** VALIDATED by the student — 2026-11-23
 
 ---
 

@@ -3,7 +3,7 @@ import pytest
 
 from app import create_app
 from app.config import Config
-from tests.fakes import FakeClock
+from tests.fakes import FakeAudioExtractor, FakeClock, FakeTranscriber, InlineJobRunner
 
 
 @pytest.fixture
@@ -13,6 +13,7 @@ def config(tmp_path) -> Config:
         secret_key="test-secret-key",
         base_url="https://test.example",
         database_path=str(tmp_path / "test.db"),
+        video_work_dir=str(tmp_path / "video-work"),  # never the real temp folder
     )
 
 
@@ -23,7 +24,9 @@ def clock() -> FakeClock:
 
 @pytest.fixture
 def app(config, clock):
-    return create_app(config, clock=clock)
+    # F4 doubles by default: no ffmpeg, no Whisper model, no thread in the tests.
+    return create_app(config, clock=clock, transcriber=FakeTranscriber(),
+                      audio_extractor=FakeAudioExtractor(), job_runner=InlineJobRunner())
 
 
 @pytest.fixture

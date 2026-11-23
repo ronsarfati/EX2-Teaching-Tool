@@ -1,9 +1,16 @@
-"""Lecturer pages: login, dashboard, open / close session (FR-1.1, FR-1.13, FR-6.1)."""
+"""Lecturer pages: login, dashboard, sessions, polls, homework peers and video summaries (FR-1, FR-3, FR-4, FR-6.1)."""
 from __future__ import annotations
 
-from flask import Blueprint, Response, current_app, redirect, render_template, request, session, url_for
+from datetime import datetime
 
-from app.errors import InvalidRepoUrlError, UnreadablePhotoError, WrongPinError
+from flask import (Blueprint, Response, abort, current_app, redirect, render_template, request, session,
+                   url_for)
+from werkzeug.exceptions import RequestEntityTooLarge
+
+from app.errors import (InvalidRepoUrlError, UnreadablePhotoError, UnsupportedVideoFormatError,
+                        VideoTooLargeError, WrongPinError)
+from app.repositories.summaries import JobStatus
+from app.services.video import VideoSummaryService, summary_markdown, summary_plain_text
 from app.web.auth import lecturer_required, pin_matches
 
 bp = Blueprint("lecturer", __name__, url_prefix="/lecturer")
@@ -131,3 +138,62 @@ def peers():
             return render_template("peers.html", text=text, error=error.user_message), error.http_status
         return redirect(url_for("lecturer.peers"))
     return render_template("peers.html", text="\n".join(reviewer.peer_repos()), error=None)
+
+
+@bp.route("/video", methods=["GET", "POST"])
+@lecturer_required
+def video():
+    """Upload a recording for a summary (FR-4.1, UC-12) and list the active job and past summaries (FR-4.7)."""
+    services = _services()
+    service = services["video_service"]
+    limit = services["config"].video_max_bytes
+    if request.method == "POST":
+        # Raised for this request only, before the body is read: the other uploads keep the 25 MB limit.
+        request.max_content_length = limit
+        try:
+            upload = request.files.get("video")
+            language = request.form.get("language", "auto")
+        except RequestEntityTooLarge:
+            raise VideoTooLargeError(limit) from None
+        if upload is None:
+            raise UnsupportedVideoFormatError()
+        job = service.submit(upload.stream, upload.filename or "", language)
+        return redirect(url_for("lecturer.video_job", job_id=job.id), code=303)
+    return render_template(
+        "video.html", active=service.active(), recent=service.recent(10), max_bytes=limit,
+        too_large_message=VideoTooLargeError(limit).user_message,
+        extensions=sorted(VideoSummaryService.ALLOWED_EXTENSIONS),
+    )
+
+
+@bp.get("/video/jobs/<int:job_id>")
+@lecturer_required
+def video_job(job_id: int):
+    """Status page while the job runs, the summary or the failure message once it ended (FR-4.7, FR-4.8)."""
+    return render_template("video_job.html", job=_services()["video_service"].get(job_id), JobStatus=JobStatus)
+
+
+def _summary_download(job_id: int, extension: str) -> Response:
+    job = _services()["video_service"].get(job_id)
+    if job.status is not JobStatus.DONE:
+        abort(404, "This summary is not ready yet.")
+    if extension == "md":
+        content, mimetype = summary_markdown(job), "text/markdown"
+    else:
+        content, mimetype = summary_plain_text(job), "text/plain"
+    day = datetime.fromtimestamp(job.finished_at or job.created_at).strftime("%Y-%m-%d")
+    response = _download(content.encode("utf-8"), f"lecture-summary-{day}-{job.id}.{extension}", mimetype)
+    response.headers["Content-Type"] = f"{mimetype}; charset=utf-8"
+    return response
+
+
+@bp.get("/video/jobs/<int:job_id>/summary.md")
+@lecturer_required
+def video_summary_md(job_id: int):
+    return _summary_download(job_id, "md")
+
+
+@bp.get("/video/jobs/<int:job_id>/summary.txt")
+@lecturer_required
+def video_summary_txt(job_id: int):
+    return _summary_download(job_id, "txt")

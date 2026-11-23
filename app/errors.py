@@ -147,9 +147,46 @@ class RepoUnavailableError(ReviewError):
     http_status = 400
 
 
-class UnreadableVideoError(AppError):
+class VideoError(AppError):
+    """A recording or its summary job was refused or failed (F4, D34)."""
+
+
+class UnreadableVideoError(VideoError):
     user_message = "We could not read this video file."
     http_status = 400
+
+
+class UnsupportedVideoFormatError(VideoError):
+    user_message = "Please choose a video or audio recording (for example MP4, MOV, MKV, WebM or M4A)."
+    http_status = 400
+
+
+class VideoTooLargeError(VideoError):
+    """The upload is above `VIDEO_MAX_BYTES`; the message quotes the configured limit in GB."""
+
+    http_status = 413
+
+    def __init__(self, limit_bytes: int = 2 * 1024**3) -> None:
+        self.limit_bytes = limit_bytes
+        gigabytes = round(limit_bytes / 1024**3, 1)
+        figure = f"{gigabytes:.0f}" if gigabytes == int(gigabytes) else f"{gigabytes:.1f}"
+        self.user_message = f"This file is too large. The maximum is {figure} GB."
+        super().__init__()
+
+
+class NoSpeechError(VideoError):
+    user_message = "No speech was found in this recording."
+    http_status = 400
+
+
+class TranscriptionUnavailableError(VideoError):
+    user_message = "The transcription service is unavailable right now. Please try again later."
+    http_status = 503
+
+
+class SummaryJobRunningError(VideoError):
+    user_message = "A video is already being summarised. Please wait until it is finished."
+    http_status = 409
 
 
 class WrongPinError(AppError):

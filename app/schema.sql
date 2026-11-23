@@ -75,3 +75,23 @@ CREATE TABLE IF NOT EXISTS comment (
     text       TEXT NOT NULL,
     created_at REAL NOT NULL
 );
+
+-- F4 video summary jobs (D34). One row per job. No transcript, file name, path or media column (FR-4.5):
+-- only the status, the summary text and timestamps are kept.
+CREATE TABLE IF NOT EXISTS summary_job (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    status            TEXT    NOT NULL CHECK (status IN ('queued', 'extracting_audio', 'transcribing',
+                                                         'summarising', 'done', 'failed')),
+    is_active         INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+    progress          REAL    NOT NULL DEFAULT 0 CHECK (progress BETWEEN 0 AND 1),
+    summary_language  TEXT,
+    detected_language TEXT,
+    media_seconds     REAL,
+    summary_text      TEXT    CHECK (summary_text IS NULL OR status = 'done'),
+    error_message     TEXT    CHECK (error_message IS NULL OR status = 'failed'),
+    created_at        REAL    NOT NULL,
+    updated_at        REAL    NOT NULL,
+    finished_at       REAL
+);
+-- At most one active job at a time (FR-4.6), enforced by the database as defence in depth.
+CREATE UNIQUE INDEX IF NOT EXISTS one_active_summary_job ON summary_job(is_active) WHERE is_active = 1;

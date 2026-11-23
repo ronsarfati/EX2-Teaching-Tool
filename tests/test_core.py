@@ -17,7 +17,7 @@ def test_config_defaults():
     assert config.database_path == "instance/app.db"
     assert config.face_score_threshold == 0.4
     assert config.anthropic_model == "claude-sonnet-5-5"
-    assert config.whisper_model == "base"
+    assert config.whisper_model == "small"  # D34
     assert config.anthropic_api_key is None  # NFR-9: no key is fine
 
 

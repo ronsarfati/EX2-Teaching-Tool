@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Video summary {{ job.id }}{% endblock %}
+{% block content %}
+<h1>Video summary</h1>
+{% if job.status == JobStatus.DONE %}
+<p>{{ job.status.label() }}.</p>
+<article>
+  {# Auto-escaped on purpose: the text comes from an LLM and may contain HTML (never use |safe). #}
+  <div dir="auto" style="white-space: pre-wrap">{{ job.summary_text }}</div>
+</article>
+<p><a href="{{ url_for('lecturer.video_summary_md', job_id=job.id) }}">Download .md</a> |
+<a href="{{ url_for('lecturer.video_summary_txt', job_id=job.id) }}">Download .txt</a></p>
+{% elif job.status == JobStatus.FAILED %}
+<p role="alert">{{ job.error_message }}</p>
+<p><a href="{{ url_for('lecturer.video') }}">Upload another recording</a></p>
+{% else %}
+<p><strong id="job-label">{{ job.status.label() }}</strong> <span id="job-progress"></span></p>
+<p id="job-error" hidden>Connection problem, retrying...</p>
+<script>document.body.dataset.api = "{{ url_for('api.video_job', job_id=job.id) }}";</script>
+<script src="{{ url_for('static', filename='video_job.js') }}"></script>
+{% endif %}
+<p><a href="{{ url_for('lecturer.video') }}">All summaries</a></p>
+{% endblock %}

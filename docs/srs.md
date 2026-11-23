@@ -1,9 +1,10 @@
 # Software Requirements Specification (To Do 5)
 
 Covers R27. IEEE-830-inspired, kept short. Requirements are cited as R1-R37
-([requirements.md](requirements.md)), validated decisions as D1-D33 ([decisions.md](decisions.md); D5 and D26
+([requirements.md](requirements.md)), validated decisions as D1-D34 ([decisions.md](decisions.md); D5 and D26
 are superseded by D30; D31 records the design-level choices validated on 23/11; D32 is superseded by D33 (23/11),
-which removes every network / IP check and makes the projected code 4 digits), measured figures as sections of the [tools report](tools_report.md). Scope and schedule: [sow.md](sow.md).
+which removes every network / IP check and makes the projected code 4 digits; D34 (23/11) closes D10 and specifies
+F4 for real recordings of any length), measured figures as sections of the [tools report](tools_report.md). Scope and schedule: [sow.md](sow.md).
 
 ## 1. Introduction
 
@@ -23,7 +24,7 @@ and by the lecturer from a laptop (projector) and a phone (R12-R14). Features (R
 | F1 Attendance (main) | Check-in with a rotating projector QR and a 4-digit projected code, photo head count with consistency alert, online table + CSV/XLSX | R1-R4 | D6-D8, D27, D30, D33 |
 | F2 Comments | Anonymous comments/suggestions, during class (real time) and after class | R5 | D4, D8, D29 |
 | F3 Polls | One poll open at a time, one question, 2-4 options, live results | R6 | D9, D28 |
-| F4 Video summary | Local transcription + LLM summary; **deferred** | R7, R8 | D10 |
+| F4 Video summary | Upload of a class recording of any length (PIN), local audio extraction and transcription in a background job, structured LLM summary, status page, download; media deleted, transcript not kept | R7, R8, R15, R16 | D10 (closed), D34 |
 | F5 Homework review | LLM review of a public repository with anonymised comparison | R9, R10 | D11 |
 
 Out of scope: see [sow.md](sow.md) section 3 (no Moodle/Zoom, no personal data, no accounts, no native app, no
@@ -65,6 +66,7 @@ flowchart LR
   PJ[Projector<br/>laptop browser, PIN] --> FS
   FS --> DB[(SQLite file)]
   FS --> YN[YuNet face detector, local]
+  FS --> FF[ffmpeg, local]
   FS --> FW[faster-whisper, local]
   FS -- text only --> AN[Anthropic API]
 ```
@@ -83,7 +85,7 @@ IP address: a check-in works the same on the campus Wi-Fi and on mobile data (D3
 
 ### 2.3 Operating environment
 
-- Server: Python 3.11+ on the lecturer's laptop (macOS tested in the tools report), CPU only (D2, D7, D10).
+- Server: Python 3.11+ on the lecturer's laptop (macOS tested in the tools report), CPU only (D2, D7, D34); `ffmpeg` installed for F4 (D34).
 - Clients: iOS Safari and Android Chrome with the built-in camera QR reader (or Google Lens) (tools report 2.4);
   any desktop browser for the projector.
 - Network: public HTTPS URL from `cloudflared` (tools report 2.9) or plain HTTP on a hotspot / LAN (D13); students
@@ -94,8 +96,9 @@ IP address: a check-in works the same on the campus Wi-Fi and on mobile data (D3
 - C1 No personal data: no name, ID, e-mail, face recognition or location; photos discarded (R16, D6, D7, D21).
 - C2 No Moodle, Zoom, Meet or Classroom integration; videos are uploaded files (R15).
 - C3 KISS: phone web app, few taps, no installation, no accounts (R14, D6, D22).
-- C4 Only implementable, reused components (Flask, `qrcode`, OpenCV YuNet, faster-whisper, Anthropic SDK,
-  `openpyxl`, `cloudflared`), each tested in the tools report (R17, R18, R25).
+- C4 Only implementable, reused components (Flask, `qrcode`, OpenCV YuNet, faster-whisper, `ffmpeg`, Anthropic SDK,
+  `openpyxl`, `cloudflared`), each tested in the tools report (R17, R18, R25; `ffmpeg` to be recorded in task T18f,
+  D34).
 - C5 Live 10-minute demo in this class (R13, R19).
 - C6 Secrets (API key, PIN, signing key) only in environment variables / git-ignored `.env` (D12, D22).
 - C7 No network check (D33): presence rests on the rotating QR, the projected 4-digit code and the photo check
@@ -114,6 +117,9 @@ IP address: a check-in works the same on the campus Wi-Fi and on mobile data (D3
   The campus Wi-Fi isolates clients, so a phone cannot reach the laptop by its LAN address: plan A (tunnel) is used
   in class (D13 note).
 - A8 (Removed by D33: no Apple relay list any more.)
+- A9 For F4 (D34): the `ffmpeg` command is installed on the laptop; the Whisper model (`small`, ~460 MB) is
+  downloaded once, at its first real use, before class; large recordings are uploaded from the laptop itself
+  (`http://localhost`), because the tunnel limits request size and duration.
 - A7 Restarting the quick tunnel changes its host name, so the device-token cookie is lost and phones are treated as
   first-time (nickname typed again) (D31, OI-4).
 
@@ -275,26 +281,83 @@ P: MUST. Trace: R6, D4, D9. AC: a vote is reflected within 5 s without reload.
 **FR-3.4 Close.** The lecturer shall close the poll; votes after closing are rejected; results stay visible.
 P: MUST. Trace: R6, D9. AC: a vote after closing is rejected; the final counts are unchanged.
 
-### 3.4 F4 Video summary — deferred (D10)
+### 3.4 F4 Video summary (D34; D10 closed)
 
-These requirements are kept for the design; their implementation is deferred until F1-F3 are done (D1, D10).
+F4 summarises the lecturer's **real class recordings of any length** (D34), not only a demo clip. Because a
+90-minute lecture takes about 6-15 minutes to transcribe on the demo laptop (NFR-13), the work runs as a background
+job whose status the lecturer follows on a page.
 
-**FR-4.1 Upload.** The lecturer shall upload a recorded class video file; no Zoom/Meet/Classroom API is used.
-P: MUST, deferred. Trace: R7, R15, D10. AC: an MP4 file is accepted; no external platform account is needed.
+**FR-4.1 Upload.** On the PIN-protected page "Video summary" (FR-6.1), the lecturer shall upload one recorded class
+video or audio file (Zoom, Meet or Classroom recordings: MP4, M4V, MOV, MKV, WebM, AVI, M4A, MP3, WAV, AAC, OGG, Opus,
+FLAC); no Zoom/Meet/Classroom API or account is used. The upload limit of this page is `VIDEO_MAX_BYTES` (default
+2 GB, configurable) while every other upload keeps the 25 MB limit; the upload is streamed to a temporary file outside
+the repository, never held entirely in memory. The page advises uploading large recordings on the laptop itself
+(`localhost`), not through the tunnel.
+P: MUST. Trace: R7, R15, D22, D34. AC: a file of each listed extension is accepted; another extension or no file is
+refused with the message of section 5; a file above the limit is refused with the too-large message and creates no
+job; on the photo page the 25 MB limit is unchanged.
 
-**FR-4.2 Local transcription.** The system shall transcribe the audio locally with faster-whisper (language
-configurable); the video never leaves the laptop.
-P: MUST, deferred. Trace: R7, R16, D10, tools report 2.6. AC: with a fake transcriber, the transcript is passed
-to the summariser; no network call carries the video.
+**FR-4.2 Audio extraction.** The system shall extract the audio track with `ffmpeg` as mono 16 kHz audio into a
+temporary file. A file that cannot be decoded, has no audio track or is empty shall be refused with "We could not
+read this video file.".
+P: MUST. Trace: R7, D34. AC: with a fake extractor that fails, the job ends `failed` with that message; with ffmpeg
+present (optional test), a generated MP4 yields a mono 16 kHz WAV.
 
-**FR-4.3 Structured summary.** The system shall produce, with one LLM call, a summary with the sections topics,
-key points, homework / action items, questions raised.
-P: MUST (R7), SHOULD beat the Zoom example (R8), deferred. Trace: R7, R8, D10, D12. AC: with a fake LLM client
-the four sections are displayed; the comparison with the Zoom example is reported in `docs/results.md`.
+**FR-4.3 Local transcription.** The system shall transcribe the audio on the laptop with faster-whisper: model from
+`WHISPER_MODEL` (default `small`, chosen for Hebrew quality), language auto-detected unless `WHISPER_LANGUAGE` is set,
+CPU, int8, voice-activity filter on. The model is downloaded once, at its first real use, never by the tests. If the
+model cannot be loaded or `ffmpeg` is missing, the job fails with the "transcription unavailable" message; if no
+speech is found, with the no-speech message. Audio is never sent over the network.
+P: MUST. Trace: R7, R16, D34, tools report 2.6. AC: with a fake transcriber, its transcript reaches the summariser;
+a transcriber that cannot load its model gives the transcription-unavailable message; building the app loads no
+model.
 
-**FR-4.4 Live only.** No pre-computed summary shall be shown; without an LLM key or on API failure the plain
-message of section 5 is shown.
-P: MUST, deferred. Trace: D1, D10, D12, D23. AC: with no key set, the page shows the message and no summary.
+**FR-4.4 Structured summary.** The system shall summarise the transcript with the LLM (D12) into Markdown with four
+sections: topics covered, key notions, definitions and examples, what to review; in the transcript's detected
+language unless the lecturer chose English or Hebrew on the upload form. A transcript longer than 40,000 characters
+shall be summarised by map-reduce (each part summarised into notes, then the notes merged). The prompt shall state
+that the transcript is untrusted content whose instructions must not be followed (prompt injection), that nothing may
+be invented, and that no student or other person present may be named and no phone number, e-mail or ID output.
+P: MUST (R7), SHOULD beat the Zoom example (R8). Trace: R7, R8, R16, D12, D34. AC: with a fake LLM client, a
+40,000-character transcript gives 1 call and a 40,001-character one gives 3 calls (2 parts + 1 merge); the prompt
+contains the untrusted-content and no-personal-data rules and the requested language; the comparison with the Zoom
+example is reported in `docs/results.md`.
+
+**FR-4.5 Privacy and retention.** The uploaded file and the extracted audio shall be deleted right after the
+transcription, and on every failure path; the transcript shall never be written to disk or the database and is
+dropped after summarising; only the summary text, the job status, the detected language, the duration and
+timestamps are stored (a lecture summary is not personal data). The original file name is not stored. Nothing is
+written inside the repository except the SQLite database in `instance/`.
+P: MUST. Trace: R16, D21, D34. AC: after a successful job and after a failure at each step, the work directory holds
+no job files; a marker word of the transcript appears in no table, file or log; the job table has no transcript or
+file-name column.
+
+**FR-4.6 One job at a time, in the background.** The upload shall return at once and the processing (extraction,
+transcription, summary) shall run in a background job; at most one job runs at a time; an upload while a job is
+active shall be refused with the job-running message. Without an LLM key, the upload is refused at once with the
+summary-unavailable message, before any processing.
+P: MUST. Trace: R7, R17, D12, D34. AC: with a deferred runner, the first upload leaves a `queued` job and the second
+is refused and writes nothing; with no key, no job is created.
+
+**FR-4.7 Status page.** The job page shall show the step in plain words: waiting to start, extracting the audio,
+transcribing the lecture (with a percentage), writing the summary, summary ready, failed (with the user message of
+section 5), refreshed by polling every 3 s (D4). The lecturer may leave and come back: the "Video summary" page
+links to the active job and lists recent summaries. If the application stops during a job, the job is shown as
+failed with the interrupted message at the next start and its temporary files are deleted.
+P: MUST. Trace: R7, D4, D23, D34. AC: the status JSON goes through `queued`, `extracting_audio`, `transcribing`,
+`summarising`, `done` in this order; an illegal transition is impossible; after a simulated restart an active job is
+`failed` with the interrupted message.
+
+**FR-4.8 Result and download.** A finished summary shall be shown on the job page (as plain escaped text, right-to-
+left aware) and downloadable as `.md` and `.txt` (UTF-8).
+P: MUST. Trace: R7, D34. AC: both downloads are attachments with the summary text (Hebrew preserved); the `.txt` has
+no Markdown heading or emphasis marks; downloading an unfinished summary answers "This summary is not ready yet.";
+HTML in the LLM answer is shown as text.
+
+**FR-4.9 Live only, failures.** No pre-computed summary shall be shown. On LLM failure (network, API error, timeout,
+empty answer) the job shall end `failed` with the summary-unavailable message, its files deleted.
+P: MUST. Trace: D1, D12, D23, D34. AC: with a failing fake LLM client the job page shows the message and no summary,
+and no job file remains.
 
 ### 3.5 F5 Homework review with comparison
 
@@ -355,12 +418,13 @@ P: MUST. Trace: R13, D13, D30. AC: see FR-1.5.
 | NFR-4 | Performance (check-in) | Each scan / code submission is handled by the server in < 1 s on the demo laptop, so that network delay dominates the 15 s QR window and the 5 s code rotation. | R1, D30 | Timed test with the Flask test client; manual test 3 (tools report section 3) |
 | NFR-5 | Capacity | One class (up to 52 faces detected on a provided class photo, tools report 2.5.2) with polling every 2-3 s stays under the quick tunnel limit of 200 in-flight requests (tools report 2.9). | R13, D13, D30 | Rehearsal with several tabs and phones |
 | NFR-6 | Measured, not assumed | The whole-class check-in duration and the number of refusals (expired QR or window, wrong code) are measured live during the class demo and reported in `docs/results.md`; no target figure is claimed beforehand. | R1, R19, D17, D30 | Live measurement |
-| NFR-7 | Privacy | No field asks for a name, ID or e-mail; photos are never stored; no client IP is read for attendance, and no table or export has an IP column (D33; no location is ever asked); only text (transcripts, public code) is sent to the LLM API; no photo or participant list leaves the laptop; the repository contains fictitious data only. | R16, D6, D7, D12, D21, D30, D33 | Code review, schema/export test (no IP column), test FR-1.17, history check before commit (D24) |
+| NFR-7 | Privacy | No field asks for a name, ID or e-mail; photos are never stored; recordings and their audio are deleted right after transcription and transcripts are never stored (FR-4.5, D34); no client IP is read for attendance, and no table or export has an IP column (D33; no location is ever asked); only text (transcripts, public code) is sent to the LLM API; no photo or participant list leaves the laptop; the repository contains fictitious data only. | R16, D6, D7, D12, D21, D30, D33 | Code review, schema/export test (no IP column), test FR-1.17, history check before commit (D24) |
 | NFR-8 | Security | QR tokens are HMAC-signed with a secret key from the environment; tampered or expired tokens are rejected; the projected code has 4 digits (D33); at most 5 code attempts per window; lecturer pages need the PIN; API key, PIN and signing key live in the git-ignored `.env` (`.env.example` committed); Flask debug off in the demo. | D12, D22, D23, D30, D33, tools report 2.2 | Unit tests (tampered / expired token, 4-digit code format, attempt limit, PIN), repo check |
 | NFR-9 | Reliability (demo) | The app runs on plan A (tunnel, HTTPS) and plan B (hotspot / LAN, plain HTTP) by changing only the base URL; plan C is a recorded rehearsal. F1-F3 work without an LLM key. | R13, R19, D12, D13, D30 | Rehearsal on both plans; test with no key |
 | NFR-10 | Error messages | User-facing errors are short, plain English and actionable; they never show database IDs, tokens, stack traces, file paths or exception names; details go to the server log only. | D23 | One test per row of section 5 |
 | NFR-11 | Portability | Student pages work on iOS Safari and Android Chrome (responsive, mobile-first) and open from the native camera QR link. | R14, D2, D30 | Manual tests 1-2 and 9 (tools report section 3) |
-| NFR-12 | Maintainability / testability | pytest + Flask test client; injectable clock for the 10 s / 15 s / 5 s / 1 min rules; `LLMClient` and `Transcriber` replaceable by fakes; `HeadCounter` behind an interface with configurable threshold; consistency rule a pure function; SQL isolated in repository classes. | R11, R32, D3, D7, D12, D25, D30 | Test suite runs offline with no key |
+| NFR-12 | Maintainability / testability | pytest + Flask test client; injectable clock for the 10 s / 15 s / 5 s / 1 min rules; `LLMClient`, `Transcriber`, `AudioExtractor` and the F4 job runner replaceable by fakes; `HeadCounter` behind an interface with configurable threshold; consistency rule a pure function; SQL isolated in repository classes. | R11, R32, D3, D7, D12, D25, D30, D34 | Test suite runs offline with no key, no ffmpeg and no Whisper model |
+| NFR-13 | Performance (F4 processing time) | No fixed time is promised. Measured real-time factors of faster-whisper on the demo laptop (Apple M3, CPU, int8): **0.06 with `base`, 0.17 with `small`** (tools report 2.6), i.e. about 6 / 15 minutes of transcription for a 90-minute lecture and about 15 / 40 s for a 4-minute clip, plus audio extraction and the LLM call(s). The first use adds a one-time model download (~460 MB). The status page shows progress so a long job is visibly alive. | R7, D34 | End-to-end timing of the 4-minute demo clip and, if available, of a full recording (task T18f), reported in the tools report and `docs/results.md` |
 
 ## 5. Error handling
 
@@ -388,8 +452,16 @@ messages are removed with the network check (D33).
 | Second vote, or vote on a closed poll | "You have already voted." / "This poll is closed." |
 | Malformed repository URL | "Please enter a public GitHub repository link." |
 | Repository private or not found | "We could not download this repository. Is it public?" |
-| LLM key missing or API failure / timeout | "The review service is unavailable right now. Please try again later." (same wording with "summary" for F4) |
-| Video not readable (F4, deferred) | "We could not read this video file." |
+| LLM key missing or API failure / timeout (F5) | "The review service is unavailable right now. Please try again later." |
+| LLM key missing (upload refused) or API failure / timeout / empty answer during an F4 job (FR-4.6, FR-4.9) | "The summary service is unavailable right now. Please try again later." |
+| F4: no file, or not an accepted video / audio extension (FR-4.1) | "Please choose a video or audio recording (for example MP4, MOV, MKV, WebM or M4A)." |
+| F4: file above `VIDEO_MAX_BYTES` (FR-4.1) | "This file is too large. The maximum is 2 GB." (the configured limit, in GB) |
+| F4: a summary job is already running (FR-4.6) | "A video is already being summarised. Please wait until it is finished." |
+| F4: file empty, not decodable or without an audio track (FR-4.2) | "We could not read this video file." |
+| F4: no speech found in the recording (FR-4.3) | "No speech was found in this recording." |
+| F4: Whisper model cannot be loaded / downloaded, or `ffmpeg` missing (FR-4.3) | "The transcription service is unavailable right now. Please try again later." |
+| F4: the application stopped during a job (FR-4.7) | "The summary was interrupted because the app was restarted. Please upload the video again." |
+| F4: unknown summary, or download of an unfinished one (FR-4.8) | "This summary does not exist." / "This summary is not ready yet." |
 | Wrong lecturer PIN | "Wrong PIN." |
 | Lecturer page without PIN | Redirect to the PIN page (no error text) |
 | Any unexpected server error | "Something went wrong. Please try again." |
@@ -404,17 +476,17 @@ messages are removed with the network check (D33).
 | R4 | Section 3.1 (most detailed, first), all FR-1.x MUST-MAIN |
 | R5 | FR-2.1-FR-2.4, NFR-2 |
 | R6 | FR-3.1-FR-3.4, NFR-2 |
-| R7 | FR-4.1-FR-4.4 (deferred, D10) |
-| R8 | FR-4.3 |
+| R7 | FR-4.1-FR-4.9 (D34; D10 closed), NFR-13 |
+| R8 | FR-4.4 (structured four-section summary), comparison with the Zoom example in `docs/results.md` |
 | R9 | FR-5.1-FR-5.3 |
 | R10 | FR-5.4, FR-5.5 |
-| R11 | FR-4.3, FR-5.3, NFR-12 (`LLMClient` interface) |
+| R11 | FR-4.4, FR-5.3, NFR-12 (`LLMClient` interface) |
 | R12 | Sections 2-3 (end-to-end, phone to lecturer output, every feature) |
 | R13 | FR-1.5, FR-6.3, NFR-5, NFR-9, C5, C7 |
 | R14 | FR-1.5, FR-1.7, FR-6.2, NFR-1, NFR-11, C3 |
-| R15 | FR-4.1, C2 |
-| R16 | FR-1.10, FR-1.17, FR-2.1, FR-4.2, FR-5.4, FR-6.1, NFR-7, C1 |
-| R17 | C4 (every FR maps to a tested tool) |
+| R15 | FR-4.1 (file upload, no platform API), C2 |
+| R16 | FR-1.10, FR-1.17, FR-2.1, FR-4.3, FR-4.4, FR-4.5, FR-5.4, FR-6.1, NFR-7, C1 |
+| R17 | C4 (every FR maps to a tested tool), FR-4.6 (one background thread, no job queue, D34) |
 | R18 | C4, NFR-12 |
 | R19 | NFR-6, NFR-9, C5 |
 | R20-R26 | Deliverables, not software requirements: see [sow.md](sow.md) section 4 |
@@ -422,7 +494,7 @@ messages are removed with the network check (D33).
 | R28-R31 | Built from this document: [use_cases.md](use_cases.md), [design.md](design.md) |
 | R32 | AC of every FR and verification column of section 4; [test_strategy.md](test_strategy.md); NFR-12 |
 | R33 | The demo app implements sections 3-5 |
-| R34, R35 | NFR-6 (measured live), FR-4.3 (Zoom comparison) reported in `docs/results.md` |
+| R34, R35 | NFR-6 (measured live), NFR-13 (F4 timings), FR-4.4 (Zoom comparison) reported in `docs/results.md` |
 | R36, R37 | Process requirements: see [sow.md](sow.md) sections 6 and 10 |
 
 ## 7. Open items

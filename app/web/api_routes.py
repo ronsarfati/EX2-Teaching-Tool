@@ -68,3 +68,17 @@ def comments():
     """Newest comments first: text and time only (FR-2.2, D29)."""
     recent = current_app.extensions["services"]["comment_service"].recent()
     return jsonify(comments=[{"text": c.text, "created_at": c.created_at} for c in recent])
+
+
+@bp.get("/video/jobs/<int:job_id>")
+@lecturer_required
+def video_job(job_id: int):
+    """Status of a summary job for the polling page (FR-4.7). Never the transcript or the summary text."""
+    job = current_app.extensions["services"]["video_service"].get(job_id)
+    return jsonify(
+        status=job.status.value,
+        label=job.status.label(),
+        progress=round(job.progress * 100),
+        finished=job.is_finished(),
+        error=job.error_message,
+    )

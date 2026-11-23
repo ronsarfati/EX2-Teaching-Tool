@@ -2,13 +2,17 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
 from flask import Flask, jsonify, render_template, request
 from werkzeug.exceptions import HTTPException
 
+from app.adapters.audio import AudioExtractor, FfmpegAudioExtractor
 from app.adapters.head_counter import HeadCounter, YuNetHeadCounter
+from app.adapters.jobs import JobRunner, ThreadJobRunner
 from app.adapters.llm import ClaudeClient, LLMClient
 from app.adapters.repo_fetcher import GitHubRepoFetcher, RepoFetcher
+from app.adapters.transcriber import FasterWhisperTranscriber, Transcriber
 from app.clock import Clock, SystemClock
 from app.config import Config
 from app.db import Database
@@ -18,29 +22,35 @@ from app.repositories.checkins import CheckInRepository
 from app.repositories.polls import PollRepository
 from app.repositories.sessions import SessionRepository
 from app.repositories.settings import SettingsRepository
+from app.repositories.summaries import SummaryRepository
 from app.repositories.windows import CheckInWindowRepository
 from app.services.comments import CommentService
 from app.services.checkin import CheckInService
 from app.services.export import AttendanceExporter
 from app.services.homework import HomeworkReviewer
+from app.services.lecture_summary import LectureSummariser
 from app.services.credentials import RotatingCredentials
 from app.services.polls import PollService
 from app.services.sessions import SessionService
+from app.services.video import VideoSummaryService
 from app.web.api_routes import bp as api_bp
 from app.web.lecturer_routes import bp as lecturer_bp
 from app.web.student_routes import bp as student_bp
 
 MAX_PHOTO_BYTES = 25 * 1024 * 1024  # a phone photo is a few MB; refuse absurd uploads
 GENERIC_MESSAGE = "Something went wrong. Please try again."
+SUMMARY_LLM_TIMEOUT_S = 180  # F4 runs in the background (no tunnel limit), a long map-reduce call needs time
 logger = logging.getLogger(__name__)
 
 
 def create_app(config: Config, *, clock: Clock | None = None,
                head_counter: HeadCounter | None = None, llm: LLMClient | None = None,
-               fetcher: RepoFetcher | None = None, **fakes: object) -> Flask:
+               fetcher: RepoFetcher | None = None, transcriber: Transcriber | None = None,
+               audio_extractor: AudioExtractor | None = None, job_runner: JobRunner | None = None,
+               **fakes: object) -> Flask:
     """Build the app. Anything left out (clock, adapters) gets its real implementation.
 
-    `fakes` is where later tasks add the transcriber; tests inject doubles there.
+    `fakes` overrides any other entry of the services registry; tests inject doubles there.
     """
     app = Flask(__name__)
     app.config.update(SECRET_KEY=config.secret_key, DEBUG=False, SESSION_COOKIE_SAMESITE="Lax", MAX_CONTENT_LENGTH=MAX_PHOTO_BYTES)  # NFR-8: never debug
@@ -48,7 +58,11 @@ def create_app(config: Config, *, clock: Clock | None = None,
     db.init_schema()
     clock = clock or SystemClock()
     head_counter = head_counter or YuNetHeadCounter(config.yunet_model_path, config.face_score_threshold)
+    summary_llm = llm or ClaudeClient(config.anthropic_api_key, config.anthropic_model, SUMMARY_LLM_TIMEOUT_S)
     llm = llm or ClaudeClient(config.anthropic_api_key, config.anthropic_model)
+    transcriber = transcriber or FasterWhisperTranscriber(config.whisper_model, config.whisper_language)  # loads nothing yet
+    audio_extractor = audio_extractor or FfmpegAudioExtractor()
+    job_runner = job_runner or ThreadJobRunner()
     fetcher = fetcher or GitHubRepoFetcher()
     sessions = SessionRepository(db)
     credentials = RotatingCredentials(config.secret_key, clock)
@@ -70,6 +84,10 @@ def create_app(config: Config, *, clock: Clock | None = None,
         "poll_service": PollService(PollRepository(db), clock),
         "reviewer": HomeworkReviewer(fetcher, llm, settings),
         "exporter": AttendanceExporter(sessions, check_ins),
+        "video_service": VideoSummaryService(
+            SummaryRepository(db), audio_extractor, transcriber, LectureSummariser(summary_llm),
+            job_runner, clock, Path(config.video_work_dir),
+        ),
         "head_counter": head_counter,
         "check_ins": check_ins,
         "windows": windows,
@@ -94,6 +112,7 @@ def create_app(config: Config, *, clock: Clock | None = None,
     app.register_blueprint(api_bp)
     app.register_blueprint(student_bp)
     _register_error_handlers(app)
+    app.extensions["services"]["video_service"].recover_interrupted()  # no job thread can exist yet (D34)
     return app
 
 

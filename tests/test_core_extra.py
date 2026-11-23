@@ -24,13 +24,13 @@ def all_error_classes():
 
 CONCRETE = [c for c in all_error_classes()
             if c not in (AppError, errors.CheckInError, errors.PhotoError, errors.CommentError,
-                         errors.PollError, errors.ReviewError)]
+                         errors.PollError, errors.ReviewError, errors.VideoError)]
 
 
 # ---- errors: hygiene (NFR-10) ----
 def test_every_concrete_error_is_in_srs_table_count():
-    """Covers NFR-10: 23 concrete classes exist, no undocumented extra one."""
-    assert len(CONCRETE) == 23
+    """Covers NFR-10: 28 concrete classes exist (23 + 5 of F4, D34), no undocumented extra one."""
+    assert len(CONCRETE) == 28
 
 
 @pytest.mark.parametrize("cls", CONCRETE, ids=lambda c: c.__name__)
@@ -227,7 +227,7 @@ def test_config_empty_optionals_fall_back_to_defaults():
     assert c.yunet_model_path == "models/face_detection_yunet_2023mar.onnx"
     assert c.anthropic_api_key is None  # empty key == no key (NFR-9)
     assert c.anthropic_model == "claude-sonnet-5-5"
-    assert c.whisper_model == "base"
+    assert c.whisper_model == "small"  # D34
     assert c.whisper_language is None
 
 
