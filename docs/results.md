@@ -24,8 +24,8 @@ filled in only after the demo; nothing below is estimated.
 
 Automated tests (real run on 2026-11-23, `pytest --cov=app`, offline, no API key):
 
-- 909 passed, 2 skipped (the 2 skipped tests need the YuNet model file, which is absent in the test environment).
-- Line coverage of `app/`: 99 % (1274 statements, 19 not covered: model loading in the head counter, the
+- 920 passed, 2 skipped (the 2 skipped tests need the YuNet model file, which is absent in the test environment).
+- Line coverage of `app/`: 99 % (1302 statements, 19 not covered: model loading in the head counter, the
   `__main__` start-up lines, 4 lines of the poll service).
 
 Scripted local trial (2026-11-23, app on 127.0.0.1, fictional data, Flask server driven with curl): check-in with QR

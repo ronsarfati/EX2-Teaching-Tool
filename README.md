@@ -90,7 +90,39 @@ part (D1). F4 is designed but its implementation is deferred until F1-F3 are don
 
 ### How to run
 
-Coming with the demo app (To Do 10).
+Prerequisites: Python 3.11+ (tested with 3.13) and, optionally, `cloudflared` (to expose the app to phones).
+
+```bash
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env        # then edit .env (git-ignored)
+python -m app               # serves on 0.0.0.0, port $PORT (default 5000)
+```
+
+In `.env` set:
+
+- `SECRET_KEY`: a long random string.
+- `LECTURER_PIN`: the lecturer PIN; use a long one (D22).
+- `BASE_URL`: the public URL phones will use (`http://localhost:5000` locally, the tunnel URL for the demo).
+- `ANTHROPIC_API_KEY` (optional): enables the F5 homework review; without it the page shows an "unavailable" message.
+
+`python -m app` loads `.env` with a small standard-library loader; variables already set in the environment win.
+
+Optional face model: for the photo head count, download the YuNet model `face_detection_yunet_2023mar.onnx` from
+the official OpenCV `opencv_zoo` repository and place it in `models/` (or set `YUNET_MODEL_PATH`). The model file
+is not bundled with this repository.
+
+First step for the lecturer: open the app, sign in with the PIN at `/lecturer/login` and enter the campus IP range on the allow-list
+page `/lecturer/allow-list`. An empty allow-list refuses every check-in (D30).
+
+Phones must reach the laptop. Either use a Cloudflare quick tunnel
+(`cloudflared tunnel --url http://localhost:5000`, then put the printed URL in `BASE_URL` and restart the app), or
+put the phones on the same LAN (add its range to the allow-list). See [docs/demo_script.md](docs/demo_script.md).
+
+Tests: `python -m pytest -q`.
+
+Optional demo data (fictional nicknames only, no network, no API key; existing files are not overwritten without
+`--force`): `python scripts/seed_demo.py [DB_PATH] [--force]`.
 
 ## 4. Deliverables
 
@@ -107,7 +139,7 @@ Coming with the demo app (To Do 10).
 | 7 | Main software components | [docs/design.md](docs/design.md) (sections 1-2) | Done |
 | 8 | Class and sequence diagrams | [docs/design.md](docs/design.md) (sections 3-5) | Done |
 | 9 | Test strategy (per class) | [docs/test_strategy.md](docs/test_strategy.md) | Done |
-| 10 | Demo KISS web application | [app/](app/), [tests/](tests/) | Planned |
+| 10 | Demo KISS web application | [app/](app/), [tests/](tests/) | In progress |
 | 11 | Live demo in class | demo script (with plan B) | Planned |
 | 12 | Short description of the results | [docs/results.md](docs/results.md) | Planned |
 
