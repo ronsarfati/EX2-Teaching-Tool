@@ -201,16 +201,22 @@ def test_session_closed_between_scan_and_confirm(app, session, services):
     assert r.status_code == 409 and "Attendance for this class is closed." in text(r)
 
 
-def test_off_campus(app, session):
-    r = Phone(app, ip="198.51.100.7").scan()
+def test_off_campus_is_accepted_and_labelled(app, session):
+    p = Phone(app, ip="198.51.100.7")
+    assert p.scan().status_code == 200  # D32: no refusal
+    assert p.post().status_code == 200
+    rows = app.extensions["services"]["check_ins"].list_for_session(session.id)
+    assert [c.network_origin.value for c in rows] == ["off_campus"]
+
+
+def test_malformed_address_refused_with_message(app, session):
+    r = Phone(app, ip="127.0.0.1", headers={"CF-Connecting-IP": "not-an-ip"}).scan()
     assert r.status_code == 403
     assert "Check-in only works on the university Wi-Fi. Please connect to it and scan again." in text(r)
 
 
-def test_off_campus_post(app, session):
-    p = Phone(app, ip="198.51.100.7")
-    r = p.post("Fox", "123")
-    assert r.status_code == 403
+def test_off_campus_post_without_window(app, session):
+    assert Phone(app, ip="198.51.100.7").post("Fox", "123").status_code == 400  # no scan first: no window
 
 
 def test_already_checked_in_get_and_post(app, session):
@@ -237,19 +243,23 @@ def test_checkin_get_without_token_open_session(app, session):
 
 # ---- client address (FR-1.2) ----
 
-@pytest.mark.parametrize("peer,expected", [("127.0.0.1", 200), ("::1", 200), ("198.51.100.7", 403), ("10.0.0.5", 403)])
+@pytest.mark.parametrize("peer,expected", [("127.0.0.1", 200), ("::1", 200), ("198.51.100.7", 200), ("10.0.0.5", 200)])
 def test_cf_header_only_from_loopback(app, session, peer, expected):
     p = Phone(app, ip=peer, headers={"CF-Connecting-IP": CAMPUS})
     assert p.scan().status_code == expected
 
 
 def test_loopback_without_header_is_off_campus(app, session):
-    assert Phone(app, ip="127.0.0.1").scan().status_code == 403
+    p = Phone(app, ip="127.0.0.1")
+    assert p.scan().status_code == 200
+    p.post()
+    rows = app.extensions["services"]["check_ins"].list_for_session(session.id)
+    assert rows[0].network_origin.value == "off_campus"
 
 
 def test_loopback_with_off_campus_header(app, session):
     p = Phone(app, ip="127.0.0.1", headers={"CF-Connecting-IP": "198.51.100.7"})
-    assert p.scan().status_code == 403
+    assert p.scan().status_code == 200
 
 
 # ---- cookie and privacy (D6, NFR-1) ----

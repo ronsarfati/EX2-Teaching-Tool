@@ -179,7 +179,7 @@ def test_qr_15_000_accepted_15_001_rejected_at_start(svc, session, clock):
 def test_ip_checked_at_start_and_at_confirm(svc, session):
     """Covers FR-1.4: allow-list changes between start and confirm are honoured."""
     start(svc, session)
-    svc["settings"].replace_values("campus_range", ["192.168.0.0/16"])
+    svc["settings"].replace_values("campus_range", [])  # D32: only an empty list still refuses
     with pytest.raises(OffCampusError):
         confirm(svc, session)
     with pytest.raises(OffCampusError):

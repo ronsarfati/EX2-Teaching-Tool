@@ -84,8 +84,8 @@ def test_json_keys_exact_and_no_leak(app, svc, lecturer):
     s = svc.open_session()
     attempt(app, app.test_client(), "Fox")
     data = get(lecturer, s.id).get_json()
-    assert set(data) == {"open", "n", "head_count", "consistency", "check_ins"}
-    assert set(data["check_ins"][0]) == {"nickname", "checked_in_at"}
+    assert set(data) == {"open", "n", "head_count", "consistency", "off_campus_n", "apple_relay_n", "check_ins"}
+    assert set(data["check_ins"][0]) == {"nickname", "checked_in_at", "network_origin"}
     body = get(lecturer, s.id).get_data(as_text=True)
     for forbidden in (CAMPUS, "device", "attempt", "window", "code"):
         assert forbidden not in body

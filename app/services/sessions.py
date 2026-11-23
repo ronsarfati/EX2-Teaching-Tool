@@ -2,12 +2,12 @@
 from __future__ import annotations
 
 import sqlite3
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
 from app.clock import Clock
 from app.errors import SessionAlreadyOpenError, NoOpenSessionError
-from app.repositories.checkins import CheckIn, CheckInRepository
+from app.repositories.checkins import CheckIn, CheckInRepository, NetworkOrigin, count_origins
 from app.repositories.sessions import AttendanceSession, SessionRepository
 from app.adapters.head_counter import HeadCounter
 from app.services.consistency import ConsistencyResult
@@ -30,6 +30,7 @@ class SessionSummary:
     check_ins: list[CheckIn]
     n: int
     consistency: Optional[str] = None  # "consistent" / "anomaly" once a photo is counted
+    origin_counts: dict[NetworkOrigin, int] = field(default_factory=dict)  # check-ins per network origin (D32)
 
 
 class SessionService:
@@ -88,7 +89,8 @@ class SessionService:
         consistency = None
         if session.head_count is not None:
             consistency = ConsistencyResult.evaluate(len(rows), session.head_count).label()
-        return SessionSummary(session=session, check_ins=rows, n=len(rows), consistency=consistency)
+        return SessionSummary(session=session, check_ins=rows, n=len(rows), consistency=consistency,
+                              origin_counts=count_origins(rows))
 
     def record_head_count(self, session_id: int, photo: bytes) -> SessionSummary:
         """Count faces on `photo` and store D, replacing any earlier one (D31, OI-5). The bytes stay in memory only (FR-1.17)."""

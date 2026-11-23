@@ -79,15 +79,23 @@ def test_abandoned_window_creates_no_record(svc, session):
     assert svc["check_ins"].count_for_session(session.id) == 0
 
 
-def test_start_off_campus(svc, session):
-    with pytest.raises(OffCampusError):
-        start(svc, session, ip="8.8.8.8")
+def test_start_off_campus_is_accepted(svc, session):
+    assert start(svc, session, ip="8.8.8.8") is None  # D32: no refusal, the origin is recorded at confirm
 
 
-def test_confirm_off_campus(svc, session):
+def test_confirm_off_campus_records_origin(svc, session):
     start(svc, session)
+    assert confirm(svc, session, ip="8.8.8.8").network_origin.value == "off_campus"
+
+
+def test_confirm_on_campus_records_campus(svc, session):
+    start(svc, session)
+    assert confirm(svc, session).network_origin.value == "campus"
+
+
+def test_malformed_ip_refused(svc, session):
     with pytest.raises(OffCampusError):
-        confirm(svc, session, ip="8.8.8.8")
+        start(svc, session, ip="not-an-ip")
 
 
 def test_qr_expired(svc, session, clock):

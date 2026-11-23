@@ -3,6 +3,7 @@ import pytest
 
 from app.db import Database
 from app.errors import InvalidNetworkRangeError, OffCampusError
+from app.repositories.checkins import NetworkOrigin
 from app.repositories.settings import SettingsRepository
 from app.services.network import NetworkPolicy
 
@@ -48,7 +49,12 @@ def test_allowed(policy, ip):
     policy.ensure_allowed(ip)
 
 
-@pytest.mark.parametrize("ip", ["192.0.1.255", "192.0.3.0", "2001:db9::1", "not-an-ip", ""])
+@pytest.mark.parametrize("ip", ["192.0.1.255", "192.0.3.0", "2001:db9::1"])
+def test_outside_ranges_is_off_campus(policy, ip):
+    assert policy.classify(ip) is NetworkOrigin.OFF_CAMPUS  # D32: accepted and labelled, not refused
+
+
+@pytest.mark.parametrize("ip", ["not-an-ip", ""])
 def test_refused(policy, ip):
     with pytest.raises(OffCampusError) as err:
         policy.ensure_allowed(ip)
@@ -58,8 +64,7 @@ def test_refused(policy, ip):
 def test_ipv4_against_ipv6_only_list(settings):
     p = NetworkPolicy(settings)
     p.save_ranges(["2001:db8::/32"])
-    with pytest.raises(OffCampusError):
-        p.ensure_allowed("192.0.2.10")
+    assert p.classify("192.0.2.10") is NetworkOrigin.OFF_CAMPUS
 
 
 def test_empty_list_refuses_everyone(settings):
@@ -70,8 +75,7 @@ def test_empty_list_refuses_everyone(settings):
 def test_edit_used_at_once(policy):
     policy.save_ranges(["198.51.100.0/24"])
     policy.ensure_allowed("198.51.100.9")
-    with pytest.raises(OffCampusError):
-        policy.ensure_allowed("192.0.2.10")
+    assert policy.classify("192.0.2.10") is NetworkOrigin.OFF_CAMPUS
 
 
 def test_save_normalises_and_drops_blanks(policy):

@@ -110,7 +110,7 @@ def test_edit_applies_immediately_to_new_ip(app, logged):
     logged.post(URL, data={"ranges": "203.0.113.0/24"})
     assert visit(app, "203.0.113.9").status_code == 200
     logged.post(URL, data={"ranges": "192.0.2.0/24"})
-    assert visit(app, "203.0.113.9").status_code == 403
+    assert visit(app, "203.0.113.9").status_code == 200  # D32: now off campus, still accepted
 
 
 def test_warning_only_when_empty(logged):

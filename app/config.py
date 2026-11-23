@@ -25,6 +25,7 @@ class Config:
     anthropic_model: str = "claude-sonnet-5-5"
     whisper_model: str = "base"
     whisper_language: Optional[str] = None
+    relay_ranges_path: str = "data/apple_relay_ranges_IL.csv"
 
     @classmethod
     def from_env(cls, environ: Mapping[str, str]) -> "Config":
@@ -48,4 +49,5 @@ class Config:
             anthropic_model=environ.get("ANTHROPIC_MODEL") or defaults["anthropic_model"].default,
             whisper_model=environ.get("WHISPER_MODEL") or defaults["whisper_model"].default,
             whisper_language=environ.get("WHISPER_LANGUAGE") or None,
+            relay_ranges_path=environ.get("RELAY_RANGES_PATH") or defaults["relay_ranges_path"].default,
         )

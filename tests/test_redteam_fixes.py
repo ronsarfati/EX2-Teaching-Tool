@@ -7,6 +7,7 @@ import numpy as np
 import pytest
 from openpyxl import load_workbook
 
+from app.repositories.checkins import NetworkOrigin
 from app.adapters.head_counter import MAX_PIXELS, YuNetHeadCounter
 from app.errors import UnreadablePhotoError
 from app.services.export import _safe
@@ -55,7 +56,7 @@ def test_xlsx_survives_legacy_row_with_control_char(app, services, lecturer):  #
     session = services["session_service"].open_session()
     services["db"].conn().execute(
         "INSERT INTO device(device_token, nickname, created_at) VALUES (?, ?, ?)", ("legacy-token", "a\x01b", 0.0))
-    services["check_ins"].add(session.id, "legacy-token", "a\x01b", 1.0)
+    services["check_ins"].add(session.id, "legacy-token", "a\x01b", 1.0, NetworkOrigin.CAMPUS)
     response = lecturer.get("/lecturer/export.xlsx")
     assert response.status_code == 200
     sheet = load_workbook(io.BytesIO(response.get_data()))["Check-ins"]

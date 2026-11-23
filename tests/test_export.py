@@ -51,7 +51,7 @@ def test_checkins_csv_equals_live_table(app, services, lecturer):
     session = run_session(app, services, ["Fox", "Owl"])
     rows = read_csv(lecturer.get(URLS[0]))
     live = lecturer.get(f"/api/sessions/{session.id}/attendance").get_json()["check_ins"]
-    assert rows[0] == ["session date", "nickname", "check-in time"]
+    assert rows[0] == ["session date", "nickname", "check-in time", "network"]
     assert [r[1] for r in rows[1:]] == [c["nickname"] for c in live]
 
 
@@ -60,9 +60,11 @@ def test_summary_equals_page(app, services, lecturer):
     run_session(app, services, ["Cat"])
     rows = read_csv(lecturer.get(URLS[1]))
     page = lecturer.get(f"/api/sessions/{first.id}/attendance").get_json()
-    assert rows[0] == ["session date", "check-ins (N)", "faces detected (D)", "consistency status"]
-    assert rows[1][1:] == [str(page["n"]), str(page["head_count"]), page["consistency"]]
-    assert rows[2][1:] == ["1", "", ""]  # no photo counted: empty D and status
+    assert rows[0] == ["session date", "check-ins (N)", "faces detected (D)", "consistency status",
+                       "off campus", "via Apple relay"]
+    assert rows[1][1:] == [str(page["n"]), str(page["head_count"]), page["consistency"],
+                              str(page["off_campus_n"]), str(page["apple_relay_n"])]
+    assert rows[2][1:] == ["1", "", "", "0", "0"]  # no photo counted: empty D and status
 
 
 def test_anomaly_status_exported(app, services, lecturer):
@@ -76,7 +78,7 @@ def test_xlsx_has_two_sheets_equal_to_csv(app, services, lecturer):
     assert workbook.sheetnames == ["Check-ins", "Summary"]
     checkins = [[str(c) for c in row] for row in workbook["Check-ins"].iter_rows(values_only=True)]
     assert checkins == read_csv(lecturer.get(URLS[0]))
-    assert [c.value for c in workbook["Summary"][2]][1:] == [2, 2, "consistent"]
+    assert [c.value for c in workbook["Summary"][2]][1:] == [2, 2, "consistent", 0, 0]
 
 
 def test_no_ip_or_token_column_or_value(app, services, lecturer):

@@ -8,6 +8,7 @@ from werkzeug.exceptions import HTTPException
 
 from app.adapters.head_counter import HeadCounter, YuNetHeadCounter
 from app.adapters.llm import ClaudeClient, LLMClient
+from app.adapters.relay_ranges import load_relay_ranges
 from app.adapters.repo_fetcher import GitHubRepoFetcher, RepoFetcher
 from app.clock import Clock, SystemClock
 from app.config import Config
@@ -56,6 +57,7 @@ def create_app(config: Config, *, clock: Clock | None = None,
     check_ins = CheckInRepository(db)
     windows = CheckInWindowRepository(db)
     settings = SettingsRepository(db)
+    network = NetworkPolicy(settings, load_relay_ranges(config.relay_ranges_path))  # one shared instance
     app.extensions["services"] = {
         "config": config,
         "clock": clock,
@@ -65,7 +67,7 @@ def create_app(config: Config, *, clock: Clock | None = None,
             sessions, clock, credentials, config.base_url, check_ins, head_counter
         ),
         "checkin_service": CheckInService(
-            NetworkPolicy(settings), credentials, sessions, check_ins, windows, db, clock
+            network, credentials, sessions, check_ins, windows, db, clock
         ),
         "comment_service": CommentService(CommentRepository(db), clock),
         "poll_service": PollService(PollRepository(db), clock),
@@ -75,6 +77,7 @@ def create_app(config: Config, *, clock: Clock | None = None,
         "check_ins": check_ins,
         "windows": windows,
         "settings": settings,
+        "network": network,
         **fakes,
     }
 

@@ -4,6 +4,7 @@ import threading
 
 import pytest
 
+from app.repositories.checkins import NetworkOrigin
 from app import create_app
 from app.config import Config
 from app.db import Database
@@ -99,16 +100,16 @@ def test_unique_session_device_and_nickname_upsert(db):
     s, c = SessionRepository(db), CheckInRepository(db)
     a = s.create(1.0)
     c.save_nickname("tok", "Fox", 1.0)
-    c.add(a.id, "tok", "Fox", 2.0)
+    c.add(a.id, "tok", "Fox", 2.0, NetworkOrigin.CAMPUS)
     with pytest.raises(sqlite3.IntegrityError):
-        c.add(a.id, "tok", "Fox", 3.0)
+        c.add(a.id, "tok", "Fox", 3.0, NetworkOrigin.CAMPUS)
     assert c.count_for_session(a.id) == 1
     c.save_nickname("tok", "Owl", 4.0)
     assert c.nickname_of("tok") == "Owl"
     assert c.nickname_of("other") is None
     s.close(a.id, 5.0)
     b = s.create(6.0)
-    c.add(b.id, "tok", "Owl", 7.0)  # same device, other session: allowed
+    c.add(b.id, "tok", "Owl", 7.0, NetworkOrigin.CAMPUS)  # same device, other session: allowed
     assert c.has_checked_in(b.id, "tok") and c.count_for_session(b.id) == 1
 
 
@@ -116,7 +117,7 @@ def test_check_in_requires_known_session_and_device(db):
     """Covers FK enforcement."""
     c = CheckInRepository(db)
     with pytest.raises(sqlite3.IntegrityError):
-        c.add(99, "nobody", "X", 1.0)
+        c.add(99, "nobody", "X", 1.0, NetworkOrigin.CAMPUS)
 
 
 def test_increment_attempts_sequence(db):
@@ -198,7 +199,7 @@ def test_data_survives_app_recreation_on_same_file(tmp_path):
     sv = app1.extensions["services"]
     sess = sv["sessions"].create(1.0)
     sv["check_ins"].save_nickname("tok", "Fox", 1.0)
-    sv["check_ins"].add(sess.id, "tok", "Fox", 2.0)
+    sv["check_ins"].add(sess.id, "tok", "Fox", 2.0, NetworkOrigin.CAMPUS)
     app2 = create_app(cfg)
     sv2 = app2.extensions["services"]
     assert sv2["sessions"].find_open().id == sess.id

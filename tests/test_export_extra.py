@@ -9,10 +9,12 @@ from datetime import datetime, timezone
 import pytest
 from openpyxl import load_workbook
 
+from app.repositories.checkins import NetworkOrigin
 from tests.test_export import URLS, check_in, lecturer, read_csv, run_session, services  # noqa: F401
 
-CH_HEADER = ["session date", "nickname", "check-in time"]
-SU_HEADER = ["session date", "check-ins (N)", "faces detected (D)", "consistency status"]
+CH_HEADER = ["session date", "nickname", "check-in time", "network"]
+SU_HEADER = ["session date", "check-ins (N)", "faces detected (D)", "consistency status",
+             "off campus", "via Apple relay"]
 XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 
@@ -49,8 +51,9 @@ def test_summary_rows_equal_service_summary(app, services, lecturer, three):
         s = svc.summary(session.id)
         d = s.session.head_count
         assert row[0] == datetime.fromtimestamp(session.opened_at, tz=timezone.utc).strftime("%Y-%m-%d %H:%M")
-        assert row[1:] == [str(s.n), "" if d is None else str(d), s.consistency or ""]
-    assert rows[2][2:] == ["", ""]  # session without photo
+        assert row[1:] == [str(s.n), "" if d is None else str(d), s.consistency or "",
+                          str(s.origin_counts[NetworkOrigin.OFF_CAMPUS]), str(s.origin_counts[NetworkOrigin.APPLE_RELAY])]
+    assert rows[2][2:4] == ["", ""]  # session without photo
     assert rows[1][2] == "2" and rows[3][2] == "40"
 
 
@@ -62,7 +65,7 @@ def test_checkin_rows_equal_live_api(app, services, lecturer, three):
         for c in lecturer.get(f"/api/sessions/{session.id}/attendance").get_json()["check_ins"]:
             when = datetime.fromtimestamp(c["checked_in_at"], tz=timezone.utc).strftime("%H:%M:%S")
             expected.append([datetime.fromtimestamp(session.opened_at, tz=timezone.utc).strftime("%Y-%m-%d %H:%M"),
-                             c["nickname"], when])
+                             c["nickname"], when, "campus"])
     assert len(rows) == 6 and rows == expected
 
 
@@ -122,7 +125,7 @@ def test_exporter_direct_special_characters(app, services):
     for i, n in enumerate(names):
         exporter._check_ins._db.conn().execute(
             "INSERT INTO device(device_token, nickname, created_at) VALUES (?, ?, ?)", (f"t{i}", n, 0.0))
-        exporter._check_ins.add(sess.id, f"t{i}", n, 1_700_000_000.0 + i)
+        exporter._check_ins.add(sess.id, f"t{i}", n, 1_700_000_000.0 + i, NetworkOrigin.CAMPUS)
     rows = list(csv.reader(io.StringIO(exporter.checkins_csv().decode("utf-8-sig"))))
     assert [r[1] for r in rows[1:]] == names
     wb = load_workbook(io.BytesIO(exporter.xlsx()))
@@ -135,7 +138,7 @@ def test_xlsx_row_counts_match_csv(app, services, lecturer, three):
     assert len(wb.sheetnames) == 2
     assert wb["Check-ins"].max_row == len(read_csv(lecturer.get(URLS[0]))) == 7
     assert wb["Summary"].max_row == len(read_csv(lecturer.get(URLS[1]))) == 4
-    assert [c.value for c in wb["Summary"][3]][2:] == [None, None]
+    assert [c.value for c in wb["Summary"][3]][2:4] == [None, None]
 
 
 @pytest.mark.parametrize("url,mime,name", [

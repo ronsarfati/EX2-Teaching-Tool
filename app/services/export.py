@@ -12,12 +12,13 @@ from datetime import datetime, timezone
 from openpyxl import Workbook
 from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
 
-from app.repositories.checkins import CheckInRepository
+from app.repositories.checkins import CheckInRepository, NetworkOrigin, count_origins
 from app.repositories.sessions import SessionRepository
 from app.services.consistency import ConsistencyResult
 
-CHECKINS_HEADER = ["session date", "nickname", "check-in time"]
-SUMMARY_HEADER = ["session date", "check-ins (N)", "faces detected (D)", "consistency status"]
+CHECKINS_HEADER = ["session date", "nickname", "check-in time", "network"]
+SUMMARY_HEADER = ["session date", "check-ins (N)", "faces detected (D)", "consistency status",
+                  "off campus", "via Apple relay"]
 FORMULA_TRIGGERS = ("=", "+", "-", "@", "\t", "\r")  # characters that make Excel / Calc read a cell as a formula
 
 
@@ -49,17 +50,21 @@ class AttendanceExporter:
         for session in self._sessions.list_all():
             for check_in in self._check_ins.list_for_session(session.id):
                 rows.append([_date(session.opened_at), _safe(check_in.nickname),
-                             _utc(check_in.checked_in_at).strftime("%H:%M:%S")])
+                             _utc(check_in.checked_in_at).strftime("%H:%M:%S"),
+                             check_in.network_origin.label()])
         return rows
 
     def _summary_rows(self) -> list[list[str | int]]:
         rows: list[list[str | int]] = []
         for session in self._sessions.list_all():
-            n = self._check_ins.count_for_session(session.id)
+            check_ins = self._check_ins.list_for_session(session.id)
+            n = len(check_ins)
+            origins = count_origins(check_ins)  # same counting as the live page
             d = session.head_count
             # Same rule and wording as the lecturer page; empty cells until a photo is counted (FR-1.16).
             status = "" if d is None else ConsistencyResult.evaluate(n, d).label()
-            rows.append([_date(session.opened_at), n, "" if d is None else d, status])
+            rows.append([_date(session.opened_at), n, "" if d is None else d, status,
+                         origins[NetworkOrigin.OFF_CAMPUS], origins[NetworkOrigin.APPLE_RELAY]])
         return rows
 
     @staticmethod

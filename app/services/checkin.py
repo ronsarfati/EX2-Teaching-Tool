@@ -14,7 +14,7 @@ from app.errors import (
     WindowExpiredError,
     WrongCodeError,
 )
-from app.repositories.checkins import CheckIn, CheckInRepository
+from app.repositories.checkins import CheckIn, CheckInRepository, NetworkOrigin
 from app.repositories.sessions import SessionRepository
 from app.repositories.windows import CheckInWindowRepository
 from app.services.credentials import RotatingCredentials
@@ -61,17 +61,17 @@ class CheckInService:
 
     def confirm(self, device_token: str, client_ip: str, code: str, nickname: Optional[str]) -> CheckIn:
         """Validate the typed code (and the nickname on a first visit) and record the check-in."""
-        self._network.ensure_allowed(client_ip)
+        origin = self._network.classify(client_ip)  # the origin of the confirm request is the one stored
         # A raise inside the transaction rolls it back, which would also undo the attempt counter.
         # So the refusals that must persist are returned, and raised only after the commit.
         with self._db.transaction():
-            outcome = self._confirm_in_transaction(device_token, code, nickname)
+            outcome = self._confirm_in_transaction(device_token, code, nickname, origin)
         if isinstance(outcome, CheckInError):
             raise outcome
         return outcome
 
     def _confirm_in_transaction(
-        self, device_token: str, code: str, nickname: Optional[str]
+        self, device_token: str, code: str, nickname: Optional[str], origin: NetworkOrigin
     ) -> CheckIn | CheckInError:
         now = self._clock.now()
         window = self._windows.find(device_token)
@@ -92,6 +92,6 @@ class CheckInService:
             return WrongCodeError()
         if stored is None:
             self._check_ins.save_nickname(device_token, chosen, now)
-        check_in = self._check_ins.add(session_id, device_token, chosen, now)
+        check_in = self._check_ins.add(session_id, device_token, chosen, now, origin)
         self._windows.delete(session_id, device_token)
         return check_in

@@ -4,6 +4,7 @@ from __future__ import annotations
 from flask import Blueprint, current_app, jsonify
 
 from app.adapters.qr import qr_png_data_uri
+from app.repositories.checkins import NetworkOrigin
 from app.web.auth import lecturer_required
 
 bp = Blueprint("api", __name__, url_prefix="/api")
@@ -22,7 +23,7 @@ def projector():
 @bp.get("/sessions/<int:session_id>/attendance")
 @lecturer_required
 def attendance(session_id: int):
-    """Live table rows and N (FR-1.14). Nicknames and times only: no token, no IP (D21)."""
+    """Live table rows and N (FR-1.14). Nicknames, times and origin labels only: no token, no IP (D21)."""
     services = current_app.extensions["services"]
     summary = services["session_service"].summary(session_id)
     return jsonify(
@@ -30,7 +31,12 @@ def attendance(session_id: int):
         n=summary.n,
         head_count=summary.session.head_count,  # null until a photo is counted (T11)
         consistency=summary.consistency,  # string status, null until T11
-        check_ins=[{"nickname": c.nickname, "checked_in_at": c.checked_in_at} for c in summary.check_ins],
+        off_campus_n=summary.origin_counts[NetworkOrigin.OFF_CAMPUS],
+        apple_relay_n=summary.origin_counts[NetworkOrigin.APPLE_RELAY],
+        check_ins=[
+            {"nickname": c.nickname, "checked_in_at": c.checked_in_at, "network_origin": c.network_origin.value}
+            for c in summary.check_ins
+        ],
     )
 
 

@@ -48,3 +48,6 @@ Thumbs.db
 .idea/
 .vscode/
 *.swp
+
+# --- Apple Private Relay egress lists (downloaded by scripts/update_relay_ranges.py, not bundled) ---
+data/apple_relay_ranges_*.csv

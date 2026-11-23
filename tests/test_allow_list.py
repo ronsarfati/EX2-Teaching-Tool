@@ -40,7 +40,7 @@ def test_valid_ipv4_and_ipv6_used_at_once(app, logged):
     assert response.status_code == 302
     assert check_in_status(app, "192.0.2.10") == 200
     assert check_in_status(app, "2001:db8::1") == 200
-    assert check_in_status(app, "198.51.100.7") == 403
+    assert check_in_status(app, "198.51.100.7") == 200  # D32: outside the ranges is accepted, labelled off campus
     html = logged.get(URL).get_data(as_text=True)
     assert "192.0.2.0/24" in html and "2001:db8::/32" in html
     assert "Nobody can check in" not in html

@@ -5,6 +5,7 @@ import pytest
 
 from app.db import Database
 from app.errors import InvalidNetworkRangeError, OffCampusError
+from app.repositories.checkins import NetworkOrigin
 from app.repositories.settings import SettingsRepository
 from app.services.network import NetworkPolicy
 
@@ -22,11 +23,11 @@ def policy(settings) -> NetworkPolicy:
 
 
 def _allowed(policy, ip) -> bool:
+    """True when the address is classified as campus (D32: other networks are accepted but labelled)."""
     try:
-        policy.ensure_allowed(ip)
+        return policy.classify(ip) is NetworkOrigin.CAMPUS
     except OffCampusError:
         return False
-    return True
 
 
 # ---- CIDR edges (Covers FR-1.2) ----
@@ -97,8 +98,7 @@ def test_spoofed_header_from_non_loopback_ignored(peer, policy):
     policy.save_ranges(["192.0.2.0/24"])
     resolved = NetworkPolicy.resolve_client_ip(peer, "192.0.2.10")
     assert resolved != "192.0.2.10"
-    with pytest.raises(OffCampusError):
-        policy.ensure_allowed(resolved)
+    assert policy.classify(resolved) is NetworkOrigin.OFF_CAMPUS  # the forged campus address was not believed
 
 
 def test_empty_header_from_loopback_uses_peer():
@@ -171,8 +171,7 @@ def test_client_ip_not_stored_or_logged(policy, settings, caplog):
     client = "192.0.2.123"
     with caplog.at_level(logging.DEBUG):
         policy.ensure_allowed(client)
-        with pytest.raises(OffCampusError):
-            policy.ensure_allowed("203.0.113.77")
+        assert policy.classify("203.0.113.77") is NetworkOrigin.OFF_CAMPUS
         NetworkPolicy.resolve_client_ip("127.0.0.1", client)
     assert client not in caplog.text and "203.0.113.77" not in caplog.text
     assert settings.list_values("campus_range") == ["192.0.2.0/24"]

@@ -121,8 +121,13 @@ def test_closed_session(app, open_session):
     assert response.status_code == 409 and b"Attendance for this class is closed." in response.data
 
 
-def test_off_campus(app, open_session):
+def test_off_campus_is_accepted(app, open_session):
     c, kw = phone(app, ip="198.51.100.7")
+    assert c.get(scan_url(app), **kw).status_code == 200  # D32: labelled off campus, not refused
+
+
+def test_malformed_client_address_refused(app, open_session):
+    c, kw = phone(app, ip="127.0.0.1", headers={"CF-Connecting-IP": "not-an-ip"})
     response = c.get(scan_url(app), **kw)
     assert response.status_code == 403 and b"Check-in only works on the university Wi-Fi." in response.data
 
@@ -134,7 +139,10 @@ def test_header_used_from_loopback_tunnel(app, open_session):
 
 def test_header_ignored_from_non_loopback(app, open_session):
     c, kw = phone(app, ip="198.51.100.7", headers={"CF-Connecting-IP": CAMPUS})
-    assert c.get(scan_url(app), **kw).status_code == 403
+    assert c.get(scan_url(app), **kw).status_code == 200  # accepted, but as off campus: the forged header is ignored
+    c.post("/checkin", data={"code": code_now(app, open_session), "nickname": "Fox"}, **kw)
+    rows = app.extensions["services"]["check_ins"].list_for_session(open_session.id)
+    assert rows[0].network_origin.value == "off_campus"
 
 
 def test_checkin_without_token_no_session(app):

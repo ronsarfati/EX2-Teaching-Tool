@@ -3,6 +3,7 @@ import sqlite3
 
 import pytest
 
+from app.repositories.checkins import NetworkOrigin
 from app.db import Database
 from app.repositories.checkins import CheckInRepository
 from app.repositories.sessions import SessionRepository
@@ -83,8 +84,8 @@ def test_check_in_add_list_count(sessions, check_ins):
     check_ins.save_nickname("a", "Fox", 1.0)
     check_ins.save_nickname("b", "Owl", 1.0)
     assert not check_ins.has_checked_in(s.id, "a")
-    added = check_ins.add(s.id, "a", "Fox", 10.0)
-    check_ins.add(s.id, "b", "Owl", 20.0)
+    added = check_ins.add(s.id, "a", "Fox", 10.0, NetworkOrigin.CAMPUS)
+    check_ins.add(s.id, "b", "Owl", 20.0, NetworkOrigin.CAMPUS)
     assert (added.session_id, added.nickname, added.checked_in_at) == (s.id, "Fox", 10.0)
     assert check_ins.has_checked_in(s.id, "a") and not check_ins.has_checked_in(s.id, "zzz")
     assert [c.nickname for c in check_ins.list_for_session(s.id)] == ["Fox", "Owl"]
@@ -94,9 +95,9 @@ def test_check_in_add_list_count(sessions, check_ins):
 def test_duplicate_check_in_violates_unique(sessions, check_ins):
     s = sessions.create(100.0)
     check_ins.save_nickname("a", "Fox", 1.0)
-    check_ins.add(s.id, "a", "Fox", 10.0)
+    check_ins.add(s.id, "a", "Fox", 10.0, NetworkOrigin.CAMPUS)
     with pytest.raises(sqlite3.IntegrityError):
-        check_ins.add(s.id, "a", "Fox", 11.0)
+        check_ins.add(s.id, "a", "Fox", 11.0, NetworkOrigin.CAMPUS)
 
 
 def test_window_open_find_and_attempts(sessions, windows):
