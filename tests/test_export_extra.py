@@ -4,15 +4,16 @@ Covers FR-1.18, UC-5, D8, D21, D31 (OI-6).
 """
 import csv
 import io
-from datetime import datetime, timezone
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 import pytest
 from openpyxl import load_workbook
 
 from tests.test_export import URLS, check_in, lecturer, read_csv, run_session, services  # noqa: F401
 
-CH_HEADER = ["session date", "nickname", "check-in time"]
-SU_HEADER = ["session date", "check-ins (N)", "faces detected (D)", "consistency status"]
+CH_HEADER = ["Session date (Jerusalem time)", "Nickname", "Checked in at (Jerusalem time)"]
+SU_HEADER = ["Session date (Jerusalem time)", "check-ins (N)", "faces detected (D)", "consistency status"]
 XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 
@@ -48,7 +49,7 @@ def test_summary_rows_equal_service_summary(app, services, lecturer, three):
     for row, session in zip(rows[1:], three):
         s = svc.summary(session.id)
         d = s.session.head_count
-        assert row[0] == datetime.fromtimestamp(session.opened_at, tz=timezone.utc).strftime("%Y-%m-%d %H:%M")
+        assert row[0] == datetime.fromtimestamp(session.opened_at, tz=ZoneInfo("Asia/Jerusalem")).strftime("%Y-%m-%d %H:%M")
         assert row[1:] == [str(s.n), "" if d is None else str(d), s.consistency or ""]
     assert rows[2][2:4] == ["", ""]  # session without photo
     assert rows[1][2] == "2" and rows[3][2] == "40"
@@ -60,8 +61,8 @@ def test_checkin_rows_equal_live_api(app, services, lecturer, three):
     expected = []
     for session in three:
         for c in lecturer.get(f"/api/sessions/{session.id}/attendance").get_json()["check_ins"]:
-            when = datetime.fromtimestamp(c["checked_in_at"], tz=timezone.utc).strftime("%H:%M:%S")
-            expected.append([datetime.fromtimestamp(session.opened_at, tz=timezone.utc).strftime("%Y-%m-%d %H:%M"),
+            when = datetime.fromtimestamp(c["checked_in_at"], tz=ZoneInfo("Asia/Jerusalem")).strftime("%H:%M:%S")
+            expected.append([datetime.fromtimestamp(session.opened_at, tz=ZoneInfo("Asia/Jerusalem")).strftime("%Y-%m-%d %H:%M"),
                              c["nickname"], when])
     assert len(rows) == 6 and rows == expected
 
@@ -150,4 +151,4 @@ def test_no_pin_redirects_without_content(app, services, client, url):
     run_session(app, services, ["Fox"])
     r = client.get(url)
     assert r.status_code == 302 and "/lecturer/login" in r.headers["Location"]
-    assert b"Fox" not in r.get_data() and b"session date" not in r.get_data()
+    assert b"Fox" not in r.get_data() and b"Session date" not in r.get_data()

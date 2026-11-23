@@ -16,7 +16,7 @@ async function refresh() {
     const data = await response.json();
     list.replaceChildren(...data.comments.map((c) => {
       const li = document.createElement("li");
-      li.textContent = new Date(c.created_at * 1000).toLocaleTimeString() + " - " + c.text;
+      li.textContent = new Date(c.created_at * 1000).toLocaleTimeString("en-GB", { timeZone: "Asia/Jerusalem" }) + " - " + c.text;
       return li;
     }));
     document.getElementById("comments-empty").hidden = data.comments.length > 0;

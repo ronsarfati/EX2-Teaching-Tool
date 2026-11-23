@@ -1,13 +1,12 @@
 """Offline spreadsheet of all sessions (FR-1.18, D8, D31/OI-6): CSV (two files) and XLSX (two sheets).
 
-Columns carry no IP and no device token (FR-1.3, NFR-7). Dates and times are UTC so a file does not
-depend on the server's timezone.
+Columns carry no IP and no device token (NFR-7). Dates and times are shown in Israel local time (D35)
+and the headers say so; the stored values stay UTC.
 """
 from __future__ import annotations
 
 import csv
 import io
-from datetime import datetime, timezone
 
 from openpyxl import Workbook
 from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
@@ -15,9 +14,10 @@ from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
 from app.repositories.checkins import CheckInRepository
 from app.repositories.sessions import SessionRepository
 from app.services.consistency import ConsistencyResult
+from app.timezone import ZONE_LABEL, format_local
 
-CHECKINS_HEADER = ["session date", "nickname", "check-in time"]
-SUMMARY_HEADER = ["session date", "check-ins (N)", "faces detected (D)", "consistency status"]
+CHECKINS_HEADER = [f"Session date ({ZONE_LABEL})", "Nickname", f"Checked in at ({ZONE_LABEL})"]
+SUMMARY_HEADER = [f"Session date ({ZONE_LABEL})", "check-ins (N)", "faces detected (D)", "consistency status"]
 FORMULA_TRIGGERS = ("=", "+", "-", "@", "\t", "\r")  # characters that make Excel / Calc read a cell as a formula
 
 
@@ -30,13 +30,9 @@ def _safe(text: str) -> str:
     return "'" + text if text.startswith(FORMULA_TRIGGERS) else text
 
 
-def _utc(timestamp: float) -> datetime:
-    return datetime.fromtimestamp(timestamp, tz=timezone.utc)
-
-
 def _date(timestamp: float) -> str:
     """Session date; includes the time of day so two sessions on the same day stay distinguishable."""
-    return _utc(timestamp).strftime("%Y-%m-%d %H:%M")
+    return format_local(timestamp, "%Y-%m-%d %H:%M")
 
 
 class AttendanceExporter:
@@ -49,7 +45,7 @@ class AttendanceExporter:
         for session in self._sessions.list_all():
             for check_in in self._check_ins.list_for_session(session.id):
                 rows.append([_date(session.opened_at), _safe(check_in.nickname),
-                             _utc(check_in.checked_in_at).strftime("%H:%M:%S")])
+                             format_local(check_in.checked_in_at, "%H:%M:%S")])
         return rows
 
     def _summary_rows(self) -> list[list[str | int]]:

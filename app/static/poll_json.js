@@ -19,7 +19,7 @@ function show(data) {
   statusEl.textContent = data.consistency === null ? "—" : data.consistency;
   rowsEl.replaceChildren(...data.check_ins.map((c) => {
     const tr = document.createElement("tr");
-    tr.append(cell(c.nickname), cell(new Date(c.checked_in_at * 1000).toLocaleTimeString()));
+    tr.append(cell(c.nickname), cell(new Date(c.checked_in_at * 1000).toLocaleTimeString("en-GB", { timeZone: "Asia/Jerusalem" })));
     return tr;
   }));
 }

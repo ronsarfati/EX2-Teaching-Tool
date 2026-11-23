@@ -48,7 +48,7 @@ def test_checkins_csv_equals_live_table(app, services, lecturer):
     session = run_session(app, services, ["Fox", "Owl"])
     rows = read_csv(lecturer.get(URLS[0]))
     live = lecturer.get(f"/api/sessions/{session.id}/attendance").get_json()["check_ins"]
-    assert rows[0] == ["session date", "nickname", "check-in time"]
+    assert rows[0] == ["Session date (Jerusalem time)", "Nickname", "Checked in at (Jerusalem time)"]
     assert [r[1] for r in rows[1:]] == [c["nickname"] for c in live]
 
 
@@ -57,7 +57,7 @@ def test_summary_equals_page(app, services, lecturer):
     run_session(app, services, ["Cat"])
     rows = read_csv(lecturer.get(URLS[1]))
     page = lecturer.get(f"/api/sessions/{first.id}/attendance").get_json()
-    assert rows[0] == ["session date", "check-ins (N)", "faces detected (D)", "consistency status"]
+    assert rows[0] == ["Session date (Jerusalem time)", "check-ins (N)", "faces detected (D)", "consistency status"]
     assert rows[1][1:] == [str(page["n"]), str(page["head_count"]), page["consistency"]]
     assert rows[2][1:] == ["1", "", ""]  # no photo counted: empty D and status
 

@@ -1,8 +1,6 @@
 """Lecturer pages: login, dashboard, sessions, polls, homework peers and video summaries (FR-1, FR-3, FR-4, FR-6.1)."""
 from __future__ import annotations
 
-from datetime import datetime
-
 from flask import (Blueprint, Response, abort, current_app, redirect, render_template, request, session,
                    url_for)
 from werkzeug.exceptions import RequestEntityTooLarge
@@ -11,6 +9,7 @@ from app.errors import (InvalidRepoUrlError, UnreadablePhotoError, UnsupportedVi
                         VideoTooLargeError, WrongPinError)
 from app.repositories.summaries import JobStatus
 from app.services.video import VideoSummaryService, summary_markdown, summary_plain_text
+from app.timezone import format_local
 from app.web.auth import lecturer_required, pin_matches
 
 bp = Blueprint("lecturer", __name__, url_prefix="/lecturer")
@@ -181,7 +180,7 @@ def _summary_download(job_id: int, extension: str) -> Response:
         content, mimetype = summary_markdown(job), "text/markdown"
     else:
         content, mimetype = summary_plain_text(job), "text/plain"
-    day = datetime.fromtimestamp(job.finished_at or job.created_at).strftime("%Y-%m-%d")
+    day = format_local(job.finished_at or job.created_at, "%Y-%m-%d")
     response = _download(content.encode("utf-8"), f"lecture-summary-{day}-{job.id}.{extension}", mimetype)
     response.headers["Content-Type"] = f"{mimetype}; charset=utf-8"
     return response

@@ -2,7 +2,7 @@
 
 Resolutions of the open questions (OQ1-OQ14 in `docs/requirements.md`) and of the technical choices left open by
 the statement. Proposed by the ambiguity analysis, **validated by the student on 2026-11-22** (D31: 2026-11-23;
-D32, D33 and D34: 2026-11-23).
+D32, D33, D34 and D35: 2026-11-23).
 Requirements are cited as R<n>, statement locators as F/Req/G/TD/QA (see `docs/requirements.md`).
 
 Guiding rule: the **simplest option that fully satisfies the requirements** (KISS, Req2), that can really be
@@ -51,6 +51,7 @@ old text is kept below for history only and must not be used for design.
 | D32 | Network origin of a check-in (field findings 23/11; amends D30 point 1) | ~~Every network accepted and classified campus / Apple relay / off campus, shown live and in the export~~ | SUPERSEDED by D33 (23/11) |
 | D33 | Remove the IP / network part entirely (supersedes D32 and point 1 of D30); projected code 4 digits (amends D30 point 3) | No client IP read for attendance, no allow-list, no relay list, no origin label; anti-cheat = rotating QR (10 s / 15 s) + projected **4-digit** code (0000-9999, 5 s, P1) + the unchanged D30 rules; D7 photo alert is the room-level check. Code brute force by rescanning: ~500 -> ~5,000 expected tries, residual risk recorded | VALIDATED (23/11) |
 | D34 | Video summary F4 for real recordings (closes D10) | PIN page, upload up to 2 GB (configurable, this route only) streamed to a temp file; ffmpeg -> mono 16 kHz audio; faster-whisper `small` (CPU int8, VAD, language auto unless `WHISPER_LANGUAGE`) in **one background thread, one job at a time**; Claude structured summary (map-reduce above a safe size, transcript treated as untrusted); status page polled; video and audio deleted right after transcription (also on failure), transcript never stored, only the summary text + timestamps kept in SQLite; demo on a local-only 4-min Hebrew clip | VALIDATED (23/11) |
+| D35 | Display time zone | User-visible times in Israel local time (Asia/Jerusalem, DST); storage stays UTC | VALIDATED (23/11) |
 
 "VALIDATED" = "VALIDATED by the student — 2026-11-22" unless stated otherwise. "DEFERRED" = "DEFERRED by the
 student — 2026-11-22".
@@ -253,7 +254,7 @@ kept. The "short 2-3 min clip" candidate and the `base` model default are replac
 
 **DECISION:** app on the laptop + Cloudflare quick tunnel (`cloudflared tunnel --url`, no account, public HTTPS URL). **Plan B:** phone hotspot / LAN URL over plain HTTP; the check-in still works because students scan with the phone's native camera and no in-page camera access is needed (D30); the QR codes encode the configured base URL of the active plan. **Plan C:** screen recording of a full rehearsal + lecturer page with 2-3 simulated phones. Rejected: ngrok (account, interstitial), free cloud hosts (RAM, cold start, deploy effort).
 
-**Note added with D30 (22/11).** With the campus-network filter of D30, plan A reads the client IP from the `CF-Connecting-IP` header (trusted only on requests arriving from the local tunnel); in plan B the client IP is the direct socket address, so the allow-list must also contain the LAN/hotspot range used (e.g. a private `/24`).
+~~**Note added with D30 (22/11).** With the campus-network filter of D30, plan A reads the client IP from the `CF-Connecting-IP` header (trusted only on requests arriving from the local tunnel); in plan B the client IP is the direct socket address, so the allow-list must also contain the LAN/hotspot range used (e.g. a private `/24`).~~ **SUPERSEDED by D33 (23/11):** no client IP is read and there is no allow-list.
 
 **Field note added with D32 (23/11).** On the campus Wi-Fi, a phone could not reach the laptop
 on its LAN address (client isolation, same subnet, laptop firewall off): plan B **on the campus Wi-Fi** is not
@@ -264,7 +265,7 @@ usable. Plan B on a phone hotspot was not re-tested (and is limited to a few cli
 "allow-list for each plan" no longer apply. Switching between plans A and B only changes the base URL encoded in
 the QR codes. The field note on client isolation (plan B unusable on the campus Wi-Fi) still holds.
 
-**Impact.** README "Run the demo" (including how to set the base URL encoded in the QR codes for plans A and B, and ~~the allow-list for each plan~~ (removed by D33)); tools report tests cloudflared from a real phone on mobile data (now expected to be **refused** by the D30 filter) and on the campus Wi-Fi.
+**Impact.** README "Run the demo" (including how to set the base URL encoded in the QR codes for plans A and B, and ~~the allow-list for each plan~~ (removed by D33)); tools report tests cloudflared from a real phone on mobile data (~~now expected to be refused by the D30 filter~~ superseded by D33: every network works) and on the campus Wi-Fi.
 
 **Status:** VALIDATED by the student — 2026-11-22
 
@@ -617,8 +618,8 @@ only show a short clip in class, or give the lecturer a real summary of the reco
 (Zoom / Meet / Classroom files, 60-90 minutes)?
 
 **Facts.** Measured in the tools report (2.6) on the demo laptop (Apple M3, CPU, int8, `beam_size=1`, VAD on):
-real-time factor 0.06 (`base`) and 0.17 (`small`); Hebrew detected on `m21.mp4` (p = 0.94-0.96); a 90-minute lecture
-therefore takes about **6 min (`base`) to 15 min (`small`)** to transcribe, far longer than an HTTP request (and the
+real-time factor 0.06 (`base`) and about 0.17-0.22 (`small`); Hebrew detected on `m21.mp4` (p = 0.94-0.96); a 90-minute lecture
+therefore takes about **6 min (`base`) to roughly 15-20 min (`small`)** to transcribe (extrapolation), far longer than an HTTP request (and the
 quick tunnel cuts requests at 100 s, tools report 2.9). `faster-whisper` 1.2.1 needs `av<17`. The provided `m21.mp4`
 is only 5.7 s long. The `small` model (~460 MB) is downloaded once from Hugging Face at its first use.
 
@@ -676,11 +677,11 @@ is only 5.7 s long. The `small` model (~460 MB) is downloaded once from Hugging 
 - New system dependency: the `ffmpeg` command line tool (to be installed and recorded in the tools report, D15).
 
 **Risks (written honestly).**
-- **Long processing time:** about 15 min for a 90-minute lecture with `small` (6 min with `base`, set by
+- **Long processing time:** roughly 15-20 min for a 90-minute lecture with `small` (6 min with `base`, set by
   `WHISPER_MODEL`); no promise is made beyond the measured real-time factors.
 - **CPU load during class:** transcription uses the laptop's CPU; a long job started during the attendance check-in
   may slow the server. Advice: start long recordings outside the check-in; the class demo uses the 4-minute clip
-  (about 40 s of transcription with `small`).
+  (T18f: about 70 s in total for a 244 s clip, of which about 54 s of transcription with `small`).
 - **Model download ~460 MB, once**, at the first real use (needs network); to be done before class.
 - **Upload through the tunnel:** Cloudflare's free plan documents a 100 MB request-body limit (not measured here)
   and the tunnel cuts requests at 100 s: large recordings are uploaded on the laptop itself (`http://localhost`).
@@ -699,6 +700,31 @@ faster-whisper, Claude; one thread instead of a queue), D1 (live, no pre-compute
 `summary_job`; task T18 rewritten (T18a-T18f). *SRS:* section 3.4 FR-4.1-FR-4.9, error table, NFR-13.
 
 **Status:** VALIDATED by the student — 2026-11-23
+
+---
+
+## D35 — Display time zone: Israel local time (R3, R14, R16; amends D8, D34)
+
+**Question.** The first end-to-end check (23/11) showed that the attendance export and the pages showed UTC, so a
+check-in at 21:29 local time appeared as 19:29. Which time should users see?
+
+**Facts.** The class and the lecturer are in Israel; the clock changes between winter time (UTC+2) and summer time
+(UTC+3). Times are stored as UTC epoch seconds (design 3.1, `Clock`).
+
+**DECISION.** Every user-visible time (attendance spreadsheet export, lecturer and projector pages, F4 summary date) is
+shown in **Israel local time**, IANA zone `Asia/Jerusalem`, with daylight-saving rules. **Storage stays UTC.** The
+export headers name the zone ("Session date (Jerusalem time)", "Checked in at (Jerusalem time)") so nobody reads the values as UTC. The zone is the constant
+`DISPLAY_TIMEZONE = "Asia/Jerusalem"` in `app/timezone.py` (not an environment variable); the `tzdata` package is added to
+`requirements.txt` so the zone database exists on every platform (Windows, containers).
+Rejected: showing UTC (confusing for the lecturer); the browser's own zone (the export is a file generated by the
+server; dates would differ between devices); storing local time (breaks at the daylight-saving change).
+
+**Impact.** *SRS:* FR-1.18 (export in local time, zone named in the header), NFR-7 unchanged. *Design:* helper
+`app/timezone.py` (`to_local`, `format_local`), used by templates and `AttendanceExporter`; `Config` note. *README:*
+configuration table. *Tests:* conversion in winter (UTC+2) and summer (UTC+3), header names the zone, stored values
+remain UTC.
+
+**Status:** validated by the student — 2026-11-23
 
 ---
 

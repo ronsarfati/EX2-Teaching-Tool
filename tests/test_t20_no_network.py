@@ -240,9 +240,9 @@ def test_export_columns_exact_and_no_ip(app, lecturer):
     do_check_in(app, "Fox", {"REMOTE_ADDR": "192.0.2.7"}, {"CF-Connecting-IP": "198.51.100.9"})
     sessions.close_session()
     rows = list(csv.reader(io.StringIO(lecturer.get("/lecturer/export/checkins.csv").get_data().decode("utf-8-sig"))))
-    assert rows[0] == ["session date", "nickname", "check-in time"] and len(rows[1]) == 3
+    assert rows[0] == ["Session date (Jerusalem time)", "Nickname", "Checked in at (Jerusalem time)"] and len(rows[1]) == 3
     srows = list(csv.reader(io.StringIO(lecturer.get("/lecturer/export/summary.csv").get_data().decode("utf-8-sig"))))
-    assert srows[0] == ["session date", "check-ins (N)", "faces detected (D)", "consistency status"]
+    assert srows[0] == ["Session date (Jerusalem time)", "check-ins (N)", "faces detected (D)", "consistency status"]
     wb = load_workbook(io.BytesIO(lecturer.get("/lecturer/export.xlsx").data))
     assert wb.sheetnames == ["Check-ins", "Summary"]
     assert [c.value for c in wb["Check-ins"][1]] == rows[0]
@@ -326,11 +326,11 @@ def test_old_database_untouched_and_usable(old_app):
     sessions.close_session()
     # export
     rows = list(csv.reader(io.StringIO(client.get("/lecturer/export/checkins.csv").get_data().decode("utf-8-sig"))))
-    assert rows[0] == ["session date", "nickname", "check-in time"]
+    assert rows[0] == ["Session date (Jerusalem time)", "Nickname", "Checked in at (Jerusalem time)"]
     assert [r[1] for r in rows[1:]] == ["Old A", "Old B", "Fox"]
     assert all(len(r) == 3 for r in rows)
     wb = load_workbook(io.BytesIO(client.get("/lecturer/export.xlsx").data))
-    assert [c.value for c in wb["Check-ins"][1]] == ["session date", "nickname", "check-in time"]
+    assert [c.value for c in wb["Check-ins"][1]] == ["Session date (Jerusalem time)", "Nickname", "Checked in at (Jerusalem time)"]
     conn.close()
 
 

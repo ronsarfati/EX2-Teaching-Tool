@@ -8,7 +8,6 @@ from __future__ import annotations
 import logging
 import re
 import shutil
-from datetime import datetime
 from pathlib import Path
 from typing import BinaryIO, Optional
 
@@ -22,6 +21,7 @@ from app.errors import (AppError, LLMUnavailableError, NoSpeechError, Unreadable
                         UnsupportedVideoFormatError)
 from app.repositories.summaries import JobStatus, SummaryJob, SummaryRepository
 from app.services.lecture_summary import LectureSummariser
+from app.timezone import format_local
 
 _LOG = logging.getLogger(__name__)
 GENERIC_MESSAGE = "Something went wrong. Please try again."
@@ -138,7 +138,7 @@ class VideoSummaryService:
 
 
 def _generated_line(job: SummaryJob) -> str:
-    when = datetime.fromtimestamp(job.finished_at or job.created_at).strftime("%Y-%m-%d %H:%M")
+    when = format_local(job.finished_at or job.created_at, "%Y-%m-%d %H:%M")
     return f"Generated on {when}"
 
 
