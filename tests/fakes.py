@@ -46,3 +46,23 @@ class FakeLLMClient:
         if self.error is not None:
             raise self.error
         return self.reply(prompt) if callable(self.reply) else self.reply
+
+
+class FakeRepoFetcher:
+    """RepoFetcher serving preset extracts by canonical URL; unknown URLs are unavailable. Records fetch calls."""
+
+    def __init__(self, repos: dict | None = None) -> None:
+        self.repos = repos or {}
+        self.calls: list[tuple[str, int]] = []
+
+    def normalize_url(self, url: str) -> str:
+        from app.adapters.repo_fetcher import GitHubRepoFetcher
+        return GitHubRepoFetcher().normalize_url(url)
+
+    def fetch(self, url: str, max_chars: int):
+        from app.errors import RepoUnavailableError
+        canonical = self.normalize_url(url)
+        self.calls.append((canonical, max_chars))
+        if canonical not in self.repos:
+            raise RepoUnavailableError()
+        return self.repos[canonical]
