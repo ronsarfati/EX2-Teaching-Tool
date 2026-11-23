@@ -44,7 +44,7 @@ class Config:
             database_path=environ.get("DATABASE_PATH") or defaults["database_path"].default,
             yunet_model_path=environ.get("YUNET_MODEL_PATH") or defaults["yunet_model_path"].default,
             face_score_threshold=threshold,
-            anthropic_api_key=environ.get("ANTHROPIC_API_KEY") or None,
+            anthropic_api_key=environ.get("ANTHROPIC_API_KEY", "").strip() or None,
             anthropic_model=environ.get("ANTHROPIC_MODEL") or defaults["anthropic_model"].default,
             whisper_model=environ.get("WHISPER_MODEL") or defaults["whisper_model"].default,
             whisper_language=environ.get("WHISPER_LANGUAGE") or None,

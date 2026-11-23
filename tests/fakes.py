@@ -31,3 +31,18 @@ class FakeHeadCounter:
         if self.error is not None:
             raise self.error
         return self.count
+
+
+class FakeLLMClient:
+    """LLMClient returning a preset text (or a function of the prompt), or raising a preset error; records calls."""
+
+    def __init__(self, reply="OK", error: Exception | None = None) -> None:
+        self.reply = reply
+        self.error = error
+        self.calls: list[dict] = []
+
+    def complete(self, system: str, prompt: str, max_tokens: int, feature: str = "review") -> str:
+        self.calls.append({"system": system, "prompt": prompt, "max_tokens": max_tokens})
+        if self.error is not None:
+            raise self.error
+        return self.reply(prompt) if callable(self.reply) else self.reply
