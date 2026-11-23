@@ -29,8 +29,8 @@ CONCRETE = [c for c in all_error_classes()
 
 # ---- errors: hygiene (NFR-10) ----
 def test_every_concrete_error_is_in_srs_table_count():
-    """Covers NFR-10: 25 concrete classes exist, no undocumented extra one."""
-    assert len(CONCRETE) == 25
+    """Covers NFR-10: 23 concrete classes exist, no undocumented extra one."""
+    assert len(CONCRETE) == 23
 
 
 @pytest.mark.parametrize("cls", CONCRETE, ids=lambda c: c.__name__)
@@ -67,7 +67,7 @@ def test_llm_error_default_feature_and_attribute():
 
 
 def test_group_bases_catch_families():
-    for cls in (errors.OffCampusError, errors.WrongCodeError, errors.EmptyNicknameError):
+    for cls in (errors.QrExpiredError, errors.WrongCodeError, errors.EmptyNicknameError):
         with pytest.raises(errors.CheckInError):
             raise cls()
     with pytest.raises(errors.PhotoError):

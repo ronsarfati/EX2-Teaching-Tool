@@ -11,11 +11,6 @@ SCHEMA_PATH = Path(__file__).with_name("schema.sql")
 BUSY_TIMEOUT_MS = 5000
 SQLITE_MAX_INT = 2**63 - 1  # larger Python ints make the sqlite3 driver raise OverflowError
 
-# Old rows predate the feature (D32): they were all accepted on the campus ranges, hence the default.
-NETWORK_ORIGIN_COLUMN = (
-    "TEXT NOT NULL DEFAULT 'campus' CHECK (network_origin IN ('campus', 'apple_relay', 'off_campus'))"
-)
-
 
 def valid_row_id(value: int) -> bool:
     """True if `value` can be a row id. Lookups treat any other id exactly like an unknown one (404, not 500)."""
@@ -60,16 +55,5 @@ class Database:
         connection.execute("COMMIT")
 
     def init_schema(self) -> None:
-        """Create the tables if they do not exist yet, then add columns introduced after the first release."""
+        """Create the tables if they do not exist yet (idempotent; an older database keeps its extra columns)."""
         self.conn().executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
-        self._add_column_if_missing("check_in", "network_origin", NETWORK_ORIGIN_COLUMN)
-
-    def _add_column_if_missing(self, table: str, column: str, definition: str) -> None:
-        """Upgrade a database created before `column` existed; CREATE TABLE IF NOT EXISTS never alters one.
-
-        Names and definition are constants of this module, never user input.
-        """
-        connection = self.conn()
-        existing = {row["name"] for row in connection.execute(f"PRAGMA table_info({table})")}
-        if column not in existing:
-            connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")

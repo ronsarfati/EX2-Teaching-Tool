@@ -4,7 +4,6 @@ import pytest
 from app.errors import (
     AlreadyCheckedInError,
     EmptyNicknameError,
-    OffCampusError,
     QrExpiredError,
     SessionClosedError,
     TooManyAttemptsError,
@@ -12,14 +11,12 @@ from app.errors import (
     WrongCodeError,
 )
 
-IP = "10.1.2.3"
 DEV = "device-a"
 
 
 @pytest.fixture
 def svc(app):
     services = app.extensions["services"]
-    services["settings"].replace_values("campus_range", ["10.0.0.0/8"])
     return services
 
 
@@ -38,15 +35,15 @@ def code(svc, session):
 
 def wrong(svc, session):
     good = code(svc, session)
-    return next(c for c in ("000", "001") if c != good)
+    return next(c for c in ("0000", "0001") if c != good)
 
 
-def start(svc, session, device=DEV, ip=IP):
-    return svc["checkin_service"].start(qr(svc, session), device, ip)
+def start(svc, session, device=DEV):
+    return svc["checkin_service"].start(qr(svc, session), device)
 
 
-def confirm(svc, session, c=None, nick="Fox", device=DEV, ip=IP):
-    return svc["checkin_service"].confirm(device, ip, code(svc, session) if c is None else c, nick)
+def confirm(svc, session, c=None, nick="Fox", device=DEV):
+    return svc["checkin_service"].confirm(device, code(svc, session) if c is None else c, nick)
 
 
 def test_first_visit_success(svc, session):
@@ -79,42 +76,23 @@ def test_abandoned_window_creates_no_record(svc, session):
     assert svc["check_ins"].count_for_session(session.id) == 0
 
 
-def test_start_off_campus_is_accepted(svc, session):
-    assert start(svc, session, ip="8.8.8.8") is None  # D32: no refusal, the origin is recorded at confirm
-
-
-def test_confirm_off_campus_records_origin(svc, session):
-    start(svc, session)
-    assert confirm(svc, session, ip="8.8.8.8").network_origin.value == "off_campus"
-
-
-def test_confirm_on_campus_records_campus(svc, session):
-    start(svc, session)
-    assert confirm(svc, session).network_origin.value == "campus"
-
-
-def test_malformed_ip_refused(svc, session):
-    with pytest.raises(OffCampusError):
-        start(svc, session, ip="not-an-ip")
-
-
 def test_qr_expired(svc, session, clock):
     token = qr(svc, session)
     clock.advance(26)
     with pytest.raises(QrExpiredError):
-        svc["checkin_service"].start(token, DEV, IP)
+        svc["checkin_service"].start(token, DEV)
 
 
 def test_qr_tampered(svc, session):
     with pytest.raises(QrExpiredError):
-        svc["checkin_service"].start("garbage", DEV, IP)
+        svc["checkin_service"].start("garbage", DEV)
 
 
 def test_start_closed_session(svc, session):
     token = qr(svc, session)
     svc["session_service"].close_session()
     with pytest.raises(SessionClosedError):
-        svc["checkin_service"].start(token, DEV, IP)
+        svc["checkin_service"].start(token, DEV)
 
 
 def test_start_already_checked_in(svc, session):

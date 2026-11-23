@@ -1,4 +1,4 @@
-"""Generic storage of lecturer-edited lists: kind 'campus_range' (NetworkPolicy) or 'peer_repo' (review)."""
+"""Generic storage of lecturer-edited lists: kind 'peer_repo' (homework review comparison list)."""
 from __future__ import annotations
 
 from app.db import Database

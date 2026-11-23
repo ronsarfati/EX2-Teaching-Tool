@@ -7,14 +7,12 @@ from openpyxl import load_workbook
 
 from app.services.export import AttendanceExporter
 
-CAMPUS = "192.0.2.10"
 URLS = ["/lecturer/export/checkins.csv", "/lecturer/export/summary.csv", "/lecturer/export.xlsx"]
 
 
 @pytest.fixture
 def services(app):
     s = app.extensions["services"]
-    s["settings"].replace_values("campus_range", ["192.0.2.0/24"])
     return s
 
 
@@ -26,10 +24,9 @@ def lecturer(client):
 
 def check_in(app, nickname):
     phone = app.test_client()
-    kw = {"environ_base": {"REMOTE_ADDR": CAMPUS}}
     state = app.extensions["services"]["session_service"].projector_state()
-    phone.get(state.check_in_url.split("test.example")[1], **kw)
-    phone.post("/checkin", data={"nickname": nickname, "code": state.code}, **kw)
+    phone.get(state.check_in_url.split("test.example")[1])
+    phone.post("/checkin", data={"nickname": nickname, "code": state.code})
 
 
 def run_session(app, services, nicknames, head_count=None):
@@ -51,7 +48,7 @@ def test_checkins_csv_equals_live_table(app, services, lecturer):
     session = run_session(app, services, ["Fox", "Owl"])
     rows = read_csv(lecturer.get(URLS[0]))
     live = lecturer.get(f"/api/sessions/{session.id}/attendance").get_json()["check_ins"]
-    assert rows[0] == ["session date", "nickname", "check-in time", "network"]
+    assert rows[0] == ["session date", "nickname", "check-in time"]
     assert [r[1] for r in rows[1:]] == [c["nickname"] for c in live]
 
 
@@ -60,11 +57,9 @@ def test_summary_equals_page(app, services, lecturer):
     run_session(app, services, ["Cat"])
     rows = read_csv(lecturer.get(URLS[1]))
     page = lecturer.get(f"/api/sessions/{first.id}/attendance").get_json()
-    assert rows[0] == ["session date", "check-ins (N)", "faces detected (D)", "consistency status",
-                       "off campus", "via Apple relay"]
-    assert rows[1][1:] == [str(page["n"]), str(page["head_count"]), page["consistency"],
-                              str(page["off_campus_n"]), str(page["apple_relay_n"])]
-    assert rows[2][1:] == ["1", "", "", "0", "0"]  # no photo counted: empty D and status
+    assert rows[0] == ["session date", "check-ins (N)", "faces detected (D)", "consistency status"]
+    assert rows[1][1:] == [str(page["n"]), str(page["head_count"]), page["consistency"]]
+    assert rows[2][1:] == ["1", "", ""]  # no photo counted: empty D and status
 
 
 def test_anomaly_status_exported(app, services, lecturer):
@@ -78,14 +73,14 @@ def test_xlsx_has_two_sheets_equal_to_csv(app, services, lecturer):
     assert workbook.sheetnames == ["Check-ins", "Summary"]
     checkins = [[str(c) for c in row] for row in workbook["Check-ins"].iter_rows(values_only=True)]
     assert checkins == read_csv(lecturer.get(URLS[0]))
-    assert [c.value for c in workbook["Summary"][2]][1:] == [2, 2, "consistent", 0, 0]
+    assert [c.value for c in workbook["Summary"][2]][1:] == [2, 2, "consistent"]
 
 
 def test_no_ip_or_token_column_or_value(app, services, lecturer):
     run_session(app, services, ["Fox"])
     for url in URLS[:2]:
         text = lecturer.get(url).get_data(as_text=True).lower()
-        assert CAMPUS not in text and "token" not in text and "ip" not in text.split("\n")[0].split(",")
+        assert "token" not in text and "ip" not in text.split("\n")[0].split(",")
 
 
 @pytest.mark.parametrize("nickname", ["=1+1", "+cmd", "-2", "@SUM(A1)"])

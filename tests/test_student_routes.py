@@ -3,14 +3,11 @@ import re
 
 import pytest
 
-CAMPUS = "192.0.2.10"
-
 
 @pytest.fixture
 def open_session(app, clock):
-    """Open a session, allow 192.0.2.0/24, return (qr_token, code) readers."""
+    """Open a session and return it."""
     s = app.extensions["services"]
-    s["settings"].replace_values("campus_range", ["192.0.2.0/24"])
     session = s["session_service"].open_session()
     return session
 
@@ -23,8 +20,8 @@ def code_now(app, session):
     return app.extensions["services"]["session_service"].projector_state().code
 
 
-def phone(app, ip=CAMPUS, headers=None):
-    return app.test_client(), {"environ_base": {"REMOTE_ADDR": ip}, "headers": headers or {}}
+def phone(app):
+    return app.test_client(), {}
 
 
 def test_menu(client):
@@ -39,7 +36,7 @@ def test_first_visit_shows_nickname_warning_and_numeric_code(app, open_session):
     assert response.status_code == 200
     assert 'name="nickname"' in html and 'maxlength="30"' in html
     assert "do not use your real name or ID" in html
-    assert 'inputmode="numeric"' in html and 'pattern="[0-9]{3}"' in html and "Confirm" in html
+    assert 'inputmode="numeric"' in html and 'pattern="[0-9]{4}"' in html and "Confirm" in html
     assert html.index('name="nickname"') < html.index('name="code"')
     cookie = response.headers["Set-Cookie"]
     assert "dt=" in cookie and "HttpOnly" in cookie and "SameSite=Lax" in cookie
@@ -69,7 +66,7 @@ def test_returning_device_has_no_nickname_field(app, open_session, clock):
 def test_wrong_code(app, open_session):
     c, kw = phone(app)
     c.get(scan_url(app), **kw)
-    wrong = f"{(int(code_now(app, open_session)) + 1) % 1000:03d}"
+    wrong = f"{(int(code_now(app, open_session)) + 1) % 10000:04d}"
     response = c.post("/checkin", data={"nickname": "Fox", "code": wrong}, **kw)
     assert response.status_code == 400 and b"Wrong code. Type the code shown under the QR now." in response.data
 
@@ -77,13 +74,13 @@ def test_wrong_code(app, open_session):
 def test_empty_nickname(app, open_session):
     c, kw = phone(app)
     c.get(scan_url(app), **kw)
-    response = c.post("/checkin", data={"nickname": "  ", "code": "123"}, **kw)
+    response = c.post("/checkin", data={"nickname": "  ", "code": "1234"}, **kw)
     assert b"Please choose a nickname (not your real name or ID)." in response.data
 
 
 def test_post_without_scan_window_expired(app, open_session):
     c, kw = phone(app)
-    response = c.post("/checkin", data={"nickname": "Fox", "code": "123"}, **kw)
+    response = c.post("/checkin", data={"nickname": "Fox", "code": "1234"}, **kw)
     assert response.status_code == 400 and b"Your check-in time ran out. Scan the QR code again." in response.data
 
 
@@ -98,7 +95,7 @@ def test_window_runs_out(app, open_session, clock):
 def test_too_many_attempts(app, open_session):
     c, kw = phone(app)
     c.get(scan_url(app), **kw)
-    wrong = f"{(int(code_now(app, open_session)) + 1) % 1000:03d}"
+    wrong = f"{(int(code_now(app, open_session)) + 1) % 10000:04d}"
     for _ in range(5):
         c.post("/checkin", data={"nickname": "Fox", "code": wrong}, **kw)
     response = c.post("/checkin", data={"nickname": "Fox", "code": wrong}, **kw)
@@ -119,30 +116,6 @@ def test_closed_session(app, open_session):
     app.extensions["services"]["session_service"].close_session()
     response = c.get(url, **kw)
     assert response.status_code == 409 and b"Attendance for this class is closed." in response.data
-
-
-def test_off_campus_is_accepted(app, open_session):
-    c, kw = phone(app, ip="198.51.100.7")
-    assert c.get(scan_url(app), **kw).status_code == 200  # D32: labelled off campus, not refused
-
-
-def test_malformed_client_address_refused(app, open_session):
-    c, kw = phone(app, ip="127.0.0.1", headers={"CF-Connecting-IP": "not-an-ip"})
-    response = c.get(scan_url(app), **kw)
-    assert response.status_code == 403 and b"Check-in is not available right now. Ask the lecturer." in response.data
-
-
-def test_header_used_from_loopback_tunnel(app, open_session):
-    c, kw = phone(app, ip="127.0.0.1", headers={"CF-Connecting-IP": CAMPUS})
-    assert c.get(scan_url(app), **kw).status_code == 200
-
-
-def test_header_ignored_from_non_loopback(app, open_session):
-    c, kw = phone(app, ip="198.51.100.7", headers={"CF-Connecting-IP": CAMPUS})
-    assert c.get(scan_url(app), **kw).status_code == 200  # accepted, but as off campus: the forged header is ignored
-    c.post("/checkin", data={"code": code_now(app, open_session), "nickname": "Fox"}, **kw)
-    rows = app.extensions["services"]["check_ins"].list_for_session(open_session.id)
-    assert rows[0].network_origin.value == "off_campus"
 
 
 def test_checkin_without_token_no_session(app):

@@ -4,7 +4,6 @@ import pytest
 from app.errors import (
     AlreadyCheckedInError,
     EmptyNicknameError,
-    OffCampusError,
     QrExpiredError,
     SessionClosedError,
     TooManyAttemptsError,
@@ -12,14 +11,12 @@ from app.errors import (
     WrongCodeError,
 )
 
-IP = "10.1.2.3"
 DEV = "device-a"
 
 
 @pytest.fixture
 def svc(app):
     services = app.extensions["services"]
-    services["settings"].replace_values("campus_range", ["10.0.0.0/8"])
     return services
 
 
@@ -45,15 +42,15 @@ def bad_code(svc, session):
     c = creds(svc)
     n = int(svc["session_service"]._credentials._clock.now()) // 5
     ok = {c._code_for_slice(session.id, n), c._code_for_slice(session.id, n - 1)}
-    return next(f"{i:03d}" for i in range(1000) if f"{i:03d}" not in ok)
+    return next(f"{i:04d}" for i in range(10000) if f"{i:04d}" not in ok)
 
 
-def start(svc, session, device=DEV, ip=IP):
-    return svc["checkin_service"].start(qr(svc, session), device, ip)
+def start(svc, session, device=DEV):
+    return svc["checkin_service"].start(qr(svc, session), device)
 
 
-def confirm(svc, session, c=None, nick="Fox", device=DEV, ip=IP):
-    return svc["checkin_service"].confirm(device, ip, code(svc, session) if c is None else c, nick)
+def confirm(svc, session, c=None, nick="Fox", device=DEV):
+    return svc["checkin_service"].confirm(device, code(svc, session) if c is None else c, nick)
 
 
 def test_window_60_000s_accepted(svc, session, clock):
@@ -170,21 +167,10 @@ def test_qr_15_000_accepted_15_001_rejected_at_start(svc, session, clock):
     """Covers FR-1.3, D31."""
     token = qr(svc, session)
     clock.advance(15.0)
-    assert svc["checkin_service"].start(token, DEV, IP) is None
+    assert svc["checkin_service"].start(token, DEV) is None
     clock.advance(0.001)
     with pytest.raises(QrExpiredError):
-        svc["checkin_service"].start(token, "d2", IP)
-
-
-def test_ip_checked_at_start_and_at_confirm(svc, session):
-    """Covers FR-1.4: allow-list changes between start and confirm are honoured."""
-    start(svc, session)
-    svc["settings"].replace_values("campus_range", [])  # D32: only an empty list still refuses
-    with pytest.raises(OffCampusError):
-        confirm(svc, session)
-    with pytest.raises(OffCampusError):
-        start(svc, session, device="d2")
-    assert svc["check_ins"].count_for_session(session.id) == 0
+        svc["checkin_service"].start(token, "d2")
 
 
 def test_one_check_in_per_device_per_session(svc, session):
@@ -223,6 +209,6 @@ def test_code_two_slices_old_rejected(svc, session, clock):
     clock.advance(10)
     n = int(clock.now()) // 5
     if old in {c._code_for_slice(session.id, n), c._code_for_slice(session.id, n - 1)}:
-        pytest.skip("3-digit collision with a valid code")
+        pytest.skip("4-digit collision with a valid code")
     with pytest.raises(WrongCodeError):
         confirm(svc, session, c=old)

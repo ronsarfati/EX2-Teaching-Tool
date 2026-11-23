@@ -25,8 +25,6 @@ CREATE TABLE IF NOT EXISTS check_in (
     device_token  TEXT    NOT NULL REFERENCES device(device_token),
     nickname      TEXT    NOT NULL,                      -- copy at check-in time
     checked_in_at REAL    NOT NULL,
-    -- Origin label only, never the IP (D21, D32). Databases created before it get it from Database.init_schema.
-    network_origin TEXT   NOT NULL DEFAULT 'campus' CHECK (network_origin IN ('campus', 'apple_relay', 'off_campus')),
     UNIQUE (session_id, device_token)                    -- one check-in per device per session (FR-1.12)
 );
 
@@ -38,7 +36,7 @@ CREATE TABLE IF NOT EXISTS checkin_window (
     PRIMARY KEY (session_id, device_token)
 );
 
--- Lecturer-edited lists: kind is 'campus_range' or 'peer_repo'.
+-- Lecturer-edited list: kind is 'peer_repo' (kept generic).
 CREATE TABLE IF NOT EXISTS setting_item (
     kind  TEXT NOT NULL,
     value TEXT NOT NULL,

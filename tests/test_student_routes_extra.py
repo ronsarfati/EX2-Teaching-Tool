@@ -1,16 +1,13 @@
-"""Extra end-to-end tests for the student check-in pages (T8). Covers FR-1.2, FR-1.6-FR-1.12, NFR-1, UC-2, UC-3, SRS section 5."""
+"""Extra end-to-end tests for the student check-in pages (T8). Covers FR-1.6-FR-1.12, NFR-1, UC-2, UC-3, SRS section 5."""
 import re
 from pathlib import Path
 
 import pytest
 
-CAMPUS = "192.0.2.10"
-
 
 @pytest.fixture
 def services(app):
     s = app.extensions["services"]
-    s["settings"].replace_values("campus_range", ["192.0.2.0/24"])
     return s
 
 
@@ -20,12 +17,12 @@ def session(services):
 
 
 class Phone:
-    """One browser: own cookie jar, fixed source address."""
+    """One browser with its own cookie jar."""
 
-    def __init__(self, app, ip=CAMPUS, headers=None):
+    def __init__(self, app):
         self.app = app
         self.client = app.test_client()
-        self.kw = {"environ_base": {"REMOTE_ADDR": ip}, "headers": headers or {}}
+        self.kw = {}
         self.svc = app.extensions["services"]["session_service"]
 
     def url(self):
@@ -35,7 +32,7 @@ class Phone:
         return self.svc.projector_state().code
 
     def wrong(self):
-        return f"{(int(self.code()) + 1) % 1000:03d}"
+        return f"{(int(self.code()) + 1) % 10000:04d}"
 
     def scan(self, url=None):
         return self.client.get(url or self.url(), **self.kw)
@@ -62,7 +59,7 @@ def test_field_order_and_attributes(app, session):
     nick_tag = re.search(r"<input[^>]*name=\"nickname\"[^>]*>", html).group(0)
     code_tag = re.search(r"<input[^>]*name=\"code\"[^>]*>", html).group(0)
     assert 'maxlength="30"' in nick_tag
-    assert 'inputmode="numeric"' in code_tag and 'maxlength="3"' in code_tag
+    assert 'inputmode="numeric"' in code_tag and 'maxlength="4"' in code_tag
 
 
 def test_first_visit_then_returning_next_session(app, session, services):
@@ -197,26 +194,8 @@ def test_session_closed_between_scan_and_confirm(app, session, services):
     p = Phone(app)
     p.scan()
     services["session_service"].close_session()
-    r = p.post("Fox", "123")
+    r = p.post("Fox", "1234")
     assert r.status_code == 409 and "Attendance for this class is closed." in text(r)
-
-
-def test_off_campus_is_accepted_and_labelled(app, session):
-    p = Phone(app, ip="198.51.100.7")
-    assert p.scan().status_code == 200  # D32: no refusal
-    assert p.post().status_code == 200
-    rows = app.extensions["services"]["check_ins"].list_for_session(session.id)
-    assert [c.network_origin.value for c in rows] == ["off_campus"]
-
-
-def test_malformed_address_refused_with_message(app, session):
-    r = Phone(app, ip="127.0.0.1", headers={"CF-Connecting-IP": "not-an-ip"}).scan()
-    assert r.status_code == 403
-    assert "Check-in is not available right now. Ask the lecturer." in text(r)
-
-
-def test_off_campus_post_without_window(app, session):
-    assert Phone(app, ip="198.51.100.7").post("Fox", "123").status_code == 400  # no scan first: no window
 
 
 def test_already_checked_in_get_and_post(app, session):
@@ -241,27 +220,6 @@ def test_checkin_get_without_token_open_session(app, session):
     assert r.status_code == 400 and "Scan the QR code on the projector." in text(r)
 
 
-# ---- client address (FR-1.2) ----
-
-@pytest.mark.parametrize("peer,expected", [("127.0.0.1", 200), ("::1", 200), ("198.51.100.7", 200), ("10.0.0.5", 200)])
-def test_cf_header_only_from_loopback(app, session, peer, expected):
-    p = Phone(app, ip=peer, headers={"CF-Connecting-IP": CAMPUS})
-    assert p.scan().status_code == expected
-
-
-def test_loopback_without_header_is_off_campus(app, session):
-    p = Phone(app, ip="127.0.0.1")
-    assert p.scan().status_code == 200
-    p.post()
-    rows = app.extensions["services"]["check_ins"].list_for_session(session.id)
-    assert rows[0].network_origin.value == "off_campus"
-
-
-def test_loopback_with_off_campus_header(app, session):
-    p = Phone(app, ip="127.0.0.1", headers={"CF-Connecting-IP": "198.51.100.7"})
-    assert p.scan().status_code == 200
-
-
 # ---- cookie and privacy (D6, NFR-1) ----
 
 def test_cookie_flags_and_single_set(app, session):
@@ -280,20 +238,19 @@ def test_cookie_token_is_random_per_device(app, session):
 
 
 def test_no_internals_in_any_body(app, session, services, clock):
-    """Covers NFR-1: no IP, token, class names or traceback in pages."""
+    """Covers NFR-1: no token, class names or traceback in pages."""
     p = Phone(app)
     url = p.url()
     token = url.rsplit("/", 1)[1]
     bodies = [text(p.scan())]
     bodies.append(text(p.post("Fox", p.wrong())))
     bodies.append(text(p.client.get("/c/garbage", **p.kw)))
-    bodies.append(text(Phone(app, ip="198.51.100.7").scan()))
     bodies.append(text(p.post("Fox")))
     bodies.append(text(p.scan()))
     clock.advance(30)
     bodies.append(text(Phone(app).scan(url)))
     for body in bodies:
-        for bad in (CAMPUS, "198.51.100.7", token, "Traceback", "Error:", "Exception", "app/", ".py", "sqlite", "File \""):
+        for bad in (token, "Traceback", "Error:", "Exception", "app/", ".py", "sqlite", "File \""):
             assert bad not in body, bad
 
 

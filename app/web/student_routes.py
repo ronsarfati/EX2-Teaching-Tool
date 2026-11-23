@@ -5,7 +5,7 @@ from flask import Blueprint, current_app, redirect, render_template, request, ur
 
 from app.errors import InvalidPollError, NoOpenSessionError, QrRequiredError
 from app.services.homework import NO_PEER_SENTENCE
-from app.web.device import attach_device_cookie, client_ip, device_token
+from app.web.device import attach_device_cookie, device_token
 
 bp = Blueprint("student", __name__)
 bp.after_app_request(attach_device_cookie)
@@ -28,7 +28,7 @@ def menu():
 @bp.get("/c/<qr_token>")
 def scan(qr_token: str):
     """A QR scan: open the 1-minute window; ask for a nickname only if this device has none."""
-    stored_nickname = _services()["checkin_service"].start(qr_token, device_token(), client_ip())
+    stored_nickname = _services()["checkin_service"].start(qr_token, device_token())
     return render_template("checkin.html", needs_nickname=stored_nickname is None)
 
 
@@ -43,14 +43,14 @@ def checkin_without_token():
 @bp.post("/checkin")
 def confirm():
     check_in = _services()["checkin_service"].confirm(
-        device_token(), client_ip(), request.form.get("code", "").strip(), request.form.get("nickname")
+        device_token(), request.form.get("code", "").strip(), request.form.get("nickname")
     )
     return render_template("checked_in.html", nickname=check_in.nickname)
 
 
 @bp.get("/poll")
 def poll():
-    """The open poll, if any. No allow-list here: the design only restricts check-in to the campus (FR-3.2)."""
+    """The open poll, if any. Open to every device (FR-3.2)."""
     return render_template("poll.html", poll=_services()["poll_service"].current(),
                            voted=request.args.get("voted") == "1")
 

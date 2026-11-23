@@ -1,4 +1,4 @@
-// Polls the server every second (D31) and shows the current QR and 3-digit code.
+// Polls the server every second (D31) and shows the current QR and 4-digit code.
 // The image is only replaced when it changed, so it does not flicker between rotations.
 const POLL_MS = 1000;
 const qrImg = document.getElementById("qr");

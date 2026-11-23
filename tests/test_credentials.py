@@ -1,4 +1,4 @@
-"""T3: RotatingCredentials (QR token 10 s / accepted <= 15 s, 3-digit code 5 s)."""
+"""T3: RotatingCredentials (QR token 10 s / accepted <= 15 s, 4-digit code 5 s)."""
 import random
 
 import pytest
@@ -74,11 +74,11 @@ def test_qr_errors_use_srs_message(creds):
         assert str(info.value) == "This QR code has expired. Scan a fresh one."
 
 
-def test_code_is_three_digits_for_2000_slices(creds, clock):
+def test_code_is_four_digits_for_2000_slices(creds, clock):
     for i in range(2000):
         clock.set(T0 + i * 5)
         code = creds.current_code(1)
-        assert len(code) == 3 and code.isdigit()
+        assert len(code) == 4 and code.isdigit()
 
 
 def test_code_stable_within_slice(creds, clock):
@@ -93,7 +93,7 @@ def test_code_current_and_previous_accepted_older_rejected(creds, clock):
     assert creds.is_valid_code(1, creds.current_code(1))
     assert creds.is_valid_code(1, old)
     clock.set(T0 + 10)
-    # a 1-in-1000 collision with a newer slice is possible: pick a start whose codes differ
+    # a 1-in-10,000 collision with a newer slice is possible: pick a start whose codes differ
     while old in (creds.current_code(1), creds._code_for_slice(1, int(clock.now()) // 5 - 1)):
         clock.advance(5)
         old = creds._code_for_slice(1, int(clock.now()) // 5 - 2)
@@ -102,9 +102,9 @@ def test_code_current_and_previous_accepted_older_rejected(creds, clock):
 
 def test_wrong_and_malformed_codes_rejected(creds):
     valid = {creds.current_code(1), creds._code_for_slice(1, int(T0) // 5 - 1)}
-    wrong = next(f"{n:03d}" for n in range(1000) if f"{n:03d}" not in valid)
+    wrong = next(f"{n:04d}" for n in range(10000) if f"{n:04d}" not in valid)
     assert not creds.is_valid_code(1, wrong)
-    for bad in ("12", "1234", "12a", "", "١٢٣"):
+    for bad in ("123", "12345", "12a4", "", "١٢٣٤"):
         assert not creds.is_valid_code(1, bad)
 
 

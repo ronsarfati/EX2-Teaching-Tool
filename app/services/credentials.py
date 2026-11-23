@@ -1,4 +1,4 @@
-"""Rotating QR token (10 s) and 3-digit code (5 s), derived statelessly from one secret (D30, D31).
+"""Rotating QR token (10 s) and 4-digit code (5 s), derived statelessly from one secret (D30, D31).
 
 Nothing is stored: a value is an HMAC of the session id and the time slice, so the server only
 needs the key and the injected clock to create and check it.
@@ -21,6 +21,8 @@ class RotatingCredentials:
     QR_PERIOD_S = 10
     QR_MAX_AGE_S = 15
     CODE_PERIOD_S = 5
+    # 4 digits: a random guess hits the current or previous code with probability 2 / 10,000 (D33).
+    CODE_DIGITS = 4
 
     def __init__(self, secret_key: str, clock: Clock) -> None:
         self._key = secret_key.encode()
@@ -55,15 +57,15 @@ class RotatingCredentials:
 
     def _code_for_slice(self, session_id: int, slice_no: int) -> str:
         digest = self._mac(b"code", f"{session_id}|{slice_no}".encode())
-        return f"{int.from_bytes(digest[:8], 'big') % 1000:03d}"
+        return f"{int.from_bytes(digest[:8], 'big') % 10000:04d}"
 
     def current_code(self, session_id: int) -> str:
-        """The 3-digit code (zero-padded) of the current 5 s slice."""
+        """The 4-digit code (zero-padded, e.g. 0042) of the current 5 s slice."""
         return self._code_for_slice(session_id, int(self._clock.now()) // self.CODE_PERIOD_S)
 
     def is_valid_code(self, session_id: int, code: str) -> bool:
         """True for the current or the immediately previous slice's code (P1); never raises."""
-        if not isinstance(code, str) or len(code) != 3 or not (code.isascii() and code.isdigit()):
+        if not isinstance(code, str) or len(code) != self.CODE_DIGITS or not (code.isascii() and code.isdigit()):
             return False
         slice_no = int(self._clock.now()) // self.CODE_PERIOD_S
         return any(

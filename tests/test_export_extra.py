@@ -9,12 +9,10 @@ from datetime import datetime, timezone
 import pytest
 from openpyxl import load_workbook
 
-from app.repositories.checkins import NetworkOrigin
 from tests.test_export import URLS, check_in, lecturer, read_csv, run_session, services  # noqa: F401
 
-CH_HEADER = ["session date", "nickname", "check-in time", "network"]
-SU_HEADER = ["session date", "check-ins (N)", "faces detected (D)", "consistency status",
-             "off campus", "via Apple relay"]
+CH_HEADER = ["session date", "nickname", "check-in time"]
+SU_HEADER = ["session date", "check-ins (N)", "faces detected (D)", "consistency status"]
 XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 
@@ -51,8 +49,7 @@ def test_summary_rows_equal_service_summary(app, services, lecturer, three):
         s = svc.summary(session.id)
         d = s.session.head_count
         assert row[0] == datetime.fromtimestamp(session.opened_at, tz=timezone.utc).strftime("%Y-%m-%d %H:%M")
-        assert row[1:] == [str(s.n), "" if d is None else str(d), s.consistency or "",
-                          str(s.origin_counts[NetworkOrigin.OFF_CAMPUS]), str(s.origin_counts[NetworkOrigin.APPLE_RELAY])]
+        assert row[1:] == [str(s.n), "" if d is None else str(d), s.consistency or ""]
     assert rows[2][2:4] == ["", ""]  # session without photo
     assert rows[1][2] == "2" and rows[3][2] == "40"
 
@@ -65,7 +62,7 @@ def test_checkin_rows_equal_live_api(app, services, lecturer, three):
         for c in lecturer.get(f"/api/sessions/{session.id}/attendance").get_json()["check_ins"]:
             when = datetime.fromtimestamp(c["checked_in_at"], tz=timezone.utc).strftime("%H:%M:%S")
             expected.append([datetime.fromtimestamp(session.opened_at, tz=timezone.utc).strftime("%Y-%m-%d %H:%M"),
-                             c["nickname"], when, "campus"])
+                             c["nickname"], when])
     assert len(rows) == 6 and rows == expected
 
 
@@ -76,12 +73,9 @@ def test_headers_exact_and_no_ip_token_device(app, services, lecturer, three):
         rows = read_csv(lecturer.get(url))
         assert rows[0] == header
         assert not any(f in h.lower() for h in rows[0] for f in forbidden)
-        assert "192.0.2" not in lecturer.get(url).get_data(as_text=True)
     wb = load_workbook(io.BytesIO(lecturer.get(URLS[2]).get_data()))
     for name, header in (("Check-ins", CH_HEADER), ("Summary", SU_HEADER)):
         assert [c.value for c in wb[name][1]] == header
-        for row in wb[name].iter_rows(values_only=True):
-            assert all("192.0.2" not in str(v) for v in row)
 
 
 @pytest.mark.parametrize("nickname", ["=1+1", "+1", "-1", "@a", "\tx", "\rx"])
@@ -125,7 +119,7 @@ def test_exporter_direct_special_characters(app, services):
     for i, n in enumerate(names):
         exporter._check_ins._db.conn().execute(
             "INSERT INTO device(device_token, nickname, created_at) VALUES (?, ?, ?)", (f"t{i}", n, 0.0))
-        exporter._check_ins.add(sess.id, f"t{i}", n, 1_700_000_000.0 + i, NetworkOrigin.CAMPUS)
+        exporter._check_ins.add(sess.id, f"t{i}", n, 1_700_000_000.0 + i)
     rows = list(csv.reader(io.StringIO(exporter.checkins_csv().decode("utf-8-sig"))))
     assert [r[1] for r in rows[1:]] == names
     wb = load_workbook(io.BytesIO(exporter.xlsx()))

@@ -47,13 +47,13 @@ def test_none_code_rejected_without_crash(creds):
         pytest.fail("is_valid_code(None) raised TypeError (spec: never raises)")
 
 
-def test_code_always_three_zero_padded_digits(creds, clock):
-    """Covers D30: 3 chars, zero-padded, over many slices."""
+def test_code_always_four_zero_padded_digits(creds, clock):
+    """Covers D30: 4 chars, zero-padded, over many slices."""
     seen_leading_zero = False
     for i in range(3000):
         clock.set(T0 + 5 * i)
         code = creds.current_code(7)
-        assert len(code) == 3 and code.isascii() and code.isdigit()
+        assert len(code) == 4 and code.isascii() and code.isdigit()
         seen_leading_zero |= code.startswith("0")
         assert creds.is_valid_code(7, code)
     assert seen_leading_zero

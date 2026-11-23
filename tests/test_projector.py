@@ -38,7 +38,7 @@ def test_open_session_gives_decodable_qr_and_code(logged):
     data = logged.get("/api/projector").get_json()
     assert data["open"] is True
     assert decode_qr(data["qr"]).startswith("https://test.example/c/")
-    assert re.fullmatch(r"\d{3}", data["code"])
+    assert re.fullmatch(r"\d{4}", data["code"])
 
 
 def test_qr_changes_after_10s_and_code_after_5s(logged, clock):
@@ -57,7 +57,7 @@ def test_qr_changes_after_10s_and_code_after_5s(logged, clock):
 def test_code_changes_across_5s_slices(logged, clock, app):
     logged.post("/lecturer/sessions")
     codes = set()
-    for _ in range(40):  # 3 digits: one pair may collide by chance, 40 slices cannot all be equal
+    for _ in range(40):  # 4 digits: one pair may collide by chance, 40 slices cannot all be equal
         codes.add(logged.get("/api/projector").get_json()["code"])
         clock.advance(5)
     assert len(codes) > 1

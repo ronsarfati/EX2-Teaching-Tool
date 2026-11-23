@@ -7,13 +7,12 @@ import numpy as np
 import pytest
 from openpyxl import load_workbook
 
-from app.repositories.checkins import NetworkOrigin
 from app.adapters.head_counter import MAX_PIXELS, YuNetHeadCounter
 from app.errors import UnreadablePhotoError
 from app.services.export import _safe
 from app.services.homework import _redact
 from app.services.text import strip_invisible
-from tests.test_export import CAMPUS, check_in, lecturer, run_session, services  # noqa: F401  (fixtures)
+from tests.test_export import check_in, lecturer, run_session, services  # noqa: F401  (fixtures)
 
 EMPTY_NICKNAME = "Please choose a nickname (not your real name or ID)."
 
@@ -37,9 +36,8 @@ def test_invisible_only_nickname_refused(app, services, nickname):
     services["session_service"].open_session()
     phone = app.test_client()
     state = services["session_service"].projector_state()
-    kw = {"environ_base": {"REMOTE_ADDR": CAMPUS}}
-    phone.get(state.check_in_url.split("test.example")[1], **kw)
-    response = phone.post("/checkin", data={"nickname": nickname, "code": state.code}, **kw)
+    phone.get(state.check_in_url.split("test.example")[1])
+    response = phone.post("/checkin", data={"nickname": nickname, "code": state.code})
     assert EMPTY_NICKNAME in response.get_data(as_text=True)
 
 
@@ -56,7 +54,7 @@ def test_xlsx_survives_legacy_row_with_control_char(app, services, lecturer):  #
     session = services["session_service"].open_session()
     services["db"].conn().execute(
         "INSERT INTO device(device_token, nickname, created_at) VALUES (?, ?, ?)", ("legacy-token", "a\x01b", 0.0))
-    services["check_ins"].add(session.id, "legacy-token", "a\x01b", 1.0, NetworkOrigin.CAMPUS)
+    services["check_ins"].add(session.id, "legacy-token", "a\x01b", 1.0)
     response = lecturer.get("/lecturer/export.xlsx")
     assert response.status_code == 200
     sheet = load_workbook(io.BytesIO(response.get_data()))["Check-ins"]
@@ -146,7 +144,7 @@ def test_device_cookie_samesite_lax(app, services):  # noqa: F811
     services["session_service"].open_session()
     state = services["session_service"].projector_state()
     phone = app.test_client()
-    response = phone.get(state.check_in_url.split("test.example")[1], environ_base={"REMOTE_ADDR": CAMPUS})
+    response = phone.get(state.check_in_url.split("test.example")[1])
     cookie = [c for c in response.headers.get_all("Set-Cookie") if c.startswith("dt=")]
     assert cookie and "SameSite=Lax" in cookie[0]
 

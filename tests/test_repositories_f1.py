@@ -3,7 +3,6 @@ import sqlite3
 
 import pytest
 
-from app.repositories.checkins import NetworkOrigin
 from app.db import Database
 from app.repositories.checkins import CheckInRepository
 from app.repositories.sessions import SessionRepository
@@ -84,8 +83,8 @@ def test_check_in_add_list_count(sessions, check_ins):
     check_ins.save_nickname("a", "Fox", 1.0)
     check_ins.save_nickname("b", "Owl", 1.0)
     assert not check_ins.has_checked_in(s.id, "a")
-    added = check_ins.add(s.id, "a", "Fox", 10.0, NetworkOrigin.CAMPUS)
-    check_ins.add(s.id, "b", "Owl", 20.0, NetworkOrigin.CAMPUS)
+    added = check_ins.add(s.id, "a", "Fox", 10.0)
+    check_ins.add(s.id, "b", "Owl", 20.0)
     assert (added.session_id, added.nickname, added.checked_in_at) == (s.id, "Fox", 10.0)
     assert check_ins.has_checked_in(s.id, "a") and not check_ins.has_checked_in(s.id, "zzz")
     assert [c.nickname for c in check_ins.list_for_session(s.id)] == ["Fox", "Owl"]
@@ -95,9 +94,9 @@ def test_check_in_add_list_count(sessions, check_ins):
 def test_duplicate_check_in_violates_unique(sessions, check_ins):
     s = sessions.create(100.0)
     check_ins.save_nickname("a", "Fox", 1.0)
-    check_ins.add(s.id, "a", "Fox", 10.0, NetworkOrigin.CAMPUS)
+    check_ins.add(s.id, "a", "Fox", 10.0)
     with pytest.raises(sqlite3.IntegrityError):
-        check_ins.add(s.id, "a", "Fox", 11.0, NetworkOrigin.CAMPUS)
+        check_ins.add(s.id, "a", "Fox", 11.0)
 
 
 def test_window_open_find_and_attempts(sessions, windows):
@@ -128,18 +127,18 @@ def test_window_delete_and_unknown_token(sessions, windows):
 
 
 def test_settings_round_trip_and_isolation(settings):
-    settings.replace_values("campus_range", ["10.0.0.0/8", "192.0.2.0/24"])
+    settings.replace_values("other_kind", ["x", "y"])
     settings.replace_values("peer_repo", ["https://github.com/a/b"])
-    assert settings.list_values("campus_range") == ["10.0.0.0/8", "192.0.2.0/24"]
-    settings.replace_values("campus_range", [])
-    assert settings.list_values("campus_range") == []
+    assert settings.list_values("other_kind") == ["x", "y"]
+    settings.replace_values("other_kind", [])
+    assert settings.list_values("other_kind") == []
     assert settings.list_values("peer_repo") == ["https://github.com/a/b"]
 
 
 def test_settings_replace_overwrites_and_drops_duplicates(settings):
-    settings.replace_values("campus_range", ["a", "b"])
-    settings.replace_values("campus_range", ["c", "c"])
-    assert settings.list_values("campus_range") == ["c"]
+    settings.replace_values("peer_repo", ["a", "b"])
+    settings.replace_values("peer_repo", ["c", "c"])
+    assert settings.list_values("peer_repo") == ["c"]
 
 
 def test_create_app_wires_repositories(app):

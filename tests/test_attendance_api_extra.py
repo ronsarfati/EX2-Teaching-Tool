@@ -7,15 +7,12 @@ from pathlib import Path
 
 import pytest
 
-CAMPUS = "192.0.2.10"
-KW = {"environ_base": {"REMOTE_ADDR": CAMPUS}}
 JS = Path(__file__).resolve().parent.parent / "app" / "static" / "poll_json.js"
 
 
 @pytest.fixture
 def svc(app):
     s = app.extensions["services"]
-    s["settings"].replace_values("campus_range", ["192.0.2.0/24"])
     return s["session_service"]
 
 
@@ -28,8 +25,8 @@ def lecturer(client):
 def attempt(app, phone, nickname, code=None):
     """One phone (persistent cookie jar) scans then submits; returns the POST response."""
     state = app.extensions["services"]["session_service"].projector_state()
-    phone.get(state.check_in_url.split("test.example")[1], **KW)
-    return phone.post("/checkin", data={"nickname": nickname, "code": code or state.code}, **KW)
+    phone.get(state.check_in_url.split("test.example")[1])
+    return phone.post("/checkin", data={"nickname": nickname, "code": code or state.code})
 
 
 def get(lecturer, sid):
@@ -50,10 +47,10 @@ def test_failed_attempts_never_counted(app, svc, lecturer):
     """Covers FR-1.14: wrong code, then no window at all, leave N at 0."""
     s = svc.open_session()
     phone = app.test_client()
-    attempt(app, phone, "Fox", code="zzz")
-    phone.post("/checkin", data={"nickname": "Fox", "code": "000"}, **KW)
+    attempt(app, phone, "Fox", code="zzzz")
+    phone.post("/checkin", data={"nickname": "Fox", "code": "0000"})
     other = app.test_client()  # never scanned: no window
-    other.post("/checkin", data={"nickname": "Owl", "code": svc.projector_state().code}, **KW)
+    other.post("/checkin", data={"nickname": "Owl", "code": svc.projector_state().code})
     assert get(lecturer, s.id).get_json()["n"] == 0
 
 
@@ -84,10 +81,10 @@ def test_json_keys_exact_and_no_leak(app, svc, lecturer):
     s = svc.open_session()
     attempt(app, app.test_client(), "Fox")
     data = get(lecturer, s.id).get_json()
-    assert set(data) == {"open", "n", "head_count", "consistency", "off_campus_n", "apple_relay_n", "check_ins"}
-    assert set(data["check_ins"][0]) == {"nickname", "checked_in_at", "network_origin"}
+    assert set(data) == {"open", "n", "head_count", "consistency", "check_ins"}
+    assert set(data["check_ins"][0]) == {"nickname", "checked_in_at"}
     body = get(lecturer, s.id).get_data(as_text=True)
-    for forbidden in (CAMPUS, "device", "attempt", "window", "code"):
+    for forbidden in ("device", "attempt", "window", "code"):
         assert forbidden not in body
 
 

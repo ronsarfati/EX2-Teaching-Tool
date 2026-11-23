@@ -1,13 +1,10 @@
 """Live attendance JSON (T10): rows, N, privacy, auth, unknown id."""
 import pytest
 
-CAMPUS = "192.0.2.10"
-
 
 @pytest.fixture
 def session(app):
     s = app.extensions["services"]
-    s["settings"].replace_values("campus_range", ["192.0.2.0/24"])
     return s["session_service"].open_session()
 
 
@@ -19,10 +16,9 @@ def lecturer(client):
 
 def check_in(app, nickname, code=None):
     phone = app.test_client()
-    kw = {"environ_base": {"REMOTE_ADDR": CAMPUS}}
     s = app.extensions["services"]["session_service"].projector_state()
-    phone.get(s.check_in_url.split("test.example")[1], **kw)
-    return phone.post("/checkin", data={"nickname": nickname, "code": code or s.code}, **kw)
+    phone.get(s.check_in_url.split("test.example")[1])
+    return phone.post("/checkin", data={"nickname": nickname, "code": code or s.code})
 
 
 def test_check_in_listed_with_n_plus_one(app, session, lecturer):
@@ -35,14 +31,14 @@ def test_check_in_listed_with_n_plus_one(app, session, lecturer):
 
 
 def test_wrong_code_does_not_change_n(app, session, lecturer):
-    check_in(app, "Fox", code="abc")
+    check_in(app, "Fox", code="abcd")
     assert lecturer.get(f"/api/sessions/{session.id}/attendance").get_json()["n"] == 0
 
 
 def test_json_has_no_token_or_ip(app, session, lecturer):
     check_in(app, "Fox")
     body = lecturer.get(f"/api/sessions/{session.id}/attendance").get_data(as_text=True)
-    assert CAMPUS not in body and "token" not in body and "ip" not in body.replace("nickname", "")
+    assert "token" not in body and "ip" not in body.replace("nickname", "")
 
 
 def test_requires_pin(client, session):
@@ -57,4 +53,4 @@ def test_unknown_session_is_clean_404(lecturer):
 
 def test_dashboard_embeds_poll_script(app, session, lecturer):
     html = lecturer.get("/lecturer").get_data(as_text=True)
-    assert "poll_json.js" in html and "/lecturer/allow-list" in html
+    assert "poll_json.js" in html and "/lecturer/allow-list" not in html

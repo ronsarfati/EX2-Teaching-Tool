@@ -47,11 +47,6 @@ class LLMUnavailableError(AppError):
         super().__init__()
 
 
-class OffCampusError(CheckInError):
-    user_message = "Check-in is not available right now. Ask the lecturer."
-    http_status = 403
-
-
 class QrExpiredError(CheckInError):
     user_message = "This QR code has expired. Scan a fresh one."
     http_status = 400
@@ -100,11 +95,6 @@ class EmptyNicknameError(CheckInError):
 class SessionAlreadyOpenError(AppError):
     user_message = "A session is already open. Close it first."
     http_status = 409
-
-
-class InvalidNetworkRangeError(AppError):
-    user_message = "This is not a valid network range (e.g. 192.0.2.0/24)."
-    http_status = 400
 
 
 class UnreadablePhotoError(PhotoError):

@@ -8,7 +8,6 @@ from werkzeug.exceptions import HTTPException
 
 from app.adapters.head_counter import HeadCounter, YuNetHeadCounter
 from app.adapters.llm import ClaudeClient, LLMClient
-from app.adapters.relay_ranges import load_relay_ranges
 from app.adapters.repo_fetcher import GitHubRepoFetcher, RepoFetcher
 from app.clock import Clock, SystemClock
 from app.config import Config
@@ -25,7 +24,6 @@ from app.services.checkin import CheckInService
 from app.services.export import AttendanceExporter
 from app.services.homework import HomeworkReviewer
 from app.services.credentials import RotatingCredentials
-from app.services.network import NetworkPolicy
 from app.services.polls import PollService
 from app.services.sessions import SessionService
 from app.web.api_routes import bp as api_bp
@@ -57,7 +55,6 @@ def create_app(config: Config, *, clock: Clock | None = None,
     check_ins = CheckInRepository(db)
     windows = CheckInWindowRepository(db)
     settings = SettingsRepository(db)
-    network = NetworkPolicy(settings, load_relay_ranges(config.relay_ranges_path))  # one shared instance
     app.extensions["services"] = {
         "config": config,
         "clock": clock,
@@ -67,7 +64,7 @@ def create_app(config: Config, *, clock: Clock | None = None,
             sessions, clock, credentials, config.base_url, check_ins, head_counter
         ),
         "checkin_service": CheckInService(
-            network, credentials, sessions, check_ins, windows, db, clock
+            credentials, sessions, check_ins, windows, db, clock
         ),
         "comment_service": CommentService(CommentRepository(db), clock),
         "poll_service": PollService(PollRepository(db), clock),
@@ -77,7 +74,6 @@ def create_app(config: Config, *, clock: Clock | None = None,
         "check_ins": check_ins,
         "windows": windows,
         "settings": settings,
-        "network": network,
         **fakes,
     }
 

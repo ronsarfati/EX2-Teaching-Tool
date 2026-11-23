@@ -1,11 +1,9 @@
-"""Per-request helpers: the anonymous device token (FR-1.7, D6, D31) and the client address (FR-1.2)."""
+"""Per-request helpers: the anonymous device token (FR-1.7, D6, D31)."""
 from __future__ import annotations
 
 import secrets
 
 from flask import Response, g, request
-
-from app.services.network import NetworkPolicy
 
 COOKIE_NAME = "dt"
 ONE_YEAR_SECONDS = 365 * 24 * 3600
@@ -34,9 +32,3 @@ def attach_device_cookie(response: Response) -> Response:
         )
     return response
 
-
-def client_ip() -> str:
-    """Campus-filter address: the socket peer, or CF-Connecting-IP when the peer is the local tunnel."""
-    return NetworkPolicy.resolve_client_ip(
-        request.remote_addr or "", request.headers.get("CF-Connecting-IP")
-    )

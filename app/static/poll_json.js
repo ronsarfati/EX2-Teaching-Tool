@@ -5,8 +5,6 @@ const rowsEl = document.getElementById("attendance-rows");
 const nEl = document.getElementById("n");
 const dEl = document.getElementById("d");
 const statusEl = document.getElementById("status");
-const offCampusEl = document.getElementById("off-campus-n");
-const relayEl = document.getElementById("apple-relay-n");
 const errorEl = document.getElementById("attendance-error");
 
 function cell(text) {
@@ -15,33 +13,13 @@ function cell(text) {
   return td;
 }
 
-// campus rows get no marker; Apple relay a discreet one; off campus a bold warning (D32).
-function originCell(origin) {
-  const td = document.createElement("td");
-  if (origin === "off_campus") {
-    const warning = document.createElement("strong");
-    warning.className = "origin-warning";
-    warning.style.color = "var(--pico-del-color, #c62828)";
-    warning.textContent = "off campus network";
-    td.append(warning);
-  } else if (origin === "apple_relay") {
-    const note = document.createElement("small");
-    note.textContent = "Apple relay";
-    td.append(note);
-  }
-  return td;
-}
-
 function show(data) {
   nEl.textContent = data.n;
-  offCampusEl.textContent = data.off_campus_n;
-  relayEl.textContent = data.apple_relay_n;
   dEl.textContent = data.head_count === null ? "—" : data.head_count; // "—" when no photo
   statusEl.textContent = data.consistency === null ? "—" : data.consistency;
   rowsEl.replaceChildren(...data.check_ins.map((c) => {
     const tr = document.createElement("tr");
-    tr.append(cell(c.nickname), cell(new Date(c.checked_in_at * 1000).toLocaleTimeString()),
-             originCell(c.network_origin));
+    tr.append(cell(c.nickname), cell(new Date(c.checked_in_at * 1000).toLocaleTimeString()));
     return tr;
   }));
 }

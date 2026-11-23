@@ -53,7 +53,6 @@ def test_fake_clock_moves_only_on_request():
 
 # (class name, group base name, status, SRS message)
 TABLE = [
-    ("OffCampusError", "CheckInError", 403, "Check-in is not available right now. Ask the lecturer."),
     ("QrExpiredError", "CheckInError", 400, "This QR code has expired. Scan a fresh one."),
     ("WindowExpiredError", "CheckInError", 400, "Your check-in time ran out. Scan the QR code again."),
     ("WrongCodeError", "CheckInError", 400, "Wrong code. Type the code shown under the QR now."),
@@ -64,7 +63,6 @@ TABLE = [
     ("NoOpenSessionError", "CheckInError", 404, "There is no attendance check-in right now."),
     ("EmptyNicknameError", "CheckInError", 400, "Please choose a nickname (not your real name or ID)."),
     ("SessionAlreadyOpenError", "AppError", 409, "A session is already open. Close it first."),
-    ("InvalidNetworkRangeError", "AppError", 400, "This is not a valid network range (e.g. 192.0.2.0/24)."),
     ("UnreadablePhotoError", "PhotoError", 400, "We could not read this photo. Please try another one."),
     ("DetectorUnavailableError", "PhotoError", 503, "Head count is not available right now."),
     ("EmptyCommentError", "CommentError", 400, "Please write something before sending."),
@@ -81,8 +79,8 @@ TABLE = [
 ]
 
 
-def test_table_has_25_errors():
-    assert len(TABLE) == 25
+def test_table_has_23_errors():
+    assert len(TABLE) == 23
 
 
 @pytest.mark.parametrize("name,base,status,message", TABLE)
@@ -106,7 +104,7 @@ def failing_app(app):
 
     @app.get("/api/boom-app")
     def api_boom_app():
-        raise errors.OffCampusError()
+        raise errors.QrExpiredError()
 
     @app.get("/boom")
     def boom():
@@ -123,8 +121,8 @@ def test_app_error_renders_message_and_status(failing_app):
 
 def test_app_error_under_api_is_json(failing_app):
     response = failing_app.test_client().get("/api/boom-app")
-    assert response.status_code == 403
-    assert response.get_json() == {"error": errors.OffCampusError.user_message}
+    assert response.status_code == 400
+    assert response.get_json() == {"error": errors.QrExpiredError.user_message}
 
 
 def test_unexpected_error_is_generic_and_logged(failing_app, caplog):
