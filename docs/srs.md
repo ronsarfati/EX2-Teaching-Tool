@@ -1,7 +1,7 @@
 # Software Requirements Specification (To Do 5)
 
 Covers R27. IEEE-830-inspired, kept short. Requirements are cited as R1-R37
-([requirements.md](requirements.md)), validated decisions as D1-D34 ([decisions.md](decisions.md); D5 and D26
+([requirements.md](requirements.md)), validated decisions as D1-D35 ([decisions.md](decisions.md); D5 and D26
 are superseded by D30; D31 records the design-level choices validated on 23/11; D32 is superseded by D33 (23/11),
 which removes every network / IP check and makes the projected code 4 digits; D34 (23/11) closes D10 and specifies
 F4 for real recordings of any length), measured figures as sections of the [tools report](tools_report.md). Scope and schedule: [sow.md](sow.md).
@@ -229,11 +229,11 @@ P: MUST-MAIN. Trace: R2, R16, D7, D21. AC: after an upload no image file exists 
 only the number; no edit-count route exists.
 
 **FR-1.18 Export (offline spreadsheet).** The lecturer shall download the attendance as CSV and as XLSX, one row
-per check-in with the columns session date, nickname, check-in time (no IP, no network column, D33); plus a
-per-session summary: check-ins (N), faces detected (D), consistency status. One export covers all sessions: XLSX with two sheets "Check-ins" and
+per check-in with the columns "Session date (Jerusalem time)", "Nickname", "Checked in at (Jerusalem time)" (no IP, no network column, D33); plus a
+per-session summary: session date, check-ins (N), faces detected (D), consistency status. Session dates and times are written in Israel local time (Asia/Jerusalem, DST applied), and the date and time headers name the zone ("Jerusalem time", D35); the database and the JSON API stay in UTC. One export covers all sessions: XLSX with two sheets "Check-ins" and
 "Summary"; CSV as two files `checkins.csv` and `summary.csv` (D31, OI-6). The app has no other check-in route: a student whose camera cannot
 scan the QR is added by the lecturer after class in the exported spreadsheet.
-P: MUST-MAIN. Trace: R3, D6, D8, D21, D30 (P3), D33, tools report 2.8. AC: the files open in a spreadsheet tool and
+P: MUST-MAIN. Trace: R3, D6, D8, D21, D30 (P3), D33, D35, tools report 2.8. AC: the files open in a spreadsheet tool and
 their rows equal the live table; the XLSX has the two sheets; the summary values equal those on the lecturer page; no route creates a check-in
 without a valid QR scan and code.
 
@@ -284,7 +284,7 @@ P: MUST. Trace: R6, D9. AC: a vote after closing is rejected; the final counts a
 ### 3.4 F4 Video summary (D34; D10 closed)
 
 F4 summarises the lecturer's **real class recordings of any length** (D34), not only a demo clip. Because a
-90-minute lecture takes about 6-15 minutes to transcribe on the demo laptop (NFR-13), the work runs as a background
+90-minute lecture takes roughly 15-20 minutes to transcribe with `small` on the demo laptop (extrapolation, NFR-13), the work runs as a background
 job whose status the lecturer follows on a page.
 
 **FR-4.1 Upload.** On the PIN-protected page "Video summary" (FR-6.1), the lecturer shall upload one recorded class
@@ -424,7 +424,8 @@ P: MUST. Trace: R13, D13, D30. AC: see FR-1.5.
 | NFR-10 | Error messages | User-facing errors are short, plain English and actionable; they never show database IDs, tokens, stack traces, file paths or exception names; details go to the server log only. | D23 | One test per row of section 5 |
 | NFR-11 | Portability | Student pages work on iOS Safari and Android Chrome (responsive, mobile-first) and open from the native camera QR link. | R14, D2, D30 | Manual tests 1-2 and 9 (tools report section 3) |
 | NFR-12 | Maintainability / testability | pytest + Flask test client; injectable clock for the 10 s / 15 s / 5 s / 1 min rules; `LLMClient`, `Transcriber`, `AudioExtractor` and the F4 job runner replaceable by fakes; `HeadCounter` behind an interface with configurable threshold; consistency rule a pure function; SQL isolated in repository classes. | R11, R32, D3, D7, D12, D25, D30, D34 | Test suite runs offline with no key, no ffmpeg and no Whisper model |
-| NFR-13 | Performance (F4 processing time) | No fixed time is promised. Measured real-time factors of faster-whisper on the demo laptop (Apple M3, CPU, int8): **0.06 with `base`, 0.17 with `small`** (tools report 2.6), i.e. about 6 / 15 minutes of transcription for a 90-minute lecture and about 15 / 40 s for a 4-minute clip, plus audio extraction and the LLM call(s). The first use adds a one-time model download (~460 MB). The status page shows progress so a long job is visibly alive. | R7, D34 | End-to-end timing of the 4-minute demo clip and, if available, of a full recording (task T18f), reported in the tools report and `docs/results.md` |
+| NFR-13 | Performance (F4 processing time) | No fixed time is promised. Measured real-time factors of faster-whisper on the demo laptop (Apple M3, CPU, int8): **0.06 with `base`, 0.17 with `small`** (tools report 2.6), (real-time factor about 0.17-0.22 for `small` in the T18f run). Measured in T18f: a 244 s Hebrew clip took about 70 s in total (extraction 2 s, transcription about 54 s, summary 14 s) on a MacBook M3. Extrapolation, not measured: a 90-minute lecture takes roughly 15-20 minutes with `small`, plus the LLM call(s). The first use adds a one-time model download (~460 MB). The status page shows progress so a long job is visibly alive. | R7, D34 | End-to-end timing of the 4-minute demo clip and, if available, of a full recording (task T18f), reported in the tools report and `docs/results.md` |
+| NFR-14 | Time display | Every user-visible time (export, lecturer and projector pages, F4 summary date) is shown in Israel local time (`Asia/Jerusalem`, daylight saving applied); storage stays UTC; the export header names the zone ("Jerusalem time"). | R3, R14, D35 | Conversion tests for a winter and a summer instant; export header test; stored values stay UTC |
 
 ## 5. Error handling
 

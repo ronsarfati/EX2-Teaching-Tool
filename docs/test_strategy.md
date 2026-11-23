@@ -2,7 +2,7 @@
 
 Covers R32 ("a testing strategy that addresses the classes of To Do 7"). Built from the [design](design.md)
 (classes of section 3, exceptions of 3.8, tasks T1-T21 of section 7 (T18 = T18a-T18f)), the [SRS](srs.md) (FR-x.y, NFR-n, error table
-of section 5), the [use cases](use_cases.md) (UC-1 to UC-14), the validated decisions D1-D34
+of section 5), the [use cases](use_cases.md) (UC-1 to UC-14), the validated decisions D1-D35
 ([decisions.md](decisions.md); D25 = test tooling, D7 = consistency rule, D30 / D31 = check-in rules, D33 = no network filter, 4-digit code, D34 = F4 video summary) and the
 [tools report](tools_report.md). Class, port, method and exception names are exactly those of `design.md`.
 
@@ -104,6 +104,11 @@ Each subsection gives: responsibility, test type, doubles, key cases (input -> e
 - **Key cases:** with all fakes -> `app.extensions["services"]` holds every service; `app.debug is False` (NFR-8);
   `GET /ping` -> 200; starts with no Anthropic key (NFR-9). **Trace:** D2, D25; T1.
 
+#### `load_env_file` (`tests/test_env_file.py`)
+- **Key cases:** temporary `.env` files and plain dicts only: `KEY=value` lines loaded; comments and blank lines
+  skipped; a variable already present in the environment wins; a missing file is ignored. **Trace:** NFR-8, D12,
+  README "Run".
+
 ### 2.2 F1 check-in (T2-T4, T7)
 
 #### `RotatingCredentials`
@@ -156,6 +161,10 @@ Each subsection gives: responsibility, test type, doubles, key cases (input -> e
   (`WindowExpiredError`, window already deleted) and still one record (`UNIQUE` also tested in 2.3).
 - **Transaction:** if `add` fails (simulated `IntegrityError`), no nickname, record or attempt change remains.
 - **Trace:** FR-1.6-FR-1.12, UC-2, D6, D30 (P1, P2), D31; T7, T20.
+
+#### Remaining D30 rules after T20 / T21 (`tests/test_t21_d30_rules.py`)
+- **Key cases (with `FakeClock`):** QR accepted up to 15 s old and refused after; check-in window of 60 s; nickname
+  1-30 characters; one check-in per device and session. **Trace:** FR-1.6-FR-1.14, D30, D33; T21.
 
 ### 2.3 F1 repositories (T2)
 
@@ -233,16 +242,18 @@ Type: unit on a temp DB (`db` fixture); doubles: none. All return frozen datacla
 #### `AttendanceExporter`
 - **Responsibility:** CSV and XLSX of all sessions. **Type:** unit. **Doubles:** real repositories with 2 sessions
   of fictitious check-ins (one with D, one without).
-- **Key cases:** `checkins_csv()` re-read with `csv`: header = session date, nickname, check-in time (3 columns,
-  in this order), one row per check-in, oldest first, rows equal `list_for_session`; `summary_csv()`: session date,
+- **Key cases:** `checkins_csv()` re-read with `csv`: header = `Session date (Jerusalem time)`, `Nickname`, `Checked in at (Jerusalem time)` (3 columns,
+  in this order), one row per check-in, oldest first, rows equal `list_for_session`; `summary_csv()`: `Session date (Jerusalem time)`,
   check-ins (N), faces detected (D), consistency status, the status equal to `ConsistencyResult.evaluate(N, D).label()`,
   D and status empty for the session without a photo; `xlsx()` re-read with `openpyxl`: sheets "Check-ins" and
   "Summary" with the same rows as the CSV files, header row frozen (`freeze_panes == "A2"`).
 - **Boundaries:** no session -> header rows only; a nickname with a comma or quote survives the CSV round trip.
-- **Export columns (T20, D33):** `checkins.csv` and sheet "Check-ins" have exactly session date, nickname, check-in
-  time; `summary.csv` and sheet "Summary" exactly session date, check-ins (N), faces detected (D), consistency status.
+- **Export columns (T20, D33):** `checkins.csv` and sheet "Check-ins" have exactly `Session date (Jerusalem time)`, `Nickname`, `Checked in at (Jerusalem time)`; `summary.csv` and sheet "Summary" exactly `Session date (Jerusalem time)`, check-ins (N), faces detected (D), consistency status.
 - **Privacy:** no header contains `ip` or `token`; no device token value appears in any cell (NFR-7).
-- **Trace:** FR-1.18, D8, D31 (OI-6), tools report 2.8; T12.
+- **Time zone (D35, `tests/test_timezone.py`):** a winter instant (UTC+2) and a summer instant (UTC+3) are written as Israel local time
+  (the date can change across midnight); the headers name the zone ("Jerusalem time"); the F4 "Generated on" line and the download file-name date are in Jerusalem time; the JSON API still returns UTC epochs; `to_local` / `format_local`
+  of `app/timezone.py` give the same result; the database values stay UTC epoch seconds.
+- **Trace:** FR-1.18, NFR-14, D8, D31 (OI-6), D35, tools report 2.8; T12.
 
 ### 2.5 F2 comments and F3 polls (T13, T14)
 
@@ -393,6 +404,8 @@ All automated cases are offline: `FakeAudioExtractor`, `FakeTranscriber`, `FakeL
 |---|---|---|
 | `device_token()` | first request -> cookie `dt` set, `HttpOnly`, `SameSite=Lax`, `Max-Age` of one year; second request with the cookie -> same value, no new cookie; two clients -> two different values | D6, D31 (OI-4) |
 | `lecturer_required` | every PIN route of design 2.1 (parametrised list) without the PIN -> redirect to `/lecturer/login`; with the PIN -> not redirected | FR-6.1 |
+
+`tests/test_huge_ids.py`: ids beyond the SQLite 64-bit range (10**30) on the attendance API, photo page and upload, and poll routes answer a clean 404/400, never a 500 (NFR-10, D23).
 
 ## 3. Integration tests per use case
 

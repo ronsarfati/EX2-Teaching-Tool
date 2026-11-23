@@ -5,7 +5,7 @@ filled in only after the demo; nothing below is estimated.
 
 ## 1. Setup
 
-- App: Python 3.13, Flask, SQLite, OpenCV YuNet (face count), Anthropic Claude (review); see the README.
+- App: Python 3.13, Flask, SQLite, OpenCV YuNet (face count), `ffmpeg` and faster-whisper (`small` model) for the F4 video summary, Anthropic Claude (review and summary); see the README.
 - Demo environment: laptop running the app; public HTTPS address from a Cloudflare quick tunnel (plan A) or phone hotspot
   (plan B); students on their own phones.
 - Demo data: fictional only (`scripts/seed_demo.py`); no personal data in the repository (D21).
@@ -57,7 +57,7 @@ Live class demo:
 
 ## 4. Observations
 
-- Design: all external services sit behind interfaces (`HeadCounter`, `LLMClient`, `RepoFetcher`, `Clock`), so the
+- Design: all external services sit behind interfaces (`HeadCounter`, `LLMClient`, `RepoFetcher`, `Clock`, `Transcriber`, `AudioExtractor`, `JobRunner`), so the
   whole suite runs offline and F1-F3 work without any key.
 - Field findings before the demo (23/11): a campus-IP filter and Apple's Private Relay list were tested on site and
   abandoned (D33, tools report 2.12); the check-in relies on the rotating QR and the 4-digit code instead.

@@ -2,7 +2,7 @@
 
 Covers R29 (main software components), R30 (low-level class diagrams) and R31 (sequence diagrams). Built from the
 [SRS](srs.md) (FR-x.y, NFR-n, error table of section 5), the [use cases](use_cases.md) (UC-1 to UC-14), the
-requirements R1-R37 ([requirements.md](requirements.md)), the validated decisions D1-D34
+requirements R1-R37 ([requirements.md](requirements.md)), the validated decisions D1-D35
 ([decisions.md](decisions.md); **D5 and D26 are superseded by D30 and not used**; D10 (F4 deferred) is closed by
 **D34** (23/11): F4 summarises real recordings of any length in a background job; D31 records
 the open points of section 9, all validated on 23/11; **D32 is superseded by D33** (23/11): the app reads no client
@@ -138,7 +138,7 @@ limit and 100 s request limit, D34 risks).
 
 No queue or scheduler exists: every rule with time (10 s, 15 s, 5 s, 1 min) is evaluated lazily at request time
 with the injected `Clock` (D25), and F5 runs inside the request (about 5-30 s, below the tunnel's 100 s limit).
-**The only background work is F4 (D34):** a 90-minute recording takes about 6-15 minutes to transcribe (tools report
+**The only background work is F4 (D34):** a 90-minute recording takes roughly 15-20 minutes to transcribe with `small` (extrapolated from the measured real-time factor, tools report
 2.6), far beyond any request, so `VideoSummaryService` hands one job to `ThreadJobRunner` (one daemon thread per job,
 at most one job active, enforced by the database). The job's status is persisted in SQLite, so any page load or
 poll reads it; nothing else is shared between the thread and the requests.
@@ -219,7 +219,7 @@ classes. (`NetworkPolicy`, the `NetworkOrigin` enum and the `relay_ranges` modul
 Entities and values (frozen `@dataclass`, no behaviour except validation helpers): `AttendanceSession`, `CheckIn`,
 `CheckInWindow`, `ProjectorState`, `SessionSummary`, `Comment`, `Poll`, `PollOption`, `RepoExtract`,
 `ReviewResult`, `SummaryJob`, `Transcript`; enum `JobStatus` (with its transition rule). Times are `float` epoch
-seconds from the `Clock`; formatting to local time happens only in templates and the exporter.
+seconds from the `Clock`; formatting to local time (Israel time, D35) happens only in templates and the exporter, through the helper `app/timezone.py` (`to_local`, `format_local`; storage stays UTC).
 
 ### 3.2 Core and shared
 
@@ -271,7 +271,7 @@ classDiagram
 
 | Class | Responsibility | Public interface | Collaborators | Invariants / errors |
 |---|---|---|---|---|
-| `Config` | Hold all settings read from env vars (`LECTURER_PIN`, `SECRET_KEY`, `BASE_URL`, `DATABASE_PATH`, `YUNET_MODEL_PATH`, `FACE_SCORE_THRESHOLD`, `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`, `WHISPER_MODEL`, `WHISPER_LANGUAGE`, `VIDEO_MAX_BYTES`, `VIDEO_WORK_DIR`; `RELAY_RANGES_PATH` removed by D33, and ignored if still present in an old `.env`) | `from_env(environ: Mapping[str, str]) -> Config` | none | PIN, secret key and base URL non-empty, else `ConfigError` at start-up (console only, never shown to users). No secret has a default value (NFR-8). D34: `WHISPER_MODEL` default `small` (was `base`); `WHISPER_LANGUAGE` empty -> `None` (auto-detect), else a lower-case code such as `he` or `en`; `VIDEO_MAX_BYTES` a positive integer (default 2 GiB = 2147483648), else `ConfigError`; `VIDEO_WORK_DIR` default `os.path.join(tempfile.gettempdir(), "ex2-video-summary")` (outside the repository; tests set it to `tmp_path`). |
+| `Config` | Hold all settings read from env vars (`LECTURER_PIN`, `SECRET_KEY`, `BASE_URL`, `DATABASE_PATH`, `YUNET_MODEL_PATH`, `FACE_SCORE_THRESHOLD`, `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`, `WHISPER_MODEL`, `WHISPER_LANGUAGE`, `VIDEO_MAX_BYTES`, `VIDEO_WORK_DIR`; `RELAY_RANGES_PATH` removed by D33, and ignored if still present in an old `.env`) | `from_env(environ: Mapping[str, str]) -> Config` | none | PIN, secret key and base URL non-empty, else `ConfigError` at start-up (console only, never shown to users). No secret has a default value (NFR-8). D34: `WHISPER_MODEL` default `small` (was `base`); `WHISPER_LANGUAGE` empty -> `None` (auto-detect), else a lower-case code such as `he` or `en`; `VIDEO_MAX_BYTES` a positive integer (default 2 GiB = 2147483648), else `ConfigError`; `VIDEO_WORK_DIR` default `os.path.join(tempfile.gettempdir(), "ex2-video-summary")` (outside the repository; tests set it to `tmp_path`). D35: the display zone is the constant `DISPLAY_TIMEZONE = "Asia/Jerusalem"` in `app/timezone.py` (not read from the environment) (helper described under 3.1); `tzdata` is a runtime dependency so the zone database exists on every platform. |
 | `Clock` (port) | Give the current time | `now() -> float` | - | Reason today: every D30 rule (10 s, 15 s, 5 s, 1 min) is tested with a `FakeClock` (D25). |
 | `SystemClock` | Real time | `now() -> float` (`time.time()`) | - | - |
 | `Database` | Open one SQLite connection per thread, create the schema, run transactions | `conn() -> sqlite3.Connection`, `transaction() -> ContextManager[sqlite3.Connection]` (`BEGIN IMMEDIATE`, commit or rollback), `init_schema() -> None` | stdlib `sqlite3` | Foreign keys ON, WAL mode, `busy_timeout` 5 s; `schema.sql` is idempotent (`CREATE ... IF NOT EXISTS`). `init_schema` only runs `schema.sql`: the D32 helper `_add_column_if_missing` is removed by D33 (no migration at all; see section 5 for databases created while D32 was in place). |
@@ -556,8 +556,8 @@ tests use a `FakeHeadCounter` (no model file, no OpenCV), and OpenCV is the heav
 `PollRepository.get` return `None` for any other id, exactly like an unknown id, so a huge id in a URL gives the
 normal 404 instead of an `OverflowError` (500).
 
-**`AttendanceExporter`** - offline spreadsheet (FR-1.18, D8). Columns of `checkins_csv()`: `session date`,
-`nickname`, `check-in time` (one row per check-in, all sessions, oldest first). `summary_csv()`: `session date`,
+**`AttendanceExporter`** - offline spreadsheet (FR-1.18, D8). Columns of `checkins_csv()`: `Session date (Jerusalem time)`,
+`Nickname`, `Checked in at (Jerusalem time)` (one row per check-in, all sessions, oldest first; D35: Israel time, the headers name the zone). `summary_csv()`: `Session date (Jerusalem time)`,
 `check-ins (N)`, `faces detected (D)`, `consistency status`. (The D32 `network`, `off campus` and `via Apple relay`
 columns are removed by D33.) `xlsx()`: the same two tables as two sheets "Check-ins" and "Summary"
 (`openpyxl`, frozen header row; code reused from `tools_tests/xlsx_roundtrip.py`). No IP and no device token column
@@ -1829,7 +1829,7 @@ database (e.g. the demo seed) simply has no such column.
 | State machine (enum with a transition rule) | `JobStatus.can_move_to`, enforced by `SummaryRepository.move` | Six visible states, polled by another page; an illegal jump (e.g. `done` -> `failed`) must be impossible | D34 |
 | Background job + polling (asynchronous request-reply) | `VideoSummaryService.submit` returns at once; `ThreadJobRunner`; `/api/video/jobs/<id>` | Transcription lasts minutes (RTF 0.17), longer than any request and the tunnel's 100 s | D4, D34, tools report 2.6 |
 | Map-reduce summarisation | `LectureSummariser` + `split_transcript` | A lecture of any length must fit the model's input and the call timeout | D34 |
-| Fail fast | `submit` checks extension, API key and the active job before copying 2 GB or transcribing 15 min | The lecturer learns at once what is wrong (D23) | D12, D34 |
+| Fail fast | `submit` checks extension, API key and the active job before copying 2 GB or transcribing 15-20 min | The lecturer learns at once what is wrong (D23) | D12, D34 |
 | Injected clock (Strategy for time) | `Clock` / `SystemClock` / `FakeClock` | The 10 s / 15 s / 5 s / 1 min rules are tested without sleeping | D25, D30 |
 | Application factory + constructor injection | `create_app(config, ...)` | One composition root; tests build an app with fakes | D25 |
 | Value object | `ConsistencyResult`, `ProjectorState`, dataclasses | Immutable results are easy to compare in tests | D7 |
@@ -1852,7 +1852,7 @@ database (e.g. the demo seed) simply has no such column.
 | Per-device, session-wide wrong-code limit (red-team F-02, D33 option (a)) | Not chosen by the student; the 4-digit code (option (b)) was preferred. |
 | Separate `HeadCountService`, `DeviceRepository`, `AllowListRepository` + `PeerRepoRepository` | Each would only forward calls; merged into `SessionService`, `CheckInRepository` and `SettingsRepository`. |
 | Background job queue (Celery / RQ + Redis) or a worker process for F4; any background work for F5 | F4 (D34): one job at a time needs one thread and a status row, not a broker to install and run live. F5 fits in a request (about 5-30 s). |
-| F4 inside the request (D10 candidate, short clip only) | Rejected by D34: a real recording takes 6-15 minutes to transcribe. |
+| F4 inside the request (D10 candidate, short clip only) | Rejected by D34: a real recording takes roughly 15-20 minutes to transcribe. |
 | Cloud speech-to-text API (D34) | The class audio would leave the laptop (R16) and need another account and key. |
 | Storing the transcript (to re-summarise later) | Not needed by any use case and closer to personal data (voices of the class turned into text); dropped after summarising (D34). |
 | Rendering the LLM's Markdown as HTML | Needs a library and a sanitiser for untrusted output; escaped text with `white-space: pre-wrap` is readable, and the `.md` download keeps the formatting. |
@@ -1865,7 +1865,7 @@ database (e.g. the demo seed) simply has no such column.
 
 ## 7. Implementation tasks (T1-T21)
 
-Status: **T1-T17 done** (`pytest` green); **T18 rewritten by D34 (23/11), split into T18a-T18f, to do**; **T19
+Status: **T1-T17 done** (`pytest` green); **T18 (T18a-T18f, D34) done** (23/11; T18f is the manual real run, recorded in the tools report and results); **T19
 done then removed by D33** (23/11); **T4 and T9 removed by D33**; **T20 and T21 done** (D33, commit 728381d).
 
 Order: F1 first and complete (R4, D1), then F3 > F2 > F5 > F4 (D1). Every task ends with `pytest` green and a
@@ -1927,8 +1927,8 @@ runnable skeleton.
    `apple_relay_n`, no IP field).
 9. *Live table.* `lecturer.html` has no "Network" column and no off-campus / relay counters; `poll_json.js` contains
    none of `off campus`, `Apple relay`, `origin`.
-10. *Export.* `checkins.csv` and the XLSX sheet "Check-ins" have exactly the header `session date, nickname,
-    check-in time`; `summary.csv` and the sheet "Summary" exactly `session date, check-ins (N), faces detected (D),
+10. *Export.* `checkins.csv` and the XLSX sheet "Check-ins" have exactly the header `Session date (Jerusalem time), Nickname,
+    Checked in at (Jerusalem time)`; `summary.csv` and the sheet "Summary" exactly `Session date (Jerusalem time), check-ins (N), faces detected (D),
     consistency status`; values equal the live table and summary (existing T12 assertions kept: no IP, no token).
 11. *Repository hygiene.* The relay line is removed from `.gitignore` and the local downloaded file is deleted (the
     student wants a minimal public repo); `git ls-files` lists no relay CSV and none of the deleted files.
@@ -2111,8 +2111,9 @@ Demo data (fictitious nicknames) and the demo script belong to Phase 6, not to t
 - **NFR-2 (visible within 5 s):** lecturer pages poll every 2.5 s; the projector polls every 1 s from `localhost`
   so the shown QR is at most about 11 s old, leaving about 4 s of the 15 s window for the phone (OI-8).
 - **NFR-13 (F4 processing time, D34):** measured real-time factors on the demo laptop (Apple M3, CPU int8,
-  `beam_size=1`, tools report 2.6): 0.06 (`base`), 0.17 (`small`), i.e. about 6 / 15 minutes of transcription for a
-  90-minute lecture and about 15 / 40 s for the 4-minute demo clip, plus a few seconds of ffmpeg extraction and
+  `beam_size=1`, tools report 2.6): 0.06 (`base`) and about 0.17-0.22 (`small`); T18f real run: a 244 s Hebrew clip
+  took about 70 s in total (extraction 2 s, transcription about 54 s, summary 14 s). Extrapolation, not measured: a
+  90-minute lecture takes roughly 15-20 minutes with `small`. Each job adds a few seconds of ffmpeg extraction and
   one LLM call (3.5 s measured in 2.7 for a short prompt; longer for a long transcript) or `n + 1` calls above 40,000
   characters. No hard limit is promised; the status page shows progress. The model is loaded once per process and
   reused (load 1-2 s when cached; the first use downloads ~460 MB). One job at a time bounds CPU and memory
@@ -2124,7 +2125,7 @@ Demo data (fictitious nicknames) and the demo script belong to Phase 6, not to t
 - **NFR-5 (capacity):** student pages do not poll except the poll page (one request every 3 s per phone, about 20
   requests/s for 60 phones), far below the tunnel limit of 200 in-flight requests; Flask runs with `threaded=True`.
 
-## 9. Open points (OI-1-OI-13 VALIDATED by Ron on 23/11, recorded as D31; OI-14-OI-21 of D34 to confirm, see the end of this section)
+## 9. Open points (OI-1-OI-13 validated by the student on 23/11, recorded as D31; OI-14-OI-21 of D34 to confirm, see the end of this section)
 
 | ID | Topic | Validated choice | Impact |
 |---|---|---|---|

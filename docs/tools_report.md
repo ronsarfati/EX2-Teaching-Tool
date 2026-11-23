@@ -297,23 +297,6 @@ Command: `python tools_tests/head_count.py <yunet.onnx> <yolo11n.pt|yolov8n.pt|n
   `WHISPER_MODEL`. The model (about 460 MB) is downloaded once at first use. Hebrew accuracy was judged on the
   summary of one clip, not measured as a WER. Fallback: openai-whisper.
 
-### 2.13 Audio extraction - ffmpeg (R7, R15, D34)
-
-| Candidate | Licence | Cost | Notes |
-|---|---|---|---|
-| **ffmpeg** (command line) | LGPL/GPL | free, local | Reads every format a lecturer records (MP4, MOV, MKV, WebM, M4A, MP3, ...); one external binary (`brew install ffmpeg`). |
-| PyAV (already a dependency of faster-whisper) | BSD | free | In-process, no binary; would need its own error handling per format. Not tested; kept as the fallback behind the same `AudioExtractor` port (design OI-21). |
-
-- **Command (as run by the app):** `ffmpeg` called with an argument list (no shell), video dropped, mono, 16 kHz WAV
-  output in a temporary file, with a timeout.
-- **Result:** ffmpeg 9.0.2 (Homebrew); on the 244 s Hebrew clip of 2.6 the extraction took about 2 s (T18f). A file
-  that ffmpeg cannot read, or that has no audio track, is refused with "We could not read this video file."; a missing
-  binary gives the "transcription service is unavailable" message (unit tests with a patched `subprocess.run`;
-  opt-in integration test `RUN_F4_INTEGRATION=1`).
-- **Limit:** the free Cloudflare plan limits a request body to about 100 MB (per its documentation, not measured by
-  us), so large recordings are uploaded on `localhost`, not through the tunnel (2.9).
-- **Verdict:** ADOPT.
-
 ### 2.7 LLM - Anthropic Claude via the Python SDK (R7-R11, D11, D12)
 
 | Candidate | Licence / cost | Notes |
@@ -393,6 +376,23 @@ Command: `python tools_tests/head_count.py <yunet.onnx> <yolo11n.pt|yolov8n.pt|n
   part of the non-campus traffic, not proved presence.
 - **Outcome:** abandoned with the network part (D33): added complexity and a script for no reliable gain. Remaining
   anti-cheat measures and the residual risk are in D33.
+
+### 2.13 Audio extraction - ffmpeg (R7, R15, D34)
+
+| Candidate | Licence | Cost | Notes |
+|---|---|---|---|
+| **ffmpeg** (command line) | LGPL/GPL | free, local | Reads every format a lecturer records (MP4, MOV, MKV, WebM, M4A, MP3, ...); one external binary (`brew install ffmpeg`). |
+| PyAV (already a dependency of faster-whisper) | BSD | free | In-process, no binary; would need its own error handling per format. Not tested; kept as the fallback behind the same `AudioExtractor` port (design OI-21). |
+
+- **Command (as run by the app):** `ffmpeg` called with an argument list (no shell), video dropped, mono, 16 kHz WAV
+  output in a temporary file, with a timeout.
+- **Result:** ffmpeg 9.0.2 (Homebrew); on the 244 s Hebrew clip of 2.6 the extraction took about 2 s (T18f). A file
+  that ffmpeg cannot read, or that has no audio track, is refused with "We could not read this video file."; a missing
+  binary gives the "transcription service is unavailable" message (unit tests with a patched `subprocess.run`;
+  opt-in integration test `RUN_F4_INTEGRATION=1`).
+- **Limit:** the free Cloudflare plan limits a request body to about 100 MB (per its documentation, not measured by
+  us), so large recordings are uploaded on `localhost`, not through the tunnel (2.9).
+- **Verdict:** ADOPT.
 
 ## 3. Manual tests still to do by the student
 

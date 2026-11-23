@@ -117,6 +117,8 @@ In `.env` set:
 
 `python -m app` loads `.env` with a small standard-library loader; variables already set in the environment win.
 
+Times (D35): every shown time (export, lecturer and projector pages, F4 "Generated on" line) is Israel time (`Asia/Jerusalem`, daylight saving applied); the database and the JSON API stay UTC. This is a constant in `app/timezone.py`, not a setting; `tzdata` is in `requirements.txt`.
+
 Optional face model: for the photo head count, download the YuNet model `face_detection_yunet_2023mar.onnx` from
 the official OpenCV `opencv_zoo` repository and place it in `models/` (or set `YUNET_MODEL_PATH`). The model file
 is not bundled with this repository.
@@ -147,9 +149,9 @@ Optional demo data (fictional nicknames only, no network, no API key; existing f
 | To Do | Deliverable | Location | Status |
 |---|---|---|---|
 | — | Requirements R1-R37 | [docs/requirements.md](docs/requirements.md) | Done |
-| — | Validated decisions D1-D34 | [docs/decisions.md](docs/decisions.md) | Done |
+| — | Validated decisions D1-D35 | [docs/decisions.md](docs/decisions.md) | Done |
 | 1 | Repository, problem and scope | this README | Done |
-| 2 | Repository link submitted via the course form | (by the student) | Planned |
+| 2 | Repository link submitted via the course form | (by the student) | Done |
 | 3 | Tools report, every tool tested for real | [docs/tools_report.md](docs/tools_report.md) | Done |
 | 4 | Statement of Work | [docs/sow.md](docs/sow.md) | Done |
 | 5 | Software Requirements Specification | [docs/srs.md](docs/srs.md) | Done |
@@ -157,9 +159,9 @@ Optional demo data (fictional nicknames only, no network, no API key; existing f
 | 7 | Main software components | [docs/design.md](docs/design.md) (sections 1-2) | Done |
 | 8 | Class and sequence diagrams | [docs/design.md](docs/design.md) (sections 3-5) | Done |
 | 9 | Test strategy (per class) | [docs/test_strategy.md](docs/test_strategy.md) | Done |
-| 10 | Demo KISS web application | [app/](app/), [tests/](tests/) | In progress |
-| 11 | Live demo in class | demo script (with plan B) | Planned |
-| 12 | Short description of the results | [docs/results.md](docs/results.md) | Planned |
+| 10 | Demo KISS web application | [app/](app/), [tests/](tests/) | Done (all five features implemented) |
+| 11 | Live demo in class | [docs/demo_script.md](docs/demo_script.md) (with plan B) | Planned |
+| 12 | Short description of the results | [docs/results.md](docs/results.md) | Draft (real class figures to be added after the demo) |
 
 ## 5. Privacy
 

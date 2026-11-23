@@ -2,7 +2,7 @@
 
 Covers R28 ("Define the main use cases (client stories)"). Built from the [SRS](srs.md) (FR-x.y, NFR-n, error
 messages of section 5), the requirements R1-R37 ([requirements.md](requirements.md)) and the validated decisions
-D1-D34 ([decisions.md](decisions.md); D31 = design-level choices validated on 23/11). The attendance check-in follows **D30**; D5 and D26 are superseded and not
+D1-D35 ([decisions.md](decisions.md); D31 = design-level choices validated on 23/11). The attendance check-in follows **D30**; D5 and D26 are superseded and not
 used here. F1 Attendance is the main feature (R4) and comes first.
 
 ## 1. Actors
@@ -249,7 +249,7 @@ attendance during class and keep the records afterwards.
   2. New check-ins (UC-2) appear within 5 s without reload (NFR-2).
   3. The lecturer downloads the attendance of all sessions as XLSX (sheets "Check-ins" and "Summary") or as CSV
      (`checkins.csv` and `summary.csv`) (FR-1.18, D31).
-  4. The export contains one row per check-in (session date, nickname, check-in time) and a per-session
+  4. The export contains one row per check-in (session date, nickname, check-in time; dates and times in Jerusalem time, named in the headers, D35) and a per-session
      summary: check-ins (N), faces detected (D, from UC-4), consistency status.
   5. The lecturer opens the file in a spreadsheet tool.
 - **Alternative flows:**
