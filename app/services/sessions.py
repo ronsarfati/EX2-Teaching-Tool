@@ -6,7 +6,8 @@ from dataclasses import dataclass
 from typing import Optional
 
 from app.clock import Clock
-from app.errors import SessionAlreadyOpenError
+from app.errors import SessionAlreadyOpenError, NoOpenSessionError
+from app.repositories.checkins import CheckIn, CheckInRepository
 from app.repositories.sessions import AttendanceSession, SessionRepository
 from app.services.credentials import RotatingCredentials
 
@@ -19,11 +20,27 @@ class ProjectorState:
     code: str
 
 
+@dataclass(frozen=True)
+class SessionSummary:
+    """Everything the live table shows: the check-ins and N. `consistency` stays None until a photo is counted (T11)."""
+
+    session: AttendanceSession
+    check_ins: list[CheckIn]
+    n: int
+    consistency: Optional[str] = None  # "consistent" / "anomaly" once T11 evaluates it
+
+
 class SessionService:
     def __init__(
-        self, sessions: SessionRepository, clock: Clock, credentials: RotatingCredentials, base_url: str
+        self,
+        sessions: SessionRepository,
+        clock: Clock,
+        credentials: RotatingCredentials,
+        base_url: str,
+        check_ins: CheckInRepository,
     ) -> None:
         self._sessions = sessions
+        self._check_ins = check_ins
         self._clock = clock
         self._credentials = credentials
         self._base_url = base_url
@@ -57,3 +74,11 @@ class SessionService:
             check_in_url=f"{self._base_url}/c/{token}",
             code=self._credentials.current_code(open_session.id),
         )
+
+    def summary(self, session_id: int) -> SessionSummary:
+        """Check-ins and N of a session (FR-1.14); raises NoOpenSessionError (404) for an id that does not exist; no new error class, the SRS table is closed."""
+        session = self._sessions.get(session_id)
+        if session is None:
+            raise NoOpenSessionError()
+        rows = self._check_ins.list_for_session(session_id)
+        return SessionSummary(session=session, check_ins=rows, n=len(rows))

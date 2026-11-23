@@ -47,7 +47,7 @@ def create_app(config: Config, *, clock: Clock | None = None, **fakes: object) -
         "db": db,
         "sessions": sessions,
         "session_service": SessionService(
-            sessions, clock, credentials, config.base_url
+            sessions, clock, credentials, config.base_url, check_ins
         ),
         "checkin_service": CheckInService(
             NetworkPolicy(settings), credentials, sessions, check_ins, windows, db, clock
