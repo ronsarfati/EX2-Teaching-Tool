@@ -1,16 +1,43 @@
 {% extends "base.html" %}
 {% block title %}Projector{% endblock %}
+{# Forced light theme and sizes in vh/vw: maximum contrast and legible from the back row. No URL and no script here. #}
+{% block html_attrs %} data-theme="light"{% endblock %}
+{% block nav %}
+<div class="pj-links">
+  <a href="/lecturer">Dashboard</a>
+  <a href="#" id="fullscreen">Full screen</a>
+</div>
+{% endblock %}
 {% block content %}
 <style>
-  .projector { text-align: center; }
-  .projector img { width: min(70vh, 90vw); height: auto; image-rendering: pixelated; }
-  .projector #code { font-size: 22vh; font-weight: bold; letter-spacing: 0.1em; line-height: 1; margin: 0; }
-  .projector #waiting { font-size: 5vh; }
+  .projector { display: grid; grid-template-columns: auto 1fr; gap: 4vw; align-items: center; color: #111; }
+  .projector .pj-qr { background: #fff; padding: 2vh; border-radius: 14px; }
+  .projector img { display: block; width: min(80vh, 46vw); height: auto; image-rendering: pixelated; }
+  .projector ol { margin: 0; padding: 0; list-style: none; font-size: 4vh; }
+  .projector li { margin: 2vh 0; }
+  .projector #code { font: 700 min(24vh, 13vw)/1 ui-monospace, Menlo, Consolas, monospace; letter-spacing: .1em;
+    font-variant-numeric: tabular-nums; margin: 1vh 0; color: #111; }
+  .projector #waiting { grid-column: 1 / -1; text-align: center; font-size: 6vh; color: #111; }
+  .projector .pj-hint { grid-column: 1 / -1; text-align: center; color: #555; }
+  .projector #projector-error { grid-column: 1 / -1; text-align: center; font-size: 3vh; }
+  .pj-links { display: flex; gap: 1.5rem; margin-left: auto; font-size: .9rem; }
+  @media (max-width: 899px), (orientation: portrait) {
+    .projector { grid-template-columns: 1fr; justify-items: center; text-align: center; }
+    .projector img { width: min(70vh, 90vw); }
+  }
 </style>
 <div class="projector" data-api-holder>
   <p id="waiting">No session is open.</p>
-  <img id="qr" alt="Check-in QR code" hidden>
-  <p id="code" hidden></p>
+  <p class="pj-hint" id="waiting-hint">Open a session on the dashboard.</p>
+  <div class="pj-qr" id="qr-box" hidden><img id="qr" alt="Check-in QR code" hidden></div>
+  <ol id="steps" hidden>
+    <li>1. Scan the QR with your phone camera</li>
+    <li>2. Type this code
+      <p id="code" hidden></p>
+    </li>
+    <li>3. Tap Confirm</li>
+  </ol>
+  <p id="projector-error" role="alert" hidden>Connection problem, retrying...</p>
 </div>
 <script>document.body.dataset.api = "{{ url_for('api.projector') }}";</script>
 <script src="{{ url_for('static', filename='projector.js') }}"></script>

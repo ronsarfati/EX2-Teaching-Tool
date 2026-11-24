@@ -1,35 +1,81 @@
 {% extends "lecturer_base.html" %}
+{% from "_icons.html" import icon %}
 {% block title %}Lecturer{% endblock %}
 {% block content %}
-<h1>Lecturer</h1>
+{# Session bar first: the state of the session and its one primary action. #}
+<section class="cp-sessionbar" aria-label="Session">
 {% if current %}
-<p>A session is open.</p>
-<form method="post" action="{{ url_for('lecturer.close_session') }}">
-  <button type="submit">Close session</button>
-</form>
+  <span class="cp-chip" data-state="live">Live</span>
+  <p>A session is open.</p>
+  <div class="cp-actions">
+    <a role="button" class="secondary" href="{{ url_for('lecturer.projector') }}" target="projector">{{ icon("qr") }} Projector</a>
+    <form method="post" action="{{ url_for('lecturer.close_session') }}"
+          onsubmit="return confirm('Close the session? Students can no longer check in.')">
+      <button type="submit" class="cp-danger">Close session</button>
+    </form>
+  </div>
 {% else %}
-<p>No session is open.</p>
-<form method="post" action="{{ url_for('lecturer.open_session') }}">
-  <button type="submit">Open session</button>
-</form>
+  <span class="cp-chip" data-state="closed">Closed</span>
+  <p>No session is open.</p>
+  <div class="cp-actions">
+    <small>Starts the check-in and shows the QR on the projector.</small>
+    <form method="post" action="{{ url_for('lecturer.open_session') }}">
+      <button type="submit">Open session</button>
+    </form>
+  </div>
 {% endif %}
+</section>
+
+<h2 class="cp-section">In class now</h2>
+<div class="cp-cols">
+  <article>
+    <h3>{{ icon("users") }} Attendance</h3>
 {% if current %}
-<h2>Attendance</h2>
-<p><strong id="n">0</strong> checked in | Faces in photo (D): <strong id="d">&mdash;</strong> | Status: <strong id="status">&mdash;</strong></p>
-<p><a href="{{ url_for('lecturer.photo', session_id=current.id) }}">Count heads on a class photo</a></p>
-<p id="attendance-error" hidden>Connection problem, retrying...</p>
-<table>
-  <thead><tr><th>Nickname</th><th>Checked in at</th></tr></thead>
-  <tbody id="attendance-rows"></tbody>
-</table>
-<script>document.body.dataset.api = "{{ url_for('api.attendance', session_id=current.id) }}";</script>
-<script src="{{ url_for('static', filename='poll_json.js') }}"></script>
+    <div class="cp-stats">
+      <div class="cp-stat"><strong id="n">0</strong><span>checked in</span></div>
+      <div class="cp-stat"><strong id="d">&mdash;</strong><span>faces in photo</span></div>
+      <div class="cp-stat"><span class="cp-chip" id="status" data-state="none">&mdash;</span><span>status</span></div>
+    </div>
+    <a role="button" class="secondary" href="{{ url_for('lecturer.photo', session_id=current.id) }}">{{ icon("camera") }} Count heads on a class photo</a>
+    <p id="attendance-error" class="cp-banner" data-kind="warning" hidden>Connection problem, retrying...</p>
+    <div class="cp-scroll">
+      <table>
+        <thead><tr><th>Nickname</th><th>Checked in at</th></tr></thead>
+        <tbody id="attendance-rows"></tbody>
+      </table>
+    </div>
+    <script>document.body.dataset.api = "{{ url_for('api.attendance', session_id=current.id) }}";</script>
+    <script src="{{ url_for('static', filename='poll_json.js') }}"></script>
+{% else %}
+    <p class="cp-muted">Open a session to start the check-in.</p>
 {% endif %}
-<h2>Export</h2>
-<p><a href="{{ url_for('lecturer.export_xlsx') }}">Download XLSX (all sessions)</a> |
-<a href="{{ url_for('lecturer.export_checkins_csv') }}">checkins.csv</a> |
-<a href="{{ url_for('lecturer.export_summary_csv') }}">summary.csv</a></p>
-<p><a href="{{ url_for('lecturer.polls') }}">Polls</a> | <a href="{{ url_for('lecturer.comments') }}">Comments</a></p>
-<p><a href="{{ url_for('lecturer.peers') }}">Comparison repositories (homework review)</a></p>
-<p><a href="{{ url_for('lecturer.video') }}">Video summary</a></p>
+  </article>
+  <article>
+    <h3>{{ icon("message") }} Live feedback</h3>
+    <a class="cp-row" href="{{ url_for('lecturer.polls') }}"><strong>Polls</strong><small>Ask a question, see votes live</small></a>
+    <a class="cp-row" href="{{ url_for('lecturer.comments') }}"><strong>Comments</strong><small>Anonymous suggestions, live</small></a>
+  </article>
+</div>
+
+<h2 class="cp-section">After class</h2>
+<div class="cp-cols3">
+  <article>
+    <h3>{{ icon("download") }} Export</h3>
+    <a role="button" href="{{ url_for('lecturer.export_xlsx') }}">Download XLSX (all sessions)</a>
+    <p><a href="{{ url_for('lecturer.export_checkins_csv') }}">checkins.csv</a> &middot;
+       <a href="{{ url_for('lecturer.export_summary_csv') }}">summary.csv</a></p>
+    <small class="cp-muted">Times in Jerusalem time</small>
+  </article>
+  <article>
+    <h3>{{ icon("film") }} Video summary</h3>
+    <p>Upload a recording, get a summary (.md / .txt).</p>
+    <a role="button" class="secondary" href="{{ url_for('lecturer.video') }}">Video summary</a>
+  </article>
+  <article>
+    <h3>{{ icon("git-branch") }} Homework review</h3>
+    <p>Students paste a public repository link.</p>
+    <a role="button" class="secondary" href="/review">Homework review</a>
+    <p><a href="{{ url_for('lecturer.peers') }}">Comparison repositories</a></p>
+  </article>
+</div>
 {% endblock %}

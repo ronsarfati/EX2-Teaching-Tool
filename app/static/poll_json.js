@@ -10,13 +10,27 @@ const errorEl = document.getElementById("attendance-error");
 function cell(text) {
   const td = document.createElement("td");
   td.textContent = text;
+  td.dir = "auto"; // Hebrew and English nicknames each align correctly
   return td;
+}
+
+function emptyRow() {
+  const tr = document.createElement("tr");
+  const td = cell("Nobody has checked in yet. Show the projector and ask students to scan.");
+  td.colSpan = 2;
+  tr.append(td);
+  return tr;
 }
 
 function show(data) {
   nEl.textContent = data.n;
   dEl.textContent = data.head_count === null ? "—" : data.head_count; // "—" when no photo
   statusEl.textContent = data.consistency === null ? "—" : data.consistency;
+  statusEl.dataset.state = data.consistency === null ? "none" : data.consistency; // drives the chip colour in CSS
+  if (data.check_ins.length === 0) {
+    rowsEl.replaceChildren(emptyRow());
+    return;
+  }
   rowsEl.replaceChildren(...data.check_ins.map((c) => {
     const tr = document.createElement("tr");
     tr.append(cell(c.nickname), cell(new Date(c.checked_in_at * 1000).toLocaleTimeString("en-GB", { timeZone: "Asia/Jerusalem" })));
