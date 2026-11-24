@@ -8,6 +8,7 @@
 {% if not voted %}
 <form method="post" action="{{ url_for('student.vote') }}">
   <input type="hidden" name="poll_id" value="{{ poll.id }}">
+  <input type="hidden" name="dt_stored" value="">
   {% for option in poll.options %}
   <label><input type="radio" name="option_id" value="{{ option.id }}" required> {{ option.label }}</label>
   {% endfor %}
@@ -17,6 +18,7 @@
 {% else %}
 <p>No poll is open right now. This page checks again by itself.</p>
 {% endif %}
+<script src="{{ url_for('static', filename='device.js') }}" defer></script>
 <script>
 // Reload when the lecturer opens, replaces or closes a poll (short polling, D4).
 const shownId = {{ poll.id if poll else 'null' }};

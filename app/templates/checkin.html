@@ -3,6 +3,7 @@
 {% block content %}
 <h1>Check in</h1>
 <form method="post" action="/checkin">
+  <input type="hidden" name="dt_stored" value="">
   {% if needs_nickname %}
   <label>Nickname
     <input type="text" name="nickname" maxlength="30" required autocomplete="off">
@@ -14,4 +15,5 @@
   </label>
   <button type="submit">Confirm</button>
 </form>
+<script src="{{ url_for('static', filename='device.js') }}" defer></script>
 {% endblock %}

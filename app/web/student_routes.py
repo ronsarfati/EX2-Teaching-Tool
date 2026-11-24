@@ -1,11 +1,16 @@
 """Student pages without login: menu and attendance check-in (FR-1.7-FR-1.12, FR-6.2, UC-2, UC-3)."""
 from __future__ import annotations
 
-from flask import Blueprint, current_app, redirect, render_template, request, url_for
+from flask import Blueprint, current_app, g, jsonify, redirect, render_template, request, url_for
 
 from app.errors import InvalidPollError, NoOpenSessionError, QrRequiredError
 from app.services.homework import NO_PEER_SENTENCE
-from app.web.device import attach_device_cookie, device_token
+from app.web.device import (
+    attach_device_cookie,
+    cookie_differs_from_stored,
+    device_token,
+    signed_current_token,
+)
 
 bp = Blueprint("student", __name__)
 bp.after_app_request(attach_device_cookie)
@@ -23,6 +28,22 @@ def menu():
         text="To check in, scan the QR code on the projector.",
         links=[("/checkin", "Check in"), ("/poll", "Poll"), ("/comments", "Comments"), ("/review", "Homework review")],
     )
+
+
+@bp.post("/device/sync")
+def device_sync():
+    """Reconcile the cookie with the copies mirrored on the phone (D37).
+
+    The page script sends what it found in localStorage / IndexedDB. A valid copy wins over the
+    cookie (the cookie was probably deleted); `changed` tells the page to reload so that the
+    QR scan window is reopened under the real identity.
+    """
+    payload = request.get_json(silent=True) or {}
+    stored = payload.get("stored", [])
+    candidates = [v for v in stored if isinstance(v, str)] if isinstance(stored, list) else []
+    changed = cookie_differs_from_stored(candidates)
+    g.stored_hint = candidates
+    return jsonify(token=signed_current_token(), changed=changed)
 
 
 @bp.get("/c/<qr_token>")
