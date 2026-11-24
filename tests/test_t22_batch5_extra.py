@@ -116,3 +116,31 @@ def test_blocked_storage_full_cycle_returns_to_auto():
 def test_label_follows_state():
     seen = _run(initial={"theme": "dark"}, clicks=1)
     assert seen[1]["label"] == "Dark" and seen[2]["label"] == "Auto"
+
+
+def _relative_luminance(hex_color):
+    """WCAG 2 relative luminance of a #RRGGBB colour (sRGB linearised, then weighted)."""
+    channels = [int(hex_color[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+    linear = [c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4 for c in channels]
+    return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
+
+
+def _contrast_ratio(foreground, background):
+    """WCAG 2 contrast ratio (L_light + 0.05) / (L_dark + 0.05), between 1 and 21."""
+    lighter, darker = sorted((_relative_luminance(foreground), _relative_luminance(background)), reverse=True)
+    return (lighter + 0.05) / (darker + 0.05)
+
+
+def _palette_tokens(selector):
+    """Return the --cp-* tokens declared in the first CSS block opened by `selector` in app.css."""
+    css = (STATIC / "app.css").read_text(encoding="utf-8")
+    start = css.index(selector)
+    block = css[css.index("{", start) + 1:css.index("}", start)]
+    return dict(re.findall(r"(--cp-[\w-]+):\s*(#[0-9A-Fa-f]{6})", block))
+
+
+@pytest.mark.parametrize("selector", [":root:not([data-theme=dark])", "[data-theme=dark] {"])
+def test_success_text_on_success_background_meets_wcag_aa(selector):
+    """NFR-15 / D38: success text on its tinted background must reach 4.5:1 in light and dark palettes."""
+    tokens = _palette_tokens(selector)
+    assert _contrast_ratio(tokens["--cp-success"], tokens["--cp-success-bg"]) >= 4.5
