@@ -4,7 +4,7 @@
 the course assistant).
 
 Goal: show the main feature (F1 attendance) working with the real class on their own phones, then F3, F2 and F5,
-in 10 minutes. Items marked **(pending)** depend on a choice not yet made. F4 (video summary, D34) runs as a background job during the polls.
+in 10 minutes. Items marked **(pending)** still have to be done at rehearsal. F4 (video summary, D34) runs as a background job during the polls.
 
 Roles: **Presenter** = lecturer-side laptop (projected). **Classmates** = phones. **Helper** (optional) = takes the
 class photo and watches the clock.
@@ -38,7 +38,10 @@ Manual fallback, from the repository root (`python -m app` loads `.env` itself; 
 9. F4 (D34): install `ffmpeg` (`ffmpeg -version`) and run one real summary beforehand, so the Whisper `small` model
    (about 460 MB) is already in the cache (the first use downloads it). Keep a short lecture clip (about 4 minutes,
    local only, never committed) on the laptop, and keep the finished summary (`.md`) of that clip for plan B.
-10. Have the plan C material ready: the recorded rehearsal video and screenshots (**pending**: record at rehearsal).
+10. F5: the repository reviewed live is the presenter's own public Ex1 repository (own work, so no classmate's
+    submission is shown to the class); keep its URL ready in a note on the laptop. Before the class, check the
+    repository is still public and run one review at rehearsal (needs `ANTHROPIC_API_KEY`).
+11. Have the plan C material ready: the recorded rehearsal video and screenshots (**pending**: record at rehearsal).
 
 ## 2. Timeline
 
@@ -53,7 +56,7 @@ Manual fallback, from the repository root (`python -m app` loads `.env` itself; 
 | 5:30-6:00 | Presenter | Dashboard: **Download XLSX**; open it. | Sheets "Check-ins" and "Summary" (live session only) |
 | 6:00-7:30 | Presenter + classmates | **F4 start (about 20 s):** in a second tab open `http://localhost:<port>/lecturer/video` (**localhost, not the tunnel**: the free Cloudflare plan limits a request to about 100 MB per its documentation), upload the clip; the job runs in the background (about 70 s measured for a 244 s clip, T18f). Then **Polls**: create "Which topic next?" with 2-3 options; classmates open the menu page of the app, tap **Poll**, vote; watch the bars rise, then **Close**. | Live counts, closed poll; the video page shows the step (a **Cancel** button is available while the job is active, D36) |
 | 7:30-8:30 | Classmates + Presenter | Classmates open **Comments** and post a suggestion; Presenter opens `/lecturer/comments`; comments appear within a few seconds. | Newest comments first, no names |
-| 8:30-9:30 | Presenter | **F5 Homework review**: with a key, paste one public repository URL **(pending: which repository)** and show the review with anonymised "Submission B/C" comparison. Without a key, submit anyway and show the clear message "The review service is unavailable right now. Please try again later." | Review text and metrics, or the unavailable message |
+| 8:30-9:30 | Presenter | **F5 Homework review**: with a key, paste the URL of the presenter's own public Ex1 repository (own work, so no classmate's submission is shown to the class; URL kept ready in a note on the laptop, checklist step 10) and show the review with anonymised "Submission B/C" comparison. Without a key, submit anyway and show the clear message "The review service is unavailable right now. Please try again later." | Review text and metrics, or the unavailable message |
 | 9:30-10:00 | Presenter | Wrap-up: what was measured today (N, D, duration), open the finished **Video summary** page (four sections, `.md`/`.txt` download; no recording or transcript is kept, D34), known limits (section 4). | Dashboard |
 
 If time runs short, cut in this order: F5, comments, poll, F4 display. Never cut check-in, photo count or export.
