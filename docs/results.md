@@ -8,7 +8,8 @@ filled in only after the demo; nothing below is estimated.
 - App: Python 3.13, Flask, SQLite, OpenCV YuNet (face count), `ffmpeg` and faster-whisper (`small` model) for the F4 video summary, Anthropic Claude (review and summary); see the README.
 - Demo environment: laptop running the app; public HTTPS address from a Cloudflare quick tunnel (plan A) or phone hotspot
   (plan B); students on their own phones.
-- Demo data: fictional only (`scripts/seed_demo.py`); no personal data in the repository (D21).
+- Demo data: the live class starts from an empty database (no seed), so every figure comes from the live session;
+  `scripts/seed_demo.py` (fictional data) is used for rehearsals only. No personal data in the repository (D21).
 
 ## 2. What was built (state of the code)
 

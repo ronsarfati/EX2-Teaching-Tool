@@ -17,10 +17,12 @@ Manual fallback, from the repository root (`python -m app` loads `.env` itself; 
 
 1. Environment: copy `.env.example` to `.env`, set a long random `SECRET_KEY`, a `LECTURER_PIN`, and `BASE_URL`
    (the public tunnel URL, or `http://<laptop IP>:<port>` for the hotspot plan B). Optional: `ANTHROPIC_API_KEY` (F5 and F4).
-2. Demo data (optional, fictional only): `python scripts/seed_demo.py instance/app.db --force`
-   fills 3 past sessions, a closed poll, a few comments and fake peer URLs so the export looks populated.
-   **(pending)** Seeded or empty database for the live class: decide with the lecturer; with a seeded database the
-   figures to report are those of the last (live) session only.
+2. Database: **the live class starts from an empty database (no seed)**, so every row shown and exported comes from
+   the live session. After the phone rehearsals and before the class, start from a fresh database so no rehearsal
+   rows remain: stop the app, then move or delete the local database file at `DATABASE_PATH` (default
+   `instance/app.db`, with its `app.db-wal` and `app.db-shm` companions if present); it is recreated empty at the next
+   start. `python scripts/seed_demo.py instance/app.db --force` (3 past sessions, a closed poll, a few comments, fake
+   peer URLs, all fictional) stays available for rehearsals only.
 3. YuNet model present at `YUNET_MODEL_PATH` (default `models/face_detection_yunet_2023mar.onnx`); check:
    `ls models/`. Prepare a **class photo** on the laptop (taken in the room, shown only live, never committed).
 4. Start the app: `python -m app` (port 5000, or `PORT`; **on a Mac use `PORT=5050`**, AirPlay takes 5000, and set `BASE_URL`
@@ -31,8 +33,8 @@ Manual fallback, from the repository root (`python -m app` loads `.env` itself; 
 6. Lecturer login: open `/lecturer/login` and enter the PIN.
 7. Projector: on the laptop (logged in), open `/lecturer/projector` full-screen on the projector. Open a second browser tab on
    `/lecturer` (dashboard) for yourself. Leave **no session open** yet.
-8. Quick test with your own phone: scan, confirm, then check the row appears, then reset
-   (`--force` re-seed) or close the session. Do not leave test rows if the figures are to be reported.
+8. Quick test with your own phone: scan, confirm, then check the row appears, then reset to a fresh database
+   (step 2). Do not leave test rows: the figures to report are those of the live session.
 9. F4 (D34): install `ffmpeg` (`ffmpeg -version`) and run one real summary beforehand, so the Whisper `small` model
    (about 460 MB) is already in the cache (the first use downloads it). Keep a short lecture clip (about 4 minutes,
    local only, never committed) on the laptop, and keep the finished summary (`.md`) of that clip for plan B.
@@ -48,7 +50,7 @@ Manual fallback, from the repository root (`python -m app` loads `.env` itself; 
 | 1:15-3:45 | Presenter | Switch to the dashboard tab and watch N rise; note the time when N stops rising (this is the measured check-in duration, NFR-6). Count the refusals told by students (wrong code, expired QR). | Live table: nickname + time, N counter |
 | 3:45-5:00 | Helper + Presenter | Helper takes a photo of the room; Presenter uploads it in **Count heads on a class photo**. | "Checked in N / detected D / consistent or anomaly" |
 | 5:00-5:30 | Presenter | Say: the photo is counted then discarded, only D is kept (D7). If anomaly: say it is an alert, not an accusation. Click **Close session**. | Result page, then QR disappears |
-| 5:30-6:00 | Presenter | Dashboard: **Download XLSX**; open it. | Sheets "Check-ins" and "Summary" (past sessions if seeded) |
+| 5:30-6:00 | Presenter | Dashboard: **Download XLSX**; open it. | Sheets "Check-ins" and "Summary" (live session only) |
 | 6:00-7:30 | Presenter + classmates | **F4 start (about 20 s):** in a second tab open `http://localhost:<port>/lecturer/video` (**localhost, not the tunnel**: the free Cloudflare plan limits a request to about 100 MB per its documentation), upload the clip; the job runs in the background (about 70 s measured for a 244 s clip, T18f). Then **Polls**: create "Which topic next?" with 2-3 options; classmates open the menu page of the app, tap **Poll**, vote; watch the bars rise, then **Close**. | Live counts, closed poll; the video page shows the step (a **Cancel** button is available while the job is active, D36) |
 | 7:30-8:30 | Classmates + Presenter | Classmates open **Comments** and post a suggestion; Presenter opens `/lecturer/comments`; comments appear within a few seconds. | Newest comments first, no names |
 | 8:30-9:30 | Presenter | **F5 Homework review**: with a key, paste one public repository URL **(pending: which repository)** and show the review with anonymised "Submission B/C" comparison. Without a key, submit anyway and show the clear message "The review service is unavailable right now. Please try again later." | Review text and metrics, or the unavailable message |
