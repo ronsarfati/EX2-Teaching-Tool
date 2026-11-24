@@ -81,7 +81,7 @@ def test_oversize_upload_is_refused_for_this_route_only(config, clock):
     client, app = make_client(config, clock, cfg=small)
     login(client)
     response = post_video(client, data=b"x" * 1001)
-    assert response.status_code == 413 and "This file is too large. The maximum is" in response.get_data(as_text=True)
+    assert response.status_code == 413 and "This file is too large. The maximum is 1 MB." in response.get_data(as_text=True)
     assert app.extensions["services"]["video_service"].recent() == []
     assert post_video(client, data=b"x" * 500).status_code == 303
 

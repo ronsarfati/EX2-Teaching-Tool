@@ -129,7 +129,8 @@ internet. Upload large recordings on `http://localhost:<port>/lecturer/video`, *
 Cloudflare plan limits a request body to about 100 MB (per its documentation). Measured on a MacBook M3 (T18f,
 23/11/2026): a 244 s Hebrew lecture clip took about 70 s (audio 2 s, Whisper `small` about 54 s, Claude 14 s); at the
 measured real-time factor of 0.17-0.22 a 90-minute lecture takes roughly 15-20 minutes. Do not start a long
-recording during a check-in (shared CPU). Optional integration test: `RUN_F4_INTEGRATION=1 python -m pytest -q
+recording during a check-in (shared CPU). The upload needs about twice the file size in free disk space
+(Werkzeug spools it before the copy), and only one `python -m app` can run at a time (lock file `instance/app.lock`). Optional integration test: `RUN_F4_INTEGRATION=1 python -m pytest -q
 tests/test_t18b_integration.py` (needs `ffmpeg` and the cached model).
 
 First step for the lecturer: open the app and sign in with the PIN at `/lecturer/login`.

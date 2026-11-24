@@ -901,7 +901,7 @@ stateDiagram-v2
 | `Transcriber` (port) | Speech to text | `transcribe(audio_path: Path, on_progress: Optional[ProgressCallback] = None) -> Transcript` | - | Reason today: F4 tests run without model, download or CPU time (D25, D34 point 9). |
 | `FasterWhisperTranscriber` | Run faster-whisper on a WAV file | as the port; constructor `(model_size: str, language: Optional[str])` | `faster_whisper.WhisperModel` (lazy import) | Model loaded at the **first** `transcribe` (download from Hugging Face at the first real use only), under a lock, then reused; `WhisperModel(size, device="cpu", compute_type="int8")`, `transcribe(..., language=..., beam_size=1, vad_filter=True)` exactly as measured in tools report 2.6; segments joined with `"\n"`; `on_progress(min(1.0, segment.end / info.duration))`; load failure (import, download, unknown size, disk) -> `TranscriptionUnavailableError` (not cached: the next job retries); a PyAV decode error -> `UnreadableVideoError`. Only the exception class name is logged. |
 | `AudioExtractor` (port) | Media file to mono 16 kHz WAV | `extract(media_path: Path, wav_path: Path) -> None` | - | Reasons today: tests need no ffmpeg (D25); a PyAV-based extractor is the documented fallback if `ffmpeg` cannot be installed (same port). |
-| `FfmpegAudioExtractor` | Call the `ffmpeg` command | as the port | `subprocess.run` | Command: `[ffmpeg, -nostdin, -hide_banner, -loglevel, error, -y, -i, <media>, -map, 0:a:0, -vn, -ac, 1, -ar, 16000, -c:a, pcm_s16le, <wav>]`, `shell=False`, `stdin=DEVNULL`, `capture_output=True`, `timeout=1800`. The paths are the service's own `input<ext>` / `audio.wav` (the uploaded file name never reaches the command line). `FileNotFoundError` / `PermissionError` on the binary -> `TranscriptionUnavailableError`; non-zero exit (includes "no audio stream", thanks to `-map 0:a:0`), timeout, or a WAV of at most 44 bytes (header only) -> `UnreadableVideoError`; the last 500 characters of stderr go to the log. |
+| `FfmpegAudioExtractor` | Call the `ffmpeg` command | as the port | `subprocess.run` | Command: `[ffmpeg, -nostdin, -hide_banner, -loglevel, error, -y, -i, <media>, -map, 0:a:0, -vn, -ac, 1, -ar, 16000, -c:a, pcm_s16le, <wav>]`, `shell=False`, `stdin=DEVNULL`, `capture_output=True`, `timeout=1800`. The paths are the service's own `input<ext>` / `audio.wav` (the uploaded file name never reaches the command line). `FileNotFoundError` / `PermissionError` on the binary -> `TranscriptionUnavailableError`; timeout -> `VideoTooLongError`; non-zero exit (includes "no audio stream", thanks to `-map 0:a:0`), or a WAV of at most 44 bytes (header only) -> `UnreadableVideoError`; the last 500 characters of stderr go to the log. |
 | `JobRunner` (port) | Run a task outside the request | `submit(task: Callable[[], None]) -> None` | - | Reason today: tests run the job inline (deterministic) or deferred (to observe `queued` and a concurrent refusal) without threads. |
 | `ThreadJobRunner` | Start one daemon thread per task | `submit(task)` -> `threading.Thread(target=task, name="video-summary-job", daemon=True).start()` | stdlib `threading` | No pool, no queue: the "one active job" rule is enforced by `SummaryRepository`, not by the runner. A daemon thread dies with the process; `recover_interrupted` cleans up at the next start. The thread's SQLite connection comes from `Database` (one per thread) and is released when the thread ends. |
 
@@ -923,10 +923,11 @@ stateDiagram-v2
 **Rules of `_run`** (job thread; the whole body is in `try / except AppError / except Exception / finally`):
 
 1. `move(EXTRACTING)`; `extract(input<suffix>, audio.wav)`; then delete `input<suffix>` at once (the large file goes
-   first).
+   first). Then **re-read the job** (`_is_still_active`): if it is no longer active (e.g. failed by a second app
+   instance), stop quietly, no further stage, no LLM call (the `finally` still removes the work directory).
 2. `move(TRANSCRIBING)`; `transcribe(audio.wav, on_progress)`, where `on_progress` writes `set_progress` only when the
    fraction has grown by at least `PROGRESS_STEP` (at most about 100 writes per job); then delete the job directory
-   (the audio) **right after transcription**, before any LLM call.
+   (the audio) **right after transcription**, before any LLM call. Re-check the job again before step 3.
 3. Empty transcript (only whitespace, e.g. silence removed by VAD) -> `NoSpeechError`.
 4. `move(SUMMARISING)`; `summarise(transcript, language)`; `finish(job, text, transcript.language,
    transcript.duration_s, now)`.
@@ -1016,6 +1017,7 @@ classDiagram
   class VideoTooLargeError {
     +limit_bytes: int
   }
+  class VideoTooLongError
   class WrongPinError
   AppError <|-- CheckInError
   AppError <|-- SessionAlreadyOpenError
@@ -1028,6 +1030,7 @@ classDiagram
   AppError <|-- WrongPinError
   VideoError <|-- UnreadableVideoError
   VideoError <|-- UnsupportedVideoFormatError
+  VideoError <|-- VideoTooLongError
   VideoError <|-- VideoTooLargeError
   VideoError <|-- NoSpeechError
   VideoError <|-- TranscriptionUnavailableError
@@ -1077,9 +1080,10 @@ classDiagram
 | `RepoUnavailableError` | `GitHubRepoFetcher.fetch` | We could not download this repository. Is it public? | 400 |
 | `LLMUnavailableError` | `ClaudeClient.complete`, `HomeworkReviewer.review`, `VideoSummaryService.submit` (no key), `LectureSummariser.summarise` (empty answer) | The review service is unavailable right now. Please try again later. / The summary service is unavailable right now. Please try again later. (F4, `feature="summary"`) | 503 |
 | `UnsupportedVideoFormatError` | `VideoSummaryService.submit` (no file, or extension not allowed) | Please choose a video or audio recording (for example MP4, MOV, MKV, WebM or M4A). | 400 |
-| `VideoTooLargeError` | `POST /lecturer/video` (from werkzeug's `RequestEntityTooLarge`) | This file is too large. The maximum is 2 GB. (the figure is `VIDEO_MAX_BYTES` in GB, at most one decimal) | 413 |
+| `VideoTooLargeError` | `POST /lecturer/video` (from werkzeug's `RequestEntityTooLarge`) | This file is too large. The maximum is 2 GB. (the figure is `VIDEO_MAX_BYTES`: in MB below 1 GB, e.g. "100 MB", else in GB with at most one decimal) | 413 |
 | `SummaryJobRunningError` | `SummaryRepository.create` | A video is already being summarised. Please wait until it is finished. | 409 |
 | `UnreadableVideoError` | `FfmpegAudioExtractor.extract`, `FasterWhisperTranscriber.transcribe`, `VideoSummaryService.submit` (empty file) | We could not read this video file. | 400 |
+| `VideoTooLongError` | `FfmpegAudioExtractor.extract` (timeout) | This recording is too long to process. Please upload a shorter recording. | 400 |
 | `NoSpeechError` | `VideoSummaryService._run`, `LectureSummariser.summarise` | No speech was found in this recording. | 400 |
 | `TranscriptionUnavailableError` | `FasterWhisperTranscriber.transcribe` (model cannot be loaded / downloaded), `FfmpegAudioExtractor.extract` (ffmpeg missing) | The transcription service is unavailable right now. Please try again later. | 503 |
 | (stored message, not an exception) | `VideoSummaryService.recover_interrupted` | The summary was interrupted because the app was restarted. Please upload the video again. | - |
@@ -1993,7 +1997,7 @@ and `DeferredJobRunner` (keeps tasks; `run_all()`).
    `video_max_bytes == 2147483648`, `video_work_dir` outside the repository root; `VIDEO_MAX_BYTES` = `abc`, `0` or
    `-5` -> `ConfigError`.
 2. Each new exception carries exactly the message and HTTP status of 3.8; `VideoTooLargeError(2147483648)` says "2 GB",
-   `VideoTooLargeError(1610612736)` says "1.5 GB".
+   `VideoTooLargeError(1610612736)` says "1.5 GB", `VideoTooLargeError(1048576)` "1 MB", `VideoTooLargeError(104857600)` "100 MB".
 3. **Status transitions:** the full 6 x 6 table of `JobStatus.can_move_to` (allowed: queued -> extracting_audio ->
    transcribing -> summarising -> done, and every non-terminal state -> failed; everything else refused);
    `SummaryRepository.move` raises `ValueError` on an illegal move; `fail` on a `done` job leaves it `done`.
@@ -2007,7 +2011,7 @@ and `DeferredJobRunner` (keeps tasks; `run_all()`).
 *T18b - adapters*
 8. `FfmpegAudioExtractor` (`subprocess.run` monkeypatched): exact argument list of 3.7, `shell` not used, `timeout`
    given; the uploaded file's original name never appears in the arguments.
-9. Exit code 1 -> `UnreadableVideoError`; `TimeoutExpired` -> `UnreadableVideoError`; exit 0 but WAV missing or of 44
+9. Exit code 1 -> `UnreadableVideoError`; `TimeoutExpired` -> `VideoTooLongError`; exit 0 but WAV missing or of 44
    bytes -> `UnreadableVideoError`; `FileNotFoundError` (no ffmpeg) -> `TranscriptionUnavailableError`.
 10. `FasterWhisperTranscriber` with a fake `faster_whisper` module placed in `sys.modules`: the constructor loads
     nothing; the first `transcribe` builds `WhisperModel(size, device="cpu", compute_type="int8")` once, the second

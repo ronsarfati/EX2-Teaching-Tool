@@ -456,9 +456,10 @@ messages are removed with the network check (D33).
 | LLM key missing or API failure / timeout (F5) | "The review service is unavailable right now. Please try again later." |
 | LLM key missing (upload refused) or API failure / timeout / empty answer during an F4 job (FR-4.6, FR-4.9) | "The summary service is unavailable right now. Please try again later." |
 | F4: no file, or not an accepted video / audio extension (FR-4.1) | "Please choose a video or audio recording (for example MP4, MOV, MKV, WebM or M4A)." |
-| F4: file above `VIDEO_MAX_BYTES` (FR-4.1) | "This file is too large. The maximum is 2 GB." (the configured limit, in GB) |
+| F4: file above `VIDEO_MAX_BYTES` (FR-4.1) | "This file is too large. The maximum is 2 GB." (the configured limit: in MB below 1 GB, e.g. "100 MB", else in GB with at most one decimal) |
 | F4: a summary job is already running (FR-4.6) | "A video is already being summarised. Please wait until it is finished." |
 | F4: file empty, not decodable or without an audio track (FR-4.2) | "We could not read this video file." |
+| F4: ffmpeg does not finish within its time limit (very long recording) (FR-4.2) | "This recording is too long to process. Please upload a shorter recording." |
 | F4: no speech found in the recording (FR-4.3) | "No speech was found in this recording." |
 | F4: Whisper model cannot be loaded / downloaded, or `ffmpeg` missing (FR-4.3) | "The transcription service is unavailable right now. Please try again later." |
 | F4: the application stopped during a job (FR-4.7) | "The summary was interrupted because the app was restarted. Please upload the video again." |

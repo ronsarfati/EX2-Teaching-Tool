@@ -9,7 +9,7 @@ import pytest
 from app.adapters.audio import FfmpegAudioExtractor
 from app.adapters.jobs import ThreadJobRunner
 from app.adapters.transcriber import FasterWhisperTranscriber
-from app.errors import TranscriptionUnavailableError, UnreadableVideoError
+from app.errors import TranscriptionUnavailableError, UnreadableVideoError, VideoTooLongError
 
 
 def _run_stub(monkeypatch, *, returncode=0, write=100, raises=None):
@@ -39,7 +39,7 @@ def test_ffmpeg_command_is_an_argument_list(monkeypatch, tmp_path):
 @pytest.mark.parametrize("kwargs, error", [
     ({"returncode": 1}, UnreadableVideoError),
     ({"write": 44}, UnreadableVideoError),
-    ({"raises": subprocess.TimeoutExpired("ffmpeg", 1)}, UnreadableVideoError),
+    ({"raises": subprocess.TimeoutExpired("ffmpeg", 1)}, VideoTooLongError),
     ({"raises": FileNotFoundError()}, TranscriptionUnavailableError),
 ])
 def test_ffmpeg_failures(monkeypatch, tmp_path, kwargs, error):

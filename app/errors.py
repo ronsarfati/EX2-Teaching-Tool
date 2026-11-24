@@ -156,21 +156,34 @@ class UnreadableVideoError(VideoError):
     http_status = 400
 
 
+class VideoTooLongError(VideoError):
+    """ffmpeg did not finish within its time limit (a very long recording)."""
+
+    user_message = "This recording is too long to process. Please upload a shorter recording."
+    http_status = 400
+
+
 class UnsupportedVideoFormatError(VideoError):
     user_message = "Please choose a video or audio recording (for example MP4, MOV, MKV, WebM or M4A)."
     http_status = 400
 
 
+def _format_size(size_bytes: int) -> str:
+    """MB below 1 GB (never "0 GB" for a small limit), otherwise GB with at most one decimal."""
+    if size_bytes < 1024**3:
+        return f"{max(1, round(size_bytes / 1024**2))} MB"
+    gigabytes = round(size_bytes / 1024**3, 1)
+    return f"{gigabytes:.0f} GB" if gigabytes == int(gigabytes) else f"{gigabytes:.1f} GB"
+
+
 class VideoTooLargeError(VideoError):
-    """The upload is above `VIDEO_MAX_BYTES`; the message quotes the configured limit in GB."""
+    """The upload is above `VIDEO_MAX_BYTES`; the message quotes the limit in MB below 1 GB, else in GB."""
 
     http_status = 413
 
     def __init__(self, limit_bytes: int = 2 * 1024**3) -> None:
         self.limit_bytes = limit_bytes
-        gigabytes = round(limit_bytes / 1024**3, 1)
-        figure = f"{gigabytes:.0f}" if gigabytes == int(gigabytes) else f"{gigabytes:.1f}"
-        self.user_message = f"This file is too large. The maximum is {figure} GB."
+        self.user_message = f"This file is too large. The maximum is {_format_size(limit_bytes)}."
         super().__init__()
 
 

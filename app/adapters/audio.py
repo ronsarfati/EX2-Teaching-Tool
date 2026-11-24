@@ -6,7 +6,7 @@ import subprocess
 from pathlib import Path
 from typing import Protocol
 
-from app.errors import TranscriptionUnavailableError, UnreadableVideoError
+from app.errors import TranscriptionUnavailableError, UnreadableVideoError, VideoTooLongError
 
 _LOG = logging.getLogger(__name__)
 WAV_HEADER_BYTES = 44  # a WAV of this size or less holds no samples
@@ -26,7 +26,7 @@ class FfmpegAudioExtractor:
         self._timeout_s = timeout_s  # a stuck process must not block the single job slot forever
 
     def extract(self, media_path: Path, wav_path: Path) -> None:
-        """Write `wav_path`; raise UnreadableVideoError (bad file) or TranscriptionUnavailableError (no ffmpeg)."""
+        """Write `wav_path`; raise UnreadableVideoError (bad file), VideoTooLongError (timeout) or TranscriptionUnavailableError (no ffmpeg)."""
         command = [
             self._ffmpeg, "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
             "-i", str(media_path),
@@ -42,7 +42,7 @@ class FfmpegAudioExtractor:
             raise TranscriptionUnavailableError() from None
         except subprocess.TimeoutExpired:
             _LOG.warning("ffmpeg timed out")
-            raise UnreadableVideoError() from None
+            raise VideoTooLongError() from None
         if result.returncode != 0:
             # The tail of stderr names the codec problem; it holds no speech content.
             _LOG.warning("ffmpeg failed (exit %s): %s", result.returncode,

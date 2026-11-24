@@ -690,6 +690,16 @@ is only 5.7 s long. The `small` model (~460 MB) is downloaded once from Hugging 
 - **Personal data spoken in a recording** (e.g. a student's name said aloud) may reach the transcript and the LLM;
   the prompt asks the model not to name students; residual risk accepted.
 
+**Red team 24/11 (clear defects fixed, no product choice taken).** (a) `python -m app` takes an exclusive `flock` on
+`instance/app.lock` before `create_app`: a second instance exits with "The app is already running in another
+terminal." without touching the database (skipped where `fcntl` does not exist); (b) `_run` re-reads the job before
+the transcription and summary stages and stops quietly, without an LLM call, if it is no longer active; (c) each map
+note is neutralised like the transcript before it is wrapped in `<notes part="i">`; (d) the too-large message shows MB
+below 1 GB ("100 MB"), GB above; (e) an ffmpeg timeout gives the new `VideoTooLongError` ("This recording is too long
+to process. Please upload a shorter recording."). **Known limit (R-F4-6):** the upload needs about **twice the file
+size of free disk space**, because Werkzeug spools it to a temporary file before the copy into the job directory.
+Still open for the student: duration cap, cancel button, LLM retries, export date format.
+
 **Justification.** R7 (the lecturer's own recordings), R8 (structured summary beats the Zoom example), R15 (file
 upload, no Zoom/Meet API), R16 (media deleted, transcript not kept, no file name), R17/R18 (reuse ffmpeg,
 faster-whisper, Claude; one thread instead of a queue), D1 (live, no pre-computed output).

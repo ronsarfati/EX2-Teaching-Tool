@@ -109,9 +109,13 @@ class VideoSummaryService:
             wav_path = job_dir / "audio.wav"
             self._extractor.extract(media_path, wav_path)
             media_path.unlink(missing_ok=True)  # the large upload goes first
+            if not self._is_still_active(job_id):
+                return
             self._jobs.move(job_id, JobStatus.TRANSCRIBING, self._clock.now())
             transcript = self._transcriber.transcribe(wav_path, self._progress_writer(job_id))
             shutil.rmtree(job_dir, ignore_errors=True)  # the audio is not needed any more: delete before the LLM call
+            if not self._is_still_active(job_id):
+                return
             if not transcript.text.strip():
                 raise NoSpeechError()
             self._jobs.move(job_id, JobStatus.SUMMARISING, self._clock.now())
@@ -124,6 +128,14 @@ class VideoSummaryService:
             self._jobs.fail(job_id, GENERIC_MESSAGE, self._clock.now())
         finally:
             shutil.rmtree(job_dir, ignore_errors=True)
+
+    def _is_still_active(self, job_id: int) -> bool:
+        """False when the job was failed meanwhile (e.g. a second app instance recovered it): stop, no LLM call."""
+        job = self._jobs.get(job_id)
+        if job is None or job.is_finished():
+            _LOG.warning("Summary job %s is no longer active: stopping", job_id)
+            return False
+        return True
 
     def _progress_writer(self, job_id: int):
         """A callback storing the transcription progress each time it grew by PROGRESS_STEP."""

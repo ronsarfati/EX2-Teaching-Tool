@@ -106,7 +106,7 @@ def test_every_new_error_message_and_status():
     for error, message, status in table:
         assert (error.user_message, error.http_status) == (message, status), type(error)
         assert isinstance(error, e.AppError)
-    assert VideoTooLargeError(1000).user_message.startswith("This file is too large. The maximum is ")
+    assert VideoTooLargeError(1000).user_message== "This file is too large. The maximum is 1 MB."
 
 
 ORDER = [S.QUEUED, S.EXTRACTING, S.TRANSCRIBING, S.SUMMARISING, S.DONE, S.FAILED]
@@ -845,7 +845,7 @@ def test_oversize_boundaries_and_message(config, clock):
     login(c)
     r = post_video(c, data=b"x" * 1001)
     assert r.status_code == 413
-    assert "This file is too large. The maximum is" in r.get_data(as_text=True)
+    assert "This file is too large. The maximum is 1 MB." in r.get_data(as_text=True)
     assert app.extensions["services"]["video_service"].recent() == []
     assert work_entries(small) == []
     big = dataclasses.replace(config, video_max_bytes=int(1.5 * 1024**3))

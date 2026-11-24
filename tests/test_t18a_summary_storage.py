@@ -31,6 +31,8 @@ def test_bad_video_max_bytes_is_refused(value):
 
 def test_too_large_message_quotes_the_limit():
     assert VideoTooLargeError(2147483648).user_message == "This file is too large. The maximum is 2 GB."
+    assert VideoTooLargeError(1048576).user_message == "This file is too large. The maximum is 1 MB."
+    assert VideoTooLargeError(104857600).user_message == "This file is too large. The maximum is 100 MB."
     assert VideoTooLargeError(1610612736).user_message == "This file is too large. The maximum is 1.5 GB."
 
 

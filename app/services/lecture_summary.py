@@ -87,7 +87,7 @@ class LectureSummariser:
         for number, chunk in enumerate(chunks, start=1):
             prompt = f"{wanted}\n\nPart {number} of {len(chunks)}.\n<transcript>\n{chunk}\n</transcript>"
             notes.append(self._ask(SYSTEM_NOTES, prompt, self.MAP_MAX_TOKENS))
-        merged = "\n".join(f'<notes part="{number}">\n{note}\n</notes>' for number, note in enumerate(notes, start=1))
+        merged = "\n".join(f'<notes part="{number}">\n{_neutralise(note)}\n</notes>' for number, note in enumerate(notes, start=1))
         return self._ask(SYSTEM_SUMMARY, f"{wanted}\n\n{merged}", self.REDUCE_MAX_TOKENS)
 
     def _ask(self, system: str, prompt: str, max_tokens: int) -> str:
