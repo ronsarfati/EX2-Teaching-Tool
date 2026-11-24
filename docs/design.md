@@ -2,10 +2,10 @@
 
 Covers R29 (main software components), R30 (low-level class diagrams) and R31 (sequence diagrams). Built from the
 [SRS](srs.md) (FR-x.y, NFR-n, error table of section 5), the [use cases](use_cases.md) (UC-1 to UC-14), the
-requirements R1-R37 ([requirements.md](requirements.md)), the validated decisions D1-D39
+requirements R1-R37 ([requirements.md](requirements.md)), the validated decisions D1-D40
 ([decisions.md](decisions.md); **D5 and D26 are superseded by D30 and not used**; D10 (F4 deferred) is closed by
 **D34** (23/11): F4 summarises real recordings of any length in a background job; D31 records
-the open points of section 9, all validated on 23/11 (OI-4 amended by **D37**, 24/11: signed device token mirrored on the phone; **D38** (24/11): UI redesign and name HereOrNot, section 2.2; **D39**: one-click launcher, C11); **D32 is superseded by D33** (23/11): the app reads no client
+the open points of section 9, all validated on 23/11 (OI-4 amended by **D37**, 24/11: signed device token mirrored on the phone; **D38** (24/11): UI redesign and name HereOrNot, section 2.2; **D39**: one-click launcher, C11; **D40** (24/11): course TA answer, hosting of D13 kept, Vercel rejected); **D32 is superseded by D33** (23/11): the app reads no client
 IP at all, the network check of D30 point 1 is removed, and the projected code has 4 digits) and the
 libraries tested in the [tools report](tools_report.md). All diagrams are Mermaid (D14).
 

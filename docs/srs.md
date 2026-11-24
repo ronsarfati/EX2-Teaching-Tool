@@ -1,7 +1,7 @@
 # Software Requirements Specification (To Do 5)
 
 Covers R27. IEEE-830-inspired, kept short. Requirements are cited as R1-R37
-([requirements.md](requirements.md)), validated decisions as D1-D39 ([decisions.md](decisions.md); D5 and D26
+([requirements.md](requirements.md)), validated decisions as D1-D40 ([decisions.md](decisions.md); D5 and D26
 are superseded by D30; D31 records the design-level choices validated on 23/11; D32 is superseded by D33 (23/11), D37 (24/11) signs and mirrors the device token,
 which removes every network / IP check and makes the projected code 4 digits; D34 (23/11) closes D10 and specifies
 F4 for real recordings of any length), measured figures as sections of the [tools report](tools_report.md). Scope and schedule: [sow.md](sow.md).

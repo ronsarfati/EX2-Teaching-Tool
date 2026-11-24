@@ -1,6 +1,6 @@
 # Statement of Work (To Do 4)
 
-Covers R26. Requirements are cited as R1-R37 ([requirements.md](requirements.md)), validated decisions as D1-D39
+Covers R26. Requirements are cited as R1-R37 ([requirements.md](requirements.md)), validated decisions as D1-D40
 ([decisions.md](decisions.md); D5 and D26 are superseded by D30).
 
 ## 1. Purpose and background
@@ -59,7 +59,7 @@ head count (D7).
 
 ## 5. Approach
 
-- **Design first:** requirements (R1-R37) and validated decisions (D1-D39) precede SRS, use cases and design; code
+- **Design first:** requirements (R1-R37) and validated decisions (D1-D40) precede SRS, use cases and design; code
   only implements what is designed (R17).
 - **Compose existing tools:** Flask, `qrcode`, OpenCV YuNet, `ffmpeg`, faster-whisper, Anthropic SDK, `openpyxl`,
   `cloudflared`, each tested for real in the tools report before adoption (R18, R25, D15).
@@ -95,7 +95,7 @@ head count (D7).
 - No personal data in the repository, its history or the demo; provided course files are used locally only and
   only aggregate numbers are reported (R16, D21).
 - KISS smartphone web app, few taps, no installation (R14); only implementable designs (R17).
-- Demo hosted on the student's laptop, exposed by a Cloudflare quick tunnel (D13).
+- Demo hosted on the student's laptop, exposed by a Cloudflare quick tunnel (D13); permanent hosting is not required and Vercel was rejected (D40).
 - Students may be on the university Wi-Fi or on mobile data; the check-in does not depend on the network (D33).
 - An Anthropic API key is available for F4/F5; without it F1-F3 still run and F4/F5 show a plain error (D12, D23). F4 also needs `ffmpeg` and a one-time download of the Whisper `small` model (about 460 MB, D34).
 - Individual work (D20); deadline 30/11/2026 (D16); the class demo date is still to be confirmed (D17).

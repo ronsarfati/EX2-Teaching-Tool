@@ -111,6 +111,8 @@ ln -s "$PWD/scripts/HereOrNot.command" ~/Desktop/HereOrNot.command
 
 First launch: right-click the file, then **Open** (macOS asks once to confirm). The launcher starts the Cloudflare quick tunnel, reads its URL, starts the app with that `BASE_URL` (and `PORT`, default 5050) without editing `.env`, waits for `/ping`, opens Safari on the lecturer login and stops everything when its window is closed. If HereOrNot is already running it just opens Safari. `scripts/HereOrNot.command --check` only verifies the prerequisites. The Mac must stay on during class.
 
+Permanent hosting is optional (D40); Vercel was considered and rejected, see D40.
+
 **Manual commands (fallback).**
 
 Prerequisites: Python 3.11+ (tested with 3.13) and, optionally, `cloudflared` (to expose the app to phones) and `ffmpeg` (F4 only, for example `brew install ffmpeg`).
@@ -168,7 +170,7 @@ Optional demo data (fictional nicknames only, no network, no API key; existing f
 | To Do | Deliverable | Location | Status |
 |---|---|---|---|
 | — | Requirements R1-R37 | [docs/requirements.md](docs/requirements.md) | Done |
-| — | Validated decisions D1-D39 | [docs/decisions.md](docs/decisions.md) | Done |
+| — | Validated decisions D1-D40 | [docs/decisions.md](docs/decisions.md) | Done |
 | 1 | Repository, problem and scope | this README | Done |
 | 2 | Repository link submitted via the course form | (by the student) | Done |
 | 3 | Tools report, every tool tested for real | [docs/tools_report.md](docs/tools_report.md) | Done |

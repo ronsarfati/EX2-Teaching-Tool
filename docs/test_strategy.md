@@ -2,7 +2,7 @@
 
 Covers R32 ("a testing strategy that addresses the classes of To Do 7"). Built from the [design](design.md)
 (classes of section 3, exceptions of 3.8, tasks T1-T23 of section 7 (T18 = T18a-T18f)), the [SRS](srs.md) (FR-x.y, NFR-n, error table
-of section 5), the [use cases](use_cases.md) (UC-1 to UC-14), the validated decisions D1-D39
+of section 5), the [use cases](use_cases.md) (UC-1 to UC-14), the validated decisions D1-D40
 ([decisions.md](decisions.md); D25 = test tooling, D7 = consistency rule, D30 / D31 = check-in rules, D33 = no network filter, 4-digit code, D34 = F4 video summary, D36 = F4 duration cap / cancel / retries / export date, D37 = signed device token, D38 = UI redesign, D39 = one-click launcher) and the
 [tools report](tools_report.md). Class, port, method and exception names are exactly those of `design.md`.
 

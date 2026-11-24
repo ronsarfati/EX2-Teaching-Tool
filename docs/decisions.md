@@ -2,7 +2,7 @@
 
 Resolutions of the open questions (OQ1-OQ14 in `docs/requirements.md`) and of the technical choices left open by
 the statement. Proposed by the ambiguity analysis, **validated by the student on 2026-11-22** (D31: 2026-11-23;
-D32, D33, D34 and D35: 2026-11-23; D36, D37, D38 and D39: 2026-11-24).
+D32, D33, D34 and D35: 2026-11-23; D36, D37, D38, D39 and D40: 2026-11-24).
 Requirements are cited as R<n>, statement locators as F/Req/G/TD/QA (see `docs/requirements.md`).
 
 Guiding rule: the **simplest option that fully satisfies the requirements** (KISS, Req2), that can really be
@@ -56,6 +56,7 @@ old text is kept below for history only and must not be used for design.
 | D37 | One check-in per phone even after clearing cookies (amends D6 and D31 / OI-4) | Server-signed random device token (HMAC-SHA256) mirrored on the phone in cookie, localStorage and IndexedDB; a valid older stored copy wins over a missing cookie; browser fingerprinting rejected | VALIDATED (24/11) |
 | D38 | UI redesign and visual identity (T22a-T22m) | App name **HereOrNot** ("here or not"), inline SVG logo, indigo `#3B4FD8` + orange `#FF8A3D` palette (light and dark), system fonts, Pico variables overridden in `app.css`; reorganised lecturer dashboard, phone-first student pages, forced-light projector page, `dir="auto"` on user text, busy feedback, manual theme toggle, Lucide icons (ISC); no framework change, no build step | VALIDATED (24/11) |
 | D39 | One-click launcher (plan A of D13, started by a double-click) | `scripts/HereOrNot.command`: starts the quick tunnel, reads its URL, starts the app, opens Safari on the lecturer login, cleans up on close; no fixed URL, no permanent hosting | VALIDATED (24/11) |
+| D40 | Course TA answer (24/11): hosting, anti-cheat level, class photo, API key | Permanent hosting optional: keep D13 (laptop + quick tunnel, hotspot plan B), Vercel rejected (no persistent disk for SQLite, F4 too heavy, no background thread); anti-cheat measures judged sufficient, no location check; class photo allowed, already discarded after counting (D7); demo API key = dedicated small prepaid key in `.env` only | VALIDATED (24/11) |
 
 "VALIDATED" = "VALIDATED by the student — 2026-11-22" unless stated otherwise. "DEFERRED" = "DEFERRED by the
 student — 2026-11-22".
@@ -878,6 +879,43 @@ and stops the app and the tunnel when the window is closed. If the app already a
 
 **Impact.** *Design:* section 1.2 (hosting, C11). *Demo script:* setup. *README:* "How to run".
 *Tests:* `tests/test_launcher.py` (stubs, no network).
+
+**Status:** VALIDATED by the student — 2026-11-24
+
+---
+
+## D40 — Course TA answer (24/11): hosting, anti-cheat level, class photo, API key (confirms D7, D12, D13, D33, D37; R13, R16, R19)
+
+**Context.** The student asked the course teaching assistant four questions by e-mail (24/11). This decision records
+the answers and what the project does with them.
+
+**1. Hosting.** Permanent hosting is not required; the TA mentioned Vercel (seen in the course tutorials) as an easy
+option.
+- **DECISION: keep D13** (laptop + Cloudflare quick tunnel started by the D39 launcher; phone hotspot as plan B).
+- **Vercel considered and rejected:** serverless functions have no persistent local disk (the SQLite database of D3
+  would lose the attendance); their size and time limits do not fit faster-whisper `small` (about 460 MB) plus
+  `ffmpeg` for F4 (D34); no long-running background job thread (F4, D34). Moving would mean an external database and
+  dropping or outsourcing F4: a redesign not justified for a demo.
+- **Rehearsal 24/11:** the tunnel works; on a Wi-Fi that blocks the tunnel's port 7844 the phone-hotspot fallback is
+  used.
+
+**2. Anti-cheat level.** The TA considers the current measures sufficient: rotating QR + projected code (D30, D33),
+signed device token (D37), photo head count with consistency alert (D7).
+- **DECISION: no change; no location check added** (GPS rejected in D5 / R16; campus IP check removed by D33).
+- **Rehearsal 24/11:** a re-scan in normal Safari was refused; each iOS Private Browsing tab is a new identity (known
+  D37 limit), and the photo flagged the anomaly (2 check-ins for 1 face).
+
+**3. Class photo.** Allowed during the demo provided it does not feed a face-analysis database.
+- **DECISION: no change, already the case** (D7): faces are only detected (no recognition), counted, then the photo is
+  discarded; only the count is stored.
+
+**4. API key.** The TA recommends a key tied to a separate small prepaid budget.
+- **DECISION:** the demo uses a dedicated prepaid API key with a small budget, kept only in the git-ignored `.env`
+  (never committed, D12). No provider change: free Gemini or Grok tiers are noted as an alternative behind the
+  `LLMClient` interface (D12), not needed.
+
+**Impact.** *README:* section 3 "How to run" (one line on optional hosting), decision range in section 4. *SoW:*
+section 8 (hosting assumption), decision range. *Design:* header (decision range, D40 noted). No code, requirement or test change.
 
 **Status:** VALIDATED by the student — 2026-11-24
 
