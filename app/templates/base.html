@@ -1,14 +1,36 @@
 <!doctype html>
-<html lang="en">
+{# Shell shared by every page. Blocks: html_attrs, title, head_extra, nav, content, footer.
+   No inline script and no form here: pages and tests rely on a link-only shell. #}
+<html lang="en"{% block html_attrs %}{% endblock %}>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Teaching tool{% endblock %}</title>
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#F7F8FC" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0F1220" media="(prefers-color-scheme: dark)">
+  <title>{% block title %}HereOrNot{% endblock %}</title>
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='pico.min.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+  {% block head_extra %}{% endblock %}
 </head>
 <body>
+  <header class="cp-header">
+    <div class="container cp-header-row">
+      <a class="cp-brand" href="/">
+        <svg viewBox="0 0 32 32" width="28" height="28" aria-hidden="true" class="logo">
+          <rect x="2" y="2" width="28" height="28" rx="8" fill="var(--cp-primary)"/>
+          <path d="M9 16.5l4.5 4.5L23 11.5" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="25.5" cy="6.5" r="4" fill="var(--cp-accent)" stroke="var(--cp-bg)" stroke-width="2"/>
+        </svg>
+        <span>HereOrNot</span>
+      </a>
+      {% block nav %}{% endblock %}
+    </div>
+  </header>
   <main class="container">
     {% block content %}{% endblock %}
   </main>
+  {% block footer %}{% endblock %}
 </body>
 </html>

@@ -1,0 +1,117 @@
+/* HereOrNot design tokens and components, loaded after Pico so equal-specificity rules win by order. */
+
+:root {
+  --cp-s1: .25rem; --cp-s2: .5rem; --cp-s3: .75rem; --cp-s4: 1rem; --cp-s5: 1.5rem; --cp-s6: 2rem; --cp-s7: 3rem;
+  --cp-r-sm: 8px; --cp-r: 14px; --cp-r-pill: 999px;
+  --cp-fs-xs: .8125rem; --cp-fs-sm: .875rem; --cp-fs-md: 1rem; --cp-fs-lg: 1.25rem;
+  --cp-fs-xl: 1.5625rem; --cp-fs-2xl: 1.953rem; --cp-fs-display: clamp(2.5rem, 8vw, 5rem);
+  --cp-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Roboto Mono", monospace;
+  /* System fonts only (no download); the list covers Hebrew on iOS, Android and Windows. */
+  --pico-font-family-sans-serif: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "Noto Sans Hebrew",
+    "Arial Hebrew", Arial, sans-serif;
+}
+
+/* Light palette, then dark palette (OS setting, or forced with data-theme), same selectors as Pico. */
+:root:not([data-theme=dark]), [data-theme=light] {
+  --cp-bg: #F7F8FC; --cp-surface: #FFFFFF; --cp-border: #DDE2EC; --cp-text: #1B1F2A; --cp-muted: #5B6475;
+  --cp-primary: #3B4FD8; --cp-primary-hover: #2F3FB5; --cp-on-primary: #FFFFFF; --cp-accent: #FF8A3D;
+  --cp-success: #1E7F4F; --cp-success-bg: #E3F4EA; --cp-warning: #8A5A00; --cp-warning-bg: #FFF4DB;
+  --cp-error: #C2272D; --cp-error-bg: #FDE7E8;
+  --cp-shadow: 0 1px 2px rgba(16, 24, 40, .06), 0 4px 12px rgba(16, 24, 40, .06);
+}
+@media only screen and (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --cp-bg: #0F1220; --cp-surface: #181C2E; --cp-border: #2A3048; --cp-text: #E8EAF2; --cp-muted: #A3AAC2;
+    --cp-primary: #8C9BFF; --cp-primary-hover: #A9B4FF; --cp-on-primary: #0F1220; --cp-accent: #FF9F5A;
+    --cp-success: #5FD68E; --cp-success-bg: #13301F; --cp-warning: #F5C451; --cp-warning-bg: #3A2C0B;
+    --cp-error: #FF7A7F; --cp-error-bg: #3A1416; --cp-shadow: none;
+  }
+}
+[data-theme=dark] {
+  --cp-bg: #0F1220; --cp-surface: #181C2E; --cp-border: #2A3048; --cp-text: #E8EAF2; --cp-muted: #A3AAC2;
+  --cp-primary: #8C9BFF; --cp-primary-hover: #A9B4FF; --cp-on-primary: #0F1220; --cp-accent: #FF9F5A;
+  --cp-success: #5FD68E; --cp-success-bg: #13301F; --cp-warning: #F5C451; --cp-warning-bg: #3A2C0B;
+  --cp-error: #FF7A7F; --cp-error-bg: #3A1416; --cp-shadow: none;
+}
+
+/* Map our tokens onto the Pico variables so every Pico component follows the palette. */
+:root {
+  --pico-background-color: var(--cp-bg);
+  --pico-color: var(--cp-text);
+  --pico-muted-color: var(--cp-muted);
+  --pico-muted-border-color: var(--cp-border);
+  --pico-primary: var(--cp-primary);
+  --pico-primary-background: var(--cp-primary);
+  --pico-primary-hover: var(--cp-primary-hover);
+  --pico-primary-hover-background: var(--cp-primary-hover);
+  --pico-primary-inverse: var(--cp-on-primary);
+  --pico-card-background-color: var(--cp-surface);
+  --pico-card-box-shadow: var(--cp-shadow);
+  --pico-border-radius: var(--cp-r-sm);
+  --pico-form-element-border-color: var(--cp-border);
+  --pico-form-element-background-color: var(--cp-surface);
+  --pico-ins-color: var(--cp-success);
+  --pico-del-color: var(--cp-error);
+}
+body { background: var(--cp-bg); line-height: 1.5; }
+h1, h2, h3 { line-height: 1.15; }
+h1 { font-size: var(--cp-fs-xl); font-weight: 700; }
+
+/* Header and navigation: links only. */
+.cp-header { background: var(--cp-surface); border-bottom: 1px solid var(--cp-border); }
+.cp-header-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--cp-s2) var(--cp-s5); padding-block: var(--cp-s3); }
+.cp-brand { display: inline-flex; align-items: center; gap: var(--cp-s2); font-weight: 700; font-size: var(--cp-fs-lg);
+  color: var(--cp-text); text-decoration: none; }
+.cp-nav { display: flex; align-items: center; gap: var(--cp-s3); flex: 1 1 auto; min-width: 0; margin: 0; }
+.cp-role { color: var(--cp-muted); font-size: var(--cp-fs-sm); }
+.cp-nav ul { display: flex; gap: var(--cp-s1); margin: 0; padding: 0; overflow-x: auto; white-space: nowrap; }
+.cp-nav li { list-style: none; padding: 0; margin: 0; }
+.cp-nav a { display: inline-flex; align-items: center; gap: var(--cp-s2); padding: var(--cp-s2) var(--cp-s3);
+  font-size: var(--cp-fs-sm); border-radius: var(--cp-r-sm); text-decoration: none; }
+.cp-nav a:hover { background: var(--cp-bg); }
+.icon { flex: none; }
+
+/* Buttons: large tap targets, visible focus ring that does not rely on Pico's faint one. */
+button, [role=button], input[type=submit] { min-height: 48px; border-radius: var(--cp-r); font-weight: 600; }
+:is(a, button, input, select, textarea, summary):focus-visible { outline: 3px solid var(--cp-accent); outline-offset: 2px; }
+button.cp-danger { background: transparent; color: var(--cp-error); border-color: var(--cp-error); }
+button.cp-danger:hover { background: var(--cp-error); color: var(--cp-on-primary); }
+@media (max-width: 575px) { button, [role=button] { width: 100%; } }
+
+/* Cards. */
+article { background: var(--cp-surface); border: 1px solid var(--cp-border); border-radius: var(--cp-r);
+  box-shadow: var(--cp-shadow); padding: var(--cp-s5); }
+.cp-login { max-width: 24rem; margin-inline: auto; }
+.cp-pin { font-size: var(--cp-fs-2xl); text-align: center; letter-spacing: .4em; font-family: var(--cp-mono); }
+
+/* Stat tile, chip, banner. */
+.cp-stat { text-align: center; }
+.cp-stat strong { display: block; font: 700 var(--cp-fs-display)/1 var(--cp-mono); font-variant-numeric: tabular-nums; }
+.cp-stat span { font-size: var(--cp-fs-sm); color: var(--cp-muted); }
+.cp-chip { display: inline-flex; align-items: center; gap: var(--cp-s1); padding: 2px var(--cp-s3);
+  border-radius: var(--cp-r-pill); font-size: var(--cp-fs-xs); background: var(--cp-border); color: var(--cp-text); }
+.cp-chip[data-state=consistent] { background: var(--cp-success-bg); color: var(--cp-success); }
+.cp-chip[data-state=anomaly] { background: var(--cp-warning-bg); color: var(--cp-warning); }
+.cp-chip[data-state=closed] { color: var(--cp-muted); }
+.cp-chip[data-state=live]::before { content: ""; width: .5rem; height: .5rem; border-radius: 50%;
+  background: var(--cp-accent); animation: cp-pulse 1.6s ease-in-out infinite; }
+.cp-banner { padding: var(--cp-s3) var(--cp-s4); border-radius: var(--cp-r-sm); background: var(--cp-success-bg); color: var(--cp-success); }
+.cp-banner[data-kind=warning] { background: var(--cp-warning-bg); color: var(--cp-warning); }
+.cp-banner[data-kind=error], [role=alert] { background: var(--cp-error-bg); color: var(--cp-error); }
+[role=alert] { padding: var(--cp-s3) var(--cp-s4); border-radius: var(--cp-r-sm); }
+
+/* Poll option card: the whole label is the tap target; the native radio stays as a fallback. */
+.cp-option { display: flex; align-items: center; gap: var(--cp-s3); min-height: 56px; padding: 0 var(--cp-s4);
+  margin-bottom: var(--cp-s3); border: 1px solid var(--cp-border); border-radius: var(--cp-r); background: var(--cp-surface); }
+.cp-option:has(input:checked) { border-color: var(--cp-primary); background: var(--cp-bg); }
+
+/* Bottom tab bar of the student pages (fixed, safe-area aware on phones). */
+.cp-tabbar { position: fixed; inset: auto 0 0 0; display: flex; justify-content: space-around; align-items: center;
+  height: 64px; padding-bottom: env(safe-area-inset-bottom); background: var(--cp-surface); border-top: 1px solid var(--cp-border); }
+.cp-tabbar a { flex: 1; text-align: center; font-size: var(--cp-fs-sm); text-decoration: none; }
+
+@keyframes cp-pulse { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) {
+  .cp-chip[data-state=live]::before { animation: none; }
+  * { scroll-behavior: auto !important; }
+}

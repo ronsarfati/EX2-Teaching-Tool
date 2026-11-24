@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{# Layout of every lecturer page: link-only navigation (no form, so pages that assert on forms stay exact).
+   The Projector link always targets the same named tab, so the projector window is reused. #}
+{% block nav %}
+<nav class="cp-nav" aria-label="Lecturer">
+  <span class="cp-role">Lecturer</span>
+  <ul>
+    <li><a href="{{ url_for('lecturer.dashboard') }}">{{ icon("users") }}Dashboard</a></li>
+    <li><a href="{{ url_for('lecturer.projector') }}" target="projector">{{ icon("qr") }}Projector</a></li>
+    <li><a href="{{ url_for('lecturer.polls') }}">{{ icon("bar-chart") }}Polls</a></li>
+    <li><a href="{{ url_for('lecturer.comments') }}">{{ icon("message") }}Comments</a></li>
+    <li><a href="{{ url_for('lecturer.video') }}">{{ icon("film") }}Video summary</a></li>
+    <li><a href="/review">{{ icon("git-branch") }}Homework</a></li>
+  </ul>
+</nav>
+{% endblock %}
