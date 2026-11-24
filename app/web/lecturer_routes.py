@@ -172,6 +172,14 @@ def video_job(job_id: int):
     return render_template("video_job.html", job=_services()["video_service"].get(job_id), JobStatus=JobStatus)
 
 
+@bp.post("/video/jobs/<int:job_id>/cancel")
+@lecturer_required
+def video_job_cancel(job_id: int):
+    """Cancel the active job (D36-a); an unknown id is a 404 and a finished job is left unchanged."""
+    _services()["video_service"].cancel(job_id)
+    return redirect(url_for("lecturer.video_job", job_id=job_id), code=303)
+
+
 def _summary_download(job_id: int, extension: str) -> Response:
     job = _services()["video_service"].get(job_id)
     if job.status is not JobStatus.DONE:

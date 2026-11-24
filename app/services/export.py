@@ -45,7 +45,7 @@ class AttendanceExporter:
         for session in self._sessions.list_all():
             for check_in in self._check_ins.list_for_session(session.id):
                 rows.append([_date(session.opened_at), _safe(check_in.nickname),
-                             format_local(check_in.checked_in_at, "%H:%M:%S")])
+                             format_local(check_in.checked_in_at, "%Y-%m-%d %H:%M:%S")])
         return rows
 
     def _summary_rows(self) -> list[list[str | int]]:

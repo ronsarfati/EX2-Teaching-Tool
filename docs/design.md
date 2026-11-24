@@ -557,7 +557,7 @@ tests use a `FakeHeadCounter` (no model file, no OpenCV), and OpenCV is the heav
 normal 404 instead of an `OverflowError` (500).
 
 **`AttendanceExporter`** - offline spreadsheet (FR-1.18, D8). Columns of `checkins_csv()`: `Session date (Jerusalem time)`,
-`Nickname`, `Checked in at (Jerusalem time)` (one row per check-in, all sessions, oldest first; D35: Israel time, the headers name the zone). `summary_csv()`: `Session date (Jerusalem time)`,
+`Nickname`, `Checked in at (Jerusalem time)` (one row per check-in, all sessions, oldest first; D35: Israel time, the headers name the zone; the check-in cell is `YYYY-MM-DD HH:MM:SS`, D36-c). `summary_csv()`: `Session date (Jerusalem time)`,
 `check-ins (N)`, `faces detected (D)`, `consistency status`. (The D32 `network`, `off campus` and `via Apple relay`
 columns are removed by D33.) `xlsx()`: the same two tables as two sheets "Check-ins" and "Summary"
 (`openpyxl`, frozen header row; code reused from `tools_tests/xlsx_roundtrip.py`). No IP and no device token column
@@ -765,6 +765,9 @@ classDiagram
     +active() Optional~SummaryJob~
     +recent(limit: int) list~SummaryJob~
     +recover_interrupted() int
+    +cancel(job_id: int) SummaryJob
+    +VIDEO_MAX_SECONDS: int = 14400
+    -_check_duration(media_path: Path) None
     -_run(job_id: int, media_path: Path, language: Optional~str~) None
   }
   class LectureSummariser {
@@ -774,8 +777,11 @@ classDiagram
     +SECTIONS: tuple~str~
     -_llm: LLMClient
     -_max_chunk_chars: int
+    -_sleep: Callable
+    +RETRY_BACKOFF_S: tuple = (2, 8)
     +is_available() bool
-    +summarise(transcript: Transcript, language: Optional~str~) str
+    +summarise(transcript: Transcript, language: Optional~str~, is_cancelled: Callable) str
+    -_ask(system: str, prompt: str, max_tokens: int, is_cancelled: Callable) str
   }
   class SummaryRepository {
     -_db: Database
@@ -836,11 +842,14 @@ classDiagram
   class AudioExtractor {
     <<interface>>
     +extract(media_path: Path, wav_path: Path) None
+    +duration_seconds(media_path: Path) Optional~float~
   }
   class FfmpegAudioExtractor {
     -_ffmpeg: str = "ffmpeg"
+    -_ffprobe: str = "ffprobe"
     -_timeout_s: float = 1800
     +extract(media_path: Path, wav_path: Path) None
+    +duration_seconds(media_path: Path) Optional~float~
   }
   class JobRunner {
     <<interface>>
@@ -883,18 +892,18 @@ stateDiagram-v2
   extracting_audio --> transcribing : audio.wav written, upload deleted
   transcribing --> summarising : transcript returned, audio deleted
   summarising --> done : summary stored
-  queued --> failed
-  extracting_audio --> failed : unreadable file / ffmpeg missing
-  transcribing --> failed : model unavailable / no speech
-  summarising --> failed : LLM unavailable
+  queued --> failed : cancelled (D36-a)
+  extracting_audio --> failed : unreadable file / ffmpeg missing / cancelled
+  transcribing --> failed : model unavailable / no speech / cancelled
+  summarising --> failed : LLM unavailable after 3 attempts / cancelled
   done --> [*]
   failed --> [*]
 ```
 
 | Class | Responsibility (one) | Public interface | Collaborators | Invariants / errors |
 |---|---|---|---|---|
-| `VideoSummaryService` | Own the lifecycle of a summary job: accept an upload, run the pipeline steps in order in the background, record status, guarantee the deletion of media files | `submit(upload: BinaryIO, filename: str, language: str) -> SummaryJob`; `get(job_id: int) -> SummaryJob` (werkzeug `NotFound("This summary does not exist.")` for an unknown id, same pattern as `PollService`); `active() -> Optional[SummaryJob]`; `recent(limit: int = 10) -> list[SummaryJob]` (newest first); `recover_interrupted() -> int` | `SummaryRepository`, `AudioExtractor`, `Transcriber`, `LectureSummariser`, `JobRunner`, `Clock` | See "Rules of `submit`" and "Rules of `_run`" below. Never stores the file name or the transcript. Every media file lives under `work_root/job-<id>/` and that directory is removed on every exit of `_run` and of a failed `submit`. |
-| `LectureSummariser` | Turn a transcript into one structured Markdown summary with the LLM (single call or map-reduce) | `is_available() -> bool` (delegates to `LLMClient.is_configured`); `summarise(transcript: Transcript, language: Optional[str]) -> str`; module function `split_transcript(text: str, max_chars: int) -> list[str]` | `LLMClient` | Prompts mark the transcript as untrusted data; LLM errors propagate as `LLMUnavailableError("summary")`; an empty answer -> `LLMUnavailableError("summary")`; an empty transcript -> `NoSpeechError`. Stateless (no transcript kept after the call). |
+| `VideoSummaryService` | Own the lifecycle of a summary job: accept an upload, run the pipeline steps in order in the background, record status, guarantee the deletion of media files | `submit(upload: BinaryIO, filename: str, language: str) -> SummaryJob`; `get(job_id: int) -> SummaryJob` (werkzeug `NotFound("This summary does not exist.")` for an unknown id, same pattern as `PollService`); `active() -> Optional[SummaryJob]`; `recent(limit: int = 10) -> list[SummaryJob]` (newest first); `recover_interrupted() -> int`; `cancel(job_id: int) -> SummaryJob` (D36-a: `NotFound` for an unknown id, a finished job returned unchanged, else `fail(job, "Cancelled by the lecturer.")`; the worker notices through `_is_still_active`) | `SummaryRepository`, `AudioExtractor`, `Transcriber`, `LectureSummariser`, `JobRunner`, `Clock` | See "Rules of `submit`" and "Rules of `_run`" below. Never stores the file name or the transcript. Every media file lives under `work_root/job-<id>/` and that directory is removed on every exit of `_run` and of a failed `submit`. |
+| `LectureSummariser` | Turn a transcript into one structured Markdown summary with the LLM (single call or map-reduce) | `is_available() -> bool` (delegates to `LLMClient.is_configured`); `summarise(transcript: Transcript, language: Optional[str], is_cancelled: Callable[[], bool]) -> str`; module function `split_transcript(text: str, max_chars: int) -> list[str]` | `LLMClient` | Prompts mark the transcript as untrusted data; LLM errors propagate as `LLMUnavailableError("summary")`; an empty answer -> `LLMUnavailableError("summary")`; an empty transcript -> `NoSpeechError`. `_ask` (D36-b) makes up to 3 attempts per call on `LLMUnavailableError` with `RETRY_BACKOFF_S = (2, 8)` seconds (injectable `sleep`), never retries a missing key or an empty answer, and checks `is_cancelled()` before every attempt (-> `JobCancelledError`, "Cancelled by the lecturer."). Stateless (no transcript kept after the call). |
 | `SummaryRepository` | SQL of the `summary_job` table | as in the diagram | `Database` | `create` checks and inserts in one `BEGIN IMMEDIATE` transaction and raises `SummaryJobRunningError` if an active job exists (also the partial unique index `one_active_summary_job`); `move` refuses an illegal transition with `ValueError` (programming error, not a user error) and is a no-op on a terminal job; `finish` / `fail` set `is_active = 0`, `finished_at`; `fail` on a terminal job is a no-op (a done job never becomes failed); `is_active = 1` exactly when the status is not terminal. |
 | `SummaryJob` (value) | Snapshot of one job row | fields above; `is_finished() -> bool` | - | `summary_text` is non-`None` only when `status == DONE`; `error_message` only when `FAILED`, and is always one of the user messages of SRS section 5 (D23). |
 | `JobStatus` (enum, `str` values) | Name the job states and their allowed transitions and labels | values `queued`, `extracting_audio`, `transcribing`, `summarising`, `done`, `failed`; `is_terminal()`, `can_move_to(target)`, `label()` | - | Forward order only; `failed` reachable from every non-terminal state; `done`, `failed` terminal. Labels (D23): "Waiting to start", "Extracting the audio", "Transcribing the lecture", "Writing the summary", "Summary ready", "Failed". |
@@ -916,7 +925,10 @@ stateDiagram-v2
    before any copy or transcription (same fail-fast rule as `HomeworkReviewer`, D12).
 4. `SummaryRepository.create(language, now)` -> job `queued`; `SummaryJobRunningError` if one is active.
 5. Create `work_root/job-<id>/`; copy `upload` to `input<suffix>` with `shutil.copyfileobj(..., COPY_CHUNK_BYTES)`
-   (never the whole file in memory). A 0-byte copy -> `UnreadableVideoError`. **Any exception in steps 5-6**:
+   (never the whole file in memory). A 0-byte copy -> `UnreadableVideoError`. Then `AudioExtractor.duration_seconds`
+   (`ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1`, list args, no shell, 30 s
+   timeout): above `VIDEO_MAX_SECONDS` (4 h) -> `VideoDurationLimitError` (HTTP 400); `None` (not measurable) is
+   accepted (D36-a). **Any exception in steps 5-6**:
    remove the directory, `fail(job, message)` (the `AppError` message, else the generic one), re-raise.
 6. `JobRunner.submit(lambda: self._run(job.id, media_path, language))`; return the `queued` job.
 
@@ -926,15 +938,19 @@ stateDiagram-v2
    first). Then **re-read the job** (`_is_still_active`): if it is no longer active (e.g. failed by a second app
    instance), stop quietly, no further stage, no LLM call (the `finally` still removes the work directory).
 2. `move(TRANSCRIBING)`; `transcribe(audio.wav, on_progress)`, where `on_progress` writes `set_progress` only when the
-   fraction has grown by at least `PROGRESS_STEP` (at most about 100 writes per job); then delete the job directory
+   fraction has grown by at least `PROGRESS_STEP` (at most about 100 writes per job) and first re-reads the job: if it
+   was cancelled it raises `JobCancelledError` and the transcription stops (D36-a); then delete the job directory
    (the audio) **right after transcription**, before any LLM call. Re-check the job again before step 3.
 3. Empty transcript (only whitespace, e.g. silence removed by VAD) -> `NoSpeechError`.
-4. `move(SUMMARISING)`; `summarise(transcript, language)`; `finish(job, text, transcript.language,
+4. `move(SUMMARISING)`; `summarise(transcript, language, is_cancelled)` (cancel and retry rules: `LectureSummariser._ask`, D36); `finish(job, text, transcript.language,
    transcript.duration_s, now)`.
 5. `except AppError as error` -> `fail(job, error.user_message)`; `except Exception` -> log the traceback (never the
    transcript), `fail(job, "Something went wrong. Please try again.")`; `finally` -> `shutil.rmtree(job_dir,
    ignore_errors=True)` and drop the transcript reference. So the media files are gone on success and on **every**
    failure path, and the transcript is never written anywhere.
+
+**Cancel (D36-a).** `POST /lecturer/video/jobs/<id>/cancel` calls `VideoSummaryService.cancel`, which fails the active job
+at once (slot freed) and redirects to the job page. The audio extraction is not interrupted (known limit, a few seconds).
 
 **`recover_interrupted()`** (called once by `create_app`, when no job thread can exist yet):
 `fail_all_active("The summary was interrupted because the app was restarted. Please upload the video again.")`, then
@@ -1018,6 +1034,8 @@ classDiagram
     +limit_bytes: int
   }
   class VideoTooLongError
+  class VideoDurationLimitError
+  class JobCancelledError
   class WrongPinError
   AppError <|-- CheckInError
   AppError <|-- SessionAlreadyOpenError
@@ -1031,6 +1049,8 @@ classDiagram
   VideoError <|-- UnreadableVideoError
   VideoError <|-- UnsupportedVideoFormatError
   VideoError <|-- VideoTooLongError
+  VideoTooLongError <|-- VideoDurationLimitError
+  VideoError <|-- JobCancelledError
   VideoError <|-- VideoTooLargeError
   VideoError <|-- NoSpeechError
   VideoError <|-- TranscriptionUnavailableError
@@ -1084,6 +1104,8 @@ classDiagram
 | `SummaryJobRunningError` | `SummaryRepository.create` | A video is already being summarised. Please wait until it is finished. | 409 |
 | `UnreadableVideoError` | `FfmpegAudioExtractor.extract`, `FasterWhisperTranscriber.transcribe`, `VideoSummaryService.submit` (empty file) | We could not read this video file. | 400 |
 | `VideoTooLongError` | `FfmpegAudioExtractor.extract` (timeout) | This recording is too long to process. Please upload a shorter recording. | 400 |
+| `VideoDurationLimitError` | `VideoSummaryService.submit` (ffprobe duration above 4 h, D36-a) | This recording is longer than 4 hours. Please upload a shorter recording. | 400 |
+| `JobCancelledError` | job thread (progress callback, `LectureSummariser._ask`); also the stored job message (D36-a) | Cancelled by the lecturer. | 409 |
 | `NoSpeechError` | `VideoSummaryService._run`, `LectureSummariser.summarise` | No speech was found in this recording. | 400 |
 | `TranscriptionUnavailableError` | `FasterWhisperTranscriber.transcribe` (model cannot be loaded / downloaded), `FfmpegAudioExtractor.extract` (ffmpeg missing) | The transcription service is unavailable right now. Please try again later. | 503 |
 | (stored message, not an exception) | `VideoSummaryService.recover_interrupted` | The summary was interrupted because the app was restarted. Please upload the video again. | - |
@@ -1517,6 +1539,7 @@ sequenceDiagram
   participant LS as LectureSummariser
   participant SR as SummaryRepository
   participant FS as VIDEO_WORK_DIR (temp)
+  participant AE as FfmpegAudioExtractor
   participant JR as ThreadJobRunner
   L->>B: choose a recording + summary language, "Summarise"
   alt file larger than data-max-bytes (video.js, UX only)
@@ -1551,10 +1574,17 @@ sequenceDiagram
               VS->>SR: fail(job, message, now)
               LR-->>B: "We could not read this video file." (or the generic message)
             else copied
+              VS->>AE: duration_seconds(input.ext) (ffprobe, D36-a)
+              alt longer than 4 hours
+                VS->>FS: remove job-id
+                VS->>SR: fail(job, message, now)
+                LR-->>B: 400 "This recording is longer than 4 hours. Please upload a shorter recording."
+              else shorter or not measurable
               VS->>JR: submit(task = _run(job_id, media_path, language))
               JR->>JR: start daemon thread "video-summary-job"
               VS-->>LR: SummaryJob(queued)
               LR-->>B: 303 redirect to /lecturer/video/jobs/id
+              end
             end
           end
         end
@@ -1602,6 +1632,9 @@ sequenceDiagram
     end
     loop each recognised segment (CPU, int8, VAD on)
       TR->>VS: on_progress(segment.end / duration)
+      opt job cancelled by the lecturer (D36-a)
+        VS-->>VS: JobCancelledError (transcription stops, no LLM call)
+      end
       VS->>SR: set_progress(job, p, now) (only if p grew by 1 point)
     end
     TR-->>VS: Transcript(text, language, duration_s)
@@ -1612,6 +1645,7 @@ sequenceDiagram
       VS->>SR: move(job, SUMMARISING, now)
       VS->>LS: summarise(transcript, language)
       LS->>LS: neutralise delimiters, split_transcript(text, 40000)
+      Note over LS,LC: before every call (and attempt): job cancelled -> JobCancelledError; LLMUnavailableError -> up to 3 attempts, wait 2 s then 8 s (D36-b); empty answer not retried
       alt one chunk
         LS->>LC: complete(SYSTEM_SUMMARY, transcript, 3000, "summary")
         LC->>AN: messages.create (text only)
@@ -2026,6 +2060,8 @@ and `DeferredJobRunner` (keeps tasks; `run_all()`).
 14. *Optional integration* (skipped unless `shutil.which("ffmpeg")` and `WhisperModel("small", local_files_only=True)`
     loads): ffmpeg generates a 3 s test MP4 (`-f lavfi`, tone + colour), the extractor writes a mono 16 kHz WAV
     (checked with stdlib `wave`), the transcriber returns a `Transcript` without error.
+
+*D36 (24/11) - cases in `tests/test_d36.py`:* duration over / at / under 4 h and unknown (fake extractor); `ffprobe` argument list and unusable outputs; cancel route (PIN, 404, finished job unchanged, button only while active); cancel during transcription and between map parts (no further LLM call); retries (3rd attempt succeeds, 3 failures, empty answer, no key, cancel, sleeps 2 then 8); export cell after midnight.
 
 *T18c - summariser*
 15. **Chunking boundary** (`max_chunk_chars` injected, e.g. 100): length 100 -> 1 LLM call; length 101 -> 2 chunks,

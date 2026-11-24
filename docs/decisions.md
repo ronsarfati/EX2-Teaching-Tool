@@ -2,7 +2,7 @@
 
 Resolutions of the open questions (OQ1-OQ14 in `docs/requirements.md`) and of the technical choices left open by
 the statement. Proposed by the ambiguity analysis, **validated by the student on 2026-11-22** (D31: 2026-11-23;
-D32, D33, D34 and D35: 2026-11-23).
+D32, D33, D34 and D35: 2026-11-23; D36: 2026-11-24).
 Requirements are cited as R<n>, statement locators as F/Req/G/TD/QA (see `docs/requirements.md`).
 
 Guiding rule: the **simplest option that fully satisfies the requirements** (KISS, Req2), that can really be
@@ -52,6 +52,7 @@ old text is kept below for history only and must not be used for design.
 | D33 | Remove the IP / network part entirely (supersedes D32 and point 1 of D30); projected code 4 digits (amends D30 point 3) | No client IP read for attendance, no allow-list, no relay list, no origin label; anti-cheat = rotating QR (10 s / 15 s) + projected **4-digit** code (0000-9999, 5 s, P1) + the unchanged D30 rules; D7 photo alert is the room-level check. Code brute force by rescanning: ~500 -> ~5,000 expected tries, residual risk recorded | VALIDATED (23/11) |
 | D34 | Video summary F4 for real recordings (closes D10) | PIN page, upload up to 2 GB (configurable, this route only) streamed to a temp file; ffmpeg -> mono 16 kHz audio; faster-whisper `small` (CPU int8, VAD, language auto unless `WHISPER_LANGUAGE`) in **one background thread, one job at a time**; Claude structured summary (map-reduce above a safe size, transcript treated as untrusted); status page polled; video and audio deleted right after transcription (also on failure), transcript never stored, only the summary text + timestamps kept in SQLite; demo on a local-only 4-min Hebrew clip | VALIDATED (23/11) |
 | D35 | Display time zone | User-visible times in Israel local time (Asia/Jerusalem, DST); storage stays UTC | VALIDATED (23/11) |
+| D36 | F4 red-team follow-ups (amends D34, D35) | (a) recordings above 4 h refused (ffprobe) + Cancel button; (b) up to 3 attempts per LLM call in the F4 job, backoff 2 s then 8 s; (c) export column "Checked in at" shows date and time | VALIDATED (24/11) |
 
 "VALIDATED" = "VALIDATED by the student — 2026-11-22" unless stated otherwise. "DEFERRED" = "DEFERRED by the
 student — 2026-11-22".
@@ -698,7 +699,7 @@ note is neutralised like the transcript before it is wrapped in `<notes part="i"
 below 1 GB ("100 MB"), GB above; (e) an ffmpeg timeout gives the new `VideoTooLongError` ("This recording is too long
 to process. Please upload a shorter recording."). **Known limit (R-F4-6):** the upload needs about **twice the file
 size of free disk space**, because Werkzeug spools it to a temporary file before the copy into the job directory.
-Still open for the student: duration cap, cancel button, LLM retries, export date format.
+Duration cap, cancel button, LLM retries and export date format: decided by D36 (24/11).
 
 **Justification.** R7 (the lecturer's own recordings), R8 (structured summary beats the Zoom example), R15 (file
 upload, no Zoom/Meet API), R16 (media deleted, transcript not kept, no file name), R17/R18 (reuse ffmpeg,
@@ -735,6 +736,46 @@ configuration table. *Tests:* conversion in winter (UTC+2) and summer (UTC+3), h
 remain UTC.
 
 **Status:** validated by the student — 2026-11-23
+
+---
+
+## D36 — F4 red-team follow-ups: duration cap and cancel, LLM retries, export date and time (R-F4-2, R-F4-3, R-F4-7; amends D34, D35)
+
+**Question.** The red team of 24/11 (note at the end of D34) left four points for the student. Three are decided here
+(one block, three parts); each part is validated as proposed.
+
+**D36-a — R-F4-2, duration cap and cancel.**
+1. The recording duration is measured with `ffprobe` (new method `AudioExtractor.duration_seconds(path) -> float | None`;
+   argument list, no shell, 30 s timeout) right after the upload is copied and **before the job is queued**. Above
+   `VIDEO_MAX_SECONDS = 4 * 3600` the upload is refused with HTTP 400 "This recording is longer than 4 hours. Please
+   upload a shorter recording.", the copied file is deleted and no job stays active. If `ffprobe` cannot give a duration
+   (missing, error, "N/A"), the file is accepted: the ffmpeg timeout and `VideoTooLongError` still cover it.
+2. A **Cancel** button on the job page while the job is active (`POST /lecturer/video/jobs/<id>/cancel`, PIN required,
+   same style as the other lecturer POSTs). It marks the job `failed` with "Cancelled by the lecturer." and frees the
+   slot at once. The worker thread stops as soon as it notices: in the transcription progress callback and before each
+   LLM call (map parts and reduce); **no LLM call is made after a cancel**; the work directory is removed in `finally`.
+   **Known limit:** the audio extraction itself is not interrupted (it is short), so up to a few seconds of work can
+   overlap a new upload. A finished job is left unchanged by a cancel; an unknown id is a 404.
+
+**D36-b — R-F4-3, LLM retries (F4 job thread only).** Each LLM call of the F4 job (the direct call, each map part, the
+reduce) is attempted up to **3 times in total** on a transient failure (the `LLMUnavailableError` family), with a wait of
+**2 s then 8 s**; the sleep is injectable so tests do not wait; no retry once the job was cancelled. A missing key, an
+**empty answer** and any non-transient error are not retried. F5 (homework review) is unchanged. The transcript stays in
+memory only (D34 unchanged).
+
+**D36-c — R-F4-7, export.** The "Checked in at (Jerusalem time)" column shows date and time, "YYYY-MM-DD HH:MM:SS"
+(Jerusalem time, D35), so a check-in after midnight is not read as belonging to the session date. Known limit: at the
+autumn clock change the wall-clock hour 01:xx occurs twice; the stored UTC values stay distinct, the text does not.
+
+**Justification.** Protects the single job slot and the CPU during a class (a 12-hour file would block it), lets the
+lecturer recover from a wrong upload, absorbs short API outages without losing 20 minutes of transcription, and removes
+an ambiguous time cell. Simplest option for each (one constant, one route, one loop).
+
+**Impact.** *SRS:* FR-4.1 (duration), FR-4.10 (cancel), FR-4.11 (retries), FR-4.9, error table, FR-1.18. *Design:* 3.7
+(`duration_seconds`, `cancel`, `JobCancelledError`, `_ask` retry loop), SD-10a, SD-10b, job states, `AttendanceExporter`.
+*Tests:* `tests/test_d36.py`.
+
+**Status:** VALIDATED by the student — 2026-11-24 (three parts)
 
 ---
 

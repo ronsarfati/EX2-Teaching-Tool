@@ -36,7 +36,7 @@ def test_export_header_and_cell_are_local(app, client, clock):
     sheet = load_workbook(io.BytesIO(client.get("/lecturer/export.xlsx").get_data()))["Check-ins"]
     header = [c.value for c in sheet[1]]
     assert header[2] == "Checked in at (Jerusalem time)" and "Jerusalem time" in header[0]
-    assert sheet[2][0].value == "2026-11-23 21:29" and sheet[2][2].value == "21:29:00"
+    assert sheet[2][0].value == "2026-11-23 21:29" and sheet[2][2].value == "2026-11-23 21:29:00"
 
 
 def test_summary_generated_line_uses_local_time():

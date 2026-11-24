@@ -17,8 +17,8 @@ from app.adapters.audio import AudioExtractor
 from app.adapters.jobs import JobRunner
 from app.adapters.transcriber import Transcriber
 from app.clock import Clock
-from app.errors import (AppError, LLMUnavailableError, NoSpeechError, UnreadableVideoError,
-                        UnsupportedVideoFormatError)
+from app.errors import (AppError, JobCancelledError, LLMUnavailableError, NoSpeechError, UnreadableVideoError,
+                        UnsupportedVideoFormatError, VideoDurationLimitError)
 from app.repositories.summaries import JobStatus, SummaryJob, SummaryRepository
 from app.services.lecture_summary import LectureSummariser
 from app.timezone import format_local
@@ -36,6 +36,7 @@ class VideoSummaryService:
     SUMMARY_LANGUAGES = ("auto", "en", "he")
     COPY_CHUNK_BYTES = 1024 * 1024  # copy in 1 MiB pieces: a 2 GB recording is never held in memory
     PROGRESS_STEP = 0.01  # write progress at most about 100 times per job
+    VIDEO_MAX_SECONDS = 4 * 3600  # D36-a: longer recordings are refused before any processing
 
     def __init__(self, jobs: SummaryRepository, extractor: AudioExtractor, transcriber: Transcriber,
                  summariser: LectureSummariser, runner: JobRunner, clock: Clock, work_root: Path) -> None:
@@ -62,6 +63,7 @@ class VideoSummaryService:
         try:
             job_dir.mkdir(parents=True)
             self._copy(upload, media_path)
+            self._check_duration(media_path)
             self._runner.submit(lambda: self._run(job.id, media_path, summary_language))
         except Exception as error:
             shutil.rmtree(job_dir, ignore_errors=True)
@@ -69,6 +71,17 @@ class VideoSummaryService:
             self._jobs.fail(job.id, message, self._clock.now())
             raise
         return job
+
+    def cancel(self, job_id: int) -> SummaryJob:
+        """Fail an active job as cancelled (D36-a) and free the slot at once; a finished job is left unchanged.
+
+        The worker notices at its next check (progress callback, before each LLM call) and stops.
+        """
+        job = self.get(job_id)
+        if job.is_finished():
+            return job
+        self._jobs.fail(job_id, JobCancelledError.user_message, self._clock.now())
+        return self.get(job_id)
 
     def get(self, job_id: int) -> SummaryJob:
         job = self._jobs.get(job_id)
@@ -101,6 +114,12 @@ class VideoSummaryService:
         if target.stat().st_size == 0:
             raise UnreadableVideoError()
 
+    def _check_duration(self, media_path: Path) -> None:
+        """Refuse a recording above VIDEO_MAX_SECONDS; an unmeasurable one is accepted (ffmpeg timeout still applies)."""
+        seconds = self._extractor.duration_seconds(media_path)
+        if seconds is not None and seconds > self.VIDEO_MAX_SECONDS:
+            raise VideoDurationLimitError()
+
     def _run(self, job_id: int, media_path: Path, language: Optional[str]) -> None:
         """The job body (background thread). Every exit ends in `done` or `failed` and removes the media files."""
         job_dir = media_path.parent
@@ -119,7 +138,7 @@ class VideoSummaryService:
             if not transcript.text.strip():
                 raise NoSpeechError()
             self._jobs.move(job_id, JobStatus.SUMMARISING, self._clock.now())
-            text = self._summariser.summarise(transcript, language)
+            text = self._summariser.summarise(transcript, language, lambda: not self._is_still_active(job_id))
             self._jobs.finish(job_id, text, transcript.language, transcript.duration_s, self._clock.now())
         except AppError as error:
             self._jobs.fail(job_id, error.user_message, self._clock.now())
@@ -142,6 +161,8 @@ class VideoSummaryService:
         last = [0.0]
 
         def on_progress(fraction: float) -> None:
+            if not self._is_still_active(job_id):  # cancelled: abort the transcription loop
+                raise JobCancelledError()
             if fraction - last[0] >= self.PROGRESS_STEP:
                 last[0] = fraction
                 self._jobs.set_progress(job_id, fraction, self._clock.now())

@@ -2,11 +2,12 @@
 from __future__ import annotations
 
 import re
-from typing import Optional
+import time
+from typing import Callable, Optional
 
 from app.adapters.llm import LLMClient
 from app.adapters.transcriber import Transcript
-from app.errors import LLMUnavailableError, NoSpeechError
+from app.errors import JobCancelledError, LLMUnavailableError, NoSpeechError
 
 # Meanings, not literal headings: the model must translate the headings into the output language (a literal
 # English list made it keep English headings on a Hebrew lecture). Nothing parses the headings.
@@ -66,35 +67,53 @@ class LectureSummariser:
     MAP_MAX_TOKENS = 1200
     REDUCE_MAX_TOKENS = 3000
     SECTIONS = SECTIONS
+    RETRY_BACKOFF_S = (2, 8)  # D36-b: 3 attempts in total, waiting 2 s then 8 s between them
 
-    def __init__(self, llm: LLMClient, max_chunk_chars: int = MAX_CHUNK_CHARS) -> None:
+    def __init__(self, llm: LLMClient, max_chunk_chars: int = MAX_CHUNK_CHARS,
+                 sleep: Callable[[float], None] = time.sleep) -> None:
         self._llm = llm
         self._max_chunk_chars = max_chunk_chars
+        self._sleep = sleep  # injectable so the tests do not wait
 
     def is_available(self) -> bool:
         return self._llm.is_configured()
 
-    def summarise(self, transcript: Transcript, language: Optional[str]) -> str:
-        """Markdown summary. Raises NoSpeechError (blank text) or LLMUnavailableError (no key, API error, empty)."""
+    def summarise(self, transcript: Transcript, language: Optional[str],
+                  is_cancelled: Callable[[], bool] = lambda: False) -> str:
+        """Markdown summary. Raises NoSpeechError (blank text), LLMUnavailableError (no key, API error, empty)
+        or JobCancelledError when `is_cancelled()` turns true: it is checked before every LLM call (D36-a)."""
         chunks = split_transcript(_neutralise(transcript.text), self._max_chunk_chars)
         if not chunks:
             raise NoSpeechError()
         wanted = _language_sentence(language or transcript.language)
         if len(chunks) == 1:
             return self._ask(SYSTEM_SUMMARY, f"{wanted}\n\n<transcript>\n{chunks[0]}\n</transcript>",
-                             self.REDUCE_MAX_TOKENS)
+                             self.REDUCE_MAX_TOKENS, is_cancelled)
         notes = []
         for number, chunk in enumerate(chunks, start=1):
             prompt = f"{wanted}\n\nPart {number} of {len(chunks)}.\n<transcript>\n{chunk}\n</transcript>"
-            notes.append(self._ask(SYSTEM_NOTES, prompt, self.MAP_MAX_TOKENS))
+            notes.append(self._ask(SYSTEM_NOTES, prompt, self.MAP_MAX_TOKENS, is_cancelled))
         merged = "\n".join(f'<notes part="{number}">\n{_neutralise(note)}\n</notes>' for number, note in enumerate(notes, start=1))
-        return self._ask(SYSTEM_SUMMARY, f"{wanted}\n\n{merged}", self.REDUCE_MAX_TOKENS)
+        return self._ask(SYSTEM_SUMMARY, f"{wanted}\n\n{merged}", self.REDUCE_MAX_TOKENS, is_cancelled)
 
-    def _ask(self, system: str, prompt: str, max_tokens: int) -> str:
-        reply = self._llm.complete(system, prompt, max_tokens, feature="summary").strip()
-        if not reply:
-            raise LLMUnavailableError("summary")  # an empty answer is useless to the lecturer, same message as a failure
-        return reply
+    def _ask(self, system: str, prompt: str, max_tokens: int, is_cancelled: Callable[[], bool]) -> str:
+        """One LLM call with up to 3 attempts on a transient failure (D36-b); never an LLM call after a cancel."""
+        attempts = len(self.RETRY_BACKOFF_S) + 1
+        for attempt in range(attempts):
+            if is_cancelled():
+                raise JobCancelledError()
+            try:
+                reply = self._llm.complete(system, prompt, max_tokens, feature="summary").strip()
+            except LLMUnavailableError:
+                # No key is not transient: retrying would only delay the message.
+                if attempt == attempts - 1 or not self._llm.is_configured():
+                    raise
+                self._sleep(self.RETRY_BACKOFF_S[attempt])
+                continue
+            if not reply:  # an empty answer is not retried: same message as a failure
+                raise LLMUnavailableError("summary")
+            return reply
+        raise AssertionError("unreachable")  # the loop either returns or raises
 
 
 def _neutralise(text: str) -> str:

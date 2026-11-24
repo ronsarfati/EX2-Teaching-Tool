@@ -16,6 +16,9 @@
 {% else %}
 <p><strong id="job-label">{{ job.status.label() }}</strong> <span id="job-progress"></span></p>
 <p id="job-error" hidden>Connection problem, retrying...</p>
+<form method="post" action="{{ url_for('lecturer.video_job_cancel', job_id=job.id) }}">
+  <button type="submit" class="secondary">Cancel</button>
+</form>
 <script>document.body.dataset.api = "{{ url_for('api.video_job', job_id=job.id) }}";</script>
 <script src="{{ url_for('static', filename='video_job.js') }}"></script>
 {% endif %}

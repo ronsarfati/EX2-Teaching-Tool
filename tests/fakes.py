@@ -77,10 +77,14 @@ class FakeRepoFetcher:
 class FakeAudioExtractor:
     """AudioExtractor writing a small dummy WAV, or raising a preset error; remembers what it saw."""
 
-    def __init__(self, error: Exception | None = None) -> None:
+    def __init__(self, error: Exception | None = None, duration: float | None = None) -> None:
         self.error = error
+        self.duration = duration  # what duration_seconds() reports (None = unknown)
         self.calls: list[tuple[Path, Path]] = []
         self.input_existed: list[bool] = []
+
+    def duration_seconds(self, media_path: Path) -> float | None:
+        return self.duration
 
     def extract(self, media_path: Path, wav_path: Path) -> None:
         self.calls.append((media_path, wav_path))

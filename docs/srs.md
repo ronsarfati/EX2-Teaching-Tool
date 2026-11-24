@@ -229,11 +229,11 @@ P: MUST-MAIN. Trace: R2, R16, D7, D21. AC: after an upload no image file exists 
 only the number; no edit-count route exists.
 
 **FR-1.18 Export (offline spreadsheet).** The lecturer shall download the attendance as CSV and as XLSX, one row
-per check-in with the columns "Session date (Jerusalem time)", "Nickname", "Checked in at (Jerusalem time)" (no IP, no network column, D33); plus a
+per check-in with the columns "Session date (Jerusalem time)", "Nickname", "Checked in at (Jerusalem time)" (no IP, no network column, D33), the last one as date and time "YYYY-MM-DD HH:MM:SS" (D36-c); plus a
 per-session summary: session date, check-ins (N), faces detected (D), consistency status. Session dates and times are written in Israel local time (Asia/Jerusalem, DST applied), and the date and time headers name the zone ("Jerusalem time", D35); the database and the JSON API stay in UTC. One export covers all sessions: XLSX with two sheets "Check-ins" and
 "Summary"; CSV as two files `checkins.csv` and `summary.csv` (D31, OI-6). The app has no other check-in route: a student whose camera cannot
 scan the QR is added by the lecturer after class in the exported spreadsheet.
-P: MUST-MAIN. Trace: R3, D6, D8, D21, D30 (P3), D33, D35, tools report 2.8. AC: the files open in a spreadsheet tool and
+P: MUST-MAIN. Trace: R3, D6, D8, D21, D30 (P3), D33, D35, D36-c, tools report 2.8. AC: the files open in a spreadsheet tool and
 their rows equal the live table; the XLSX has the two sheets; the summary values equal those on the lecturer page; no route creates a check-in
 without a valid QR scan and code.
 
@@ -292,10 +292,13 @@ video or audio file (Zoom, Meet or Classroom recordings: MP4, M4V, MOV, MKV, Web
 FLAC); no Zoom/Meet/Classroom API or account is used. The upload limit of this page is `VIDEO_MAX_BYTES` (default
 2 GB, configurable) while every other upload keeps the 25 MB limit; the upload is streamed to a temporary file outside
 the repository, never held entirely in memory. The page advises uploading large recordings on the laptop itself
-(`localhost`), not through the tunnel.
-P: MUST. Trace: R7, R15, D22, D34. AC: a file of each listed extension is accepted; another extension or no file is
+(`localhost`), not through the tunnel. The duration is measured with `ffprobe` right after the copy and before the job
+is queued: above 4 hours (`VIDEO_MAX_SECONDS`, D36-a) the upload is refused (HTTP 400, section 5), the copied file is
+deleted and no job stays active; if the duration cannot be measured the file is accepted (FR-4.2's time limit still applies).
+P: MUST. Trace: R7, R15, D22, D34, D36-a (R-F4-2). AC: a file of each listed extension is accepted; another extension or no file is
 refused with the message of section 5; a file above the limit is refused with the too-large message and creates no
-job; on the photo page the 25 MB limit is unchanged.
+job; on the photo page the 25 MB limit is unchanged; a fake extractor reporting 4 h + 1 s is refused (no job, no file),
+4 h exactly, a shorter duration or an unknown one is accepted; the `ffprobe` command is an argument list without shell.
 
 **FR-4.2 Audio extraction.** The system shall extract the audio track with `ffmpeg` as mono 16 kHz audio into a
 temporary file. A file that cannot be decoded, has no audio track or is empty shall be refused with "We could not
@@ -355,9 +358,24 @@ no Markdown heading or emphasis marks; downloading an unfinished summary answers
 HTML in the LLM answer is shown as text.
 
 **FR-4.9 Live only, failures.** No pre-computed summary shall be shown. On LLM failure (network, API error, timeout,
-empty answer) the job shall end `failed` with the summary-unavailable message, its files deleted.
+empty answer) the job shall end `failed` with the summary-unavailable message, its files deleted (after the retries of FR-4.11).
 P: MUST. Trace: D1, D12, D23, D34. AC: with a failing fake LLM client the job page shows the message and no summary,
 and no job file remains.
+
+**FR-4.10 Cancel.** While a job is active, its page shall show a "Cancel" button (`POST /lecturer/video/jobs/<id>/cancel`,
+PIN required). Cancelling marks the job `failed` with "Cancelled by the lecturer." and frees the slot at once; the
+background thread stops at its next check (transcription progress, before each LLM call), makes **no LLM call after the
+cancel** and removes its work directory. A finished job is unchanged; an unknown id gives 404. Known limit: the audio
+extraction step is not interrupted (short), so a few seconds of overlap are possible.
+P: MUST. Trace: R7, D34, D36-a (R-F4-2). AC: PIN required; unknown id 404; finished job unchanged; the button is shown only
+while the job is active; a cancel during transcription, or between two map parts, ends the job without a further LLM call
+and leaves no file.
+
+**FR-4.11 LLM retries.** Each LLM call of an F4 job (direct, each map part, reduce) shall be attempted up to 3 times in
+total on a transient failure (`LLMUnavailableError`), waiting 2 s then 8 s; a missing key, an empty answer and a
+cancelled job are not retried. The transcript stays in memory only.
+P: MUST. Trace: R7, D12, D34, D36-b (R-F4-3). AC: with a fake LLM failing twice, the third attempt succeeds and the sleeps are
+2 s, 8 s; failing three times ends in the summary-unavailable message after 3 calls; an empty answer is called once.
 
 ### 3.5 F5 Homework review with comparison
 
@@ -460,6 +478,8 @@ messages are removed with the network check (D33).
 | F4: a summary job is already running (FR-4.6) | "A video is already being summarised. Please wait until it is finished." |
 | F4: file empty, not decodable or without an audio track (FR-4.2) | "We could not read this video file." |
 | F4: ffmpeg does not finish within its time limit (very long recording) (FR-4.2) | "This recording is too long to process. Please upload a shorter recording." |
+| F4: recording longer than 4 hours, measured by `ffprobe` (FR-4.1, D36-a) | "This recording is longer than 4 hours. Please upload a shorter recording." |
+| F4: the lecturer cancelled the job (FR-4.10, D36-a) | "Cancelled by the lecturer." |
 | F4: no speech found in the recording (FR-4.3) | "No speech was found in this recording." |
 | F4: Whisper model cannot be loaded / downloaded, or `ffmpeg` missing (FR-4.3) | "The transcription service is unavailable right now. Please try again later." |
 | F4: the application stopped during a job (FR-4.7) | "The summary was interrupted because the app was restarted. Please upload the video again." |
@@ -478,7 +498,7 @@ messages are removed with the network check (D33).
 | R4 | Section 3.1 (most detailed, first), all FR-1.x MUST-MAIN |
 | R5 | FR-2.1-FR-2.4, NFR-2 |
 | R6 | FR-3.1-FR-3.4, NFR-2 |
-| R7 | FR-4.1-FR-4.9 (D34; D10 closed), NFR-13 |
+| R7 | FR-4.1-FR-4.11 (D34, D36; D10 closed), NFR-13 |
 | R8 | FR-4.4 (structured four-section summary), comparison with the Zoom example in `docs/results.md` |
 | R9 | FR-5.1-FR-5.3 |
 | R10 | FR-5.4, FR-5.5 |

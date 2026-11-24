@@ -61,7 +61,7 @@ def test_checkin_rows_equal_live_api(app, services, lecturer, three):
     expected = []
     for session in three:
         for c in lecturer.get(f"/api/sessions/{session.id}/attendance").get_json()["check_ins"]:
-            when = datetime.fromtimestamp(c["checked_in_at"], tz=ZoneInfo("Asia/Jerusalem")).strftime("%H:%M:%S")
+            when = datetime.fromtimestamp(c["checked_in_at"], tz=ZoneInfo("Asia/Jerusalem")).strftime("%Y-%m-%d %H:%M:%S")
             expected.append([datetime.fromtimestamp(session.opened_at, tz=ZoneInfo("Asia/Jerusalem")).strftime("%Y-%m-%d %H:%M"),
                              c["nickname"], when])
     assert len(rows) == 6 and rows == expected

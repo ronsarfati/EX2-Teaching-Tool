@@ -163,6 +163,19 @@ class VideoTooLongError(VideoError):
     http_status = 400
 
 
+class VideoDurationLimitError(VideoTooLongError):
+    """The recording lasts more than the allowed duration (D36-a), measured with ffprobe before any work."""
+
+    user_message = "This recording is longer than 4 hours. Please upload a shorter recording."
+
+
+class JobCancelledError(VideoError):
+    """The lecturer cancelled the job (D36-a); raised inside the worker thread to stop it at once."""
+
+    user_message = "Cancelled by the lecturer."
+    http_status = 409
+
+
 class UnsupportedVideoFormatError(VideoError):
     user_message = "Please choose a video or audio recording (for example MP4, MOV, MKV, WebM or M4A)."
     http_status = 400

@@ -29,8 +29,8 @@ CONCRETE = [c for c in all_error_classes()
 
 # ---- errors: hygiene (NFR-10) ----
 def test_every_concrete_error_is_in_srs_table_count():
-    """Covers NFR-10: 29 concrete classes exist (23 + 6 of F4, D34), no undocumented extra one."""
-    assert len(CONCRETE) == 29
+    """Covers NFR-10: 31 concrete classes exist (23 + 6 of F4, D34 + 2 of D36), no undocumented extra one."""
+    assert len(CONCRETE) == 31
 
 
 @pytest.mark.parametrize("cls", CONCRETE, ids=lambda c: c.__name__)
