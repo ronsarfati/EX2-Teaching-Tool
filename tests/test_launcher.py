@@ -4,8 +4,9 @@ Covers D39 (launcher: prerequisites check, tunnel URL parsing, app start with en
 already-running path, no secret in the output).
 
 The script is never edited. Tests that must not touch the real repo run a copy of it inside a temporary
-"mini repo" (scripts/, a symlinked .venv and app, a dummy .env), because the script resolves its root from its
-own location.
+"mini repo" (scripts/, a stub .venv/bin/python, a symlinked app, a dummy .env), because the script resolves its
+root from its own location. The stub python re-execs the interpreter running pytest, so the tests do not need
+<repo>/.venv to exist (fresh clone with another venv name, CI).
 """
 import os
 import re
@@ -44,7 +45,7 @@ def free_port() -> int:
 
 
 def make_repo(tmp_path: Path, *, env_file: bool = True, strip_path_export: bool = False) -> Path:
-    """Mini repo: scripts/HereOrNot.command (copy), .venv and app symlinked to the real ones, dummy .env."""
+    """Mini repo: scripts/HereOrNot.command (copy), stub .venv/bin/python, app symlinked, dummy .env."""
     root = tmp_path / "repo"
     (root / "scripts").mkdir(parents=True)
     text = SCRIPT.read_text()
@@ -53,7 +54,13 @@ def make_repo(tmp_path: Path, *, env_file: bool = True, strip_path_export: bool 
     dest = root / "scripts" / "HereOrNot.command"
     dest.write_text(text)
     dest.chmod(0o755)
-    (root / ".venv").symlink_to(REPO / ".venv")
+    # Stub interpreter: a wrapper (not a symlink, which would lose the venv's site-packages) that re-execs the
+    # Python running the tests, which has the app dependencies installed.
+    venv_bin = root / ".venv" / "bin"
+    venv_bin.mkdir(parents=True)
+    stub_python = venv_bin / "python"
+    stub_python.write_text(f'#!/bin/bash\nexec "{sys.executable}" "$@"\n')
+    stub_python.chmod(0o755)
     (root / "app").symlink_to(REPO / "app")
     if env_file:
         lines = [f"{k}=file-{v}" for k, v in SECRETS.items()] + ["BASE_URL=http://wrong.invalid"]
@@ -86,6 +93,8 @@ def has_homebrew_tools() -> bool:
 # ---------------------------------------------------------------- --check
 
 @pytest.mark.skipif(not has_homebrew_tools(), reason="cloudflared/ffmpeg not installed")
+@pytest.mark.skipif(not (REPO / ".venv" / "bin" / "python").exists(),
+                    reason="this test runs the real script in the real repo, which requires <repo>/.venv")
 def test_check_ok_in_real_repo():
     """Covers D39: --check exits 0 in the real repo (needs .venv, cloudflared, ffmpeg, .env)."""
     if not (REPO / ".env").exists():
@@ -127,7 +136,7 @@ def test_check_fails_without_env_file(tmp_path):
 def test_check_fails_without_venv(tmp_path):
     """Covers D39: missing .venv -> exit 1 with the creation command."""
     root = make_repo(tmp_path, strip_path_export=True)
-    (root / ".venv").unlink()
+    shutil.rmtree(root / ".venv")
     r = run_check(root, SYSTEM_PATH)
     assert r.returncode == 1
     assert ".venv not found" in r.stderr
