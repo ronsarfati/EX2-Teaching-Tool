@@ -2,7 +2,7 @@
 
 Covers R28 ("Define the main use cases (client stories)"). Built from the [SRS](srs.md) (FR-x.y, NFR-n, error
 messages of section 5), the requirements R1-R37 ([requirements.md](requirements.md)) and the validated decisions
-D1-D37 ([decisions.md](decisions.md); D31 = design-level choices validated on 23/11). The attendance check-in follows **D30**; D5 and D26 are superseded and not
+D1-D39 ([decisions.md](decisions.md); D31 = design-level choices validated on 23/11). The attendance check-in follows **D30**; D5 and D26 are superseded and not
 used here. F1 Attendance is the main feature (R4) and comes first.
 
 ## 1. Actors

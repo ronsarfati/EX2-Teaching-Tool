@@ -1,9 +1,9 @@
 # Test Strategy (To Do 9)
 
 Covers R32 ("a testing strategy that addresses the classes of To Do 7"). Built from the [design](design.md)
-(classes of section 3, exceptions of 3.8, tasks T1-T21 of section 7 (T18 = T18a-T18f)), the [SRS](srs.md) (FR-x.y, NFR-n, error table
-of section 5), the [use cases](use_cases.md) (UC-1 to UC-14), the validated decisions D1-D37
-([decisions.md](decisions.md); D25 = test tooling, D7 = consistency rule, D30 / D31 = check-in rules, D33 = no network filter, 4-digit code, D34 = F4 video summary, D36 = F4 duration cap / cancel / retries / export date, D37 = signed device token) and the
+(classes of section 3, exceptions of 3.8, tasks T1-T23 of section 7 (T18 = T18a-T18f)), the [SRS](srs.md) (FR-x.y, NFR-n, error table
+of section 5), the [use cases](use_cases.md) (UC-1 to UC-14), the validated decisions D1-D39
+([decisions.md](decisions.md); D25 = test tooling, D7 = consistency rule, D30 / D31 = check-in rules, D33 = no network filter, 4-digit code, D34 = F4 video summary, D36 = F4 duration cap / cancel / retries / export date, D37 = signed device token, D38 = UI redesign, D39 = one-click launcher) and the
 [tools report](tools_report.md). Class, port, method and exception names are exactly those of `design.md`.
 
 ## 1. Approach
@@ -421,6 +421,28 @@ device scanning and confirming from 10 threads gives 1 row. A run against the re
 
 `tests/test_huge_ids.py`: ids beyond the SQLite 64-bit range (10**30) on the attendance API, photo page and upload, and poll routes answer a clean 404/400, never a 500 (NFR-10, D23).
 
+### 2.9 User interface and launcher (T22, T23; D38, D39)
+
+The redesign changes no route, field name or JSON key, so the earlier tests stay unchanged and must stay green; the
+new tests guard the strings and invariants the old ones rely on (design 2.2) and the new behaviour. All run offline
+with the Flask test client; the script tests need no browser.
+
+| File (`tests/`) | Tests | Checks |
+|---|---|---|
+| `test_t22_ui.py` | 7 | shell, `/static/app.css` served, lecturer nav present and absent on the projector, login page |
+| `test_t22_batch1.py` | 24 | every page renders in the new shell; nav links resolve; CSS sane; no stale app name; no `xmlns`, no external URL, no `<form` in the shell |
+| `test_t22_batch2.py`, `test_t22_batch2_extra.py` | 6 + 13 | dashboard closed / open states (words "Open session" and "Close session" exclusive), projector link, `data-state`, ids kept, projector layout and `#projector-error`, JS invariants (`POLL_MS`, no `innerHTML`); `projector.js` and `poll_json.js` run under `node` against a small DOM stub |
+| `test_t22_batch3.py`, `test_t22_batch3_extra.py` | 9 + 15 | check-in field order and attributes, device marker (D37), menu tiles, tab bar absent on check-in pages, contextual error "Back", poll option cards and polling regex, comment counter (script run under `node`) |
+| `test_t22_batch4.py`, `test_t22_batch4_extra.py` | 7 + 10 | contract strings of the lecturer sub-pages, rendered photo result, video job pages, review page; `busy.js` and `video_job.js` run under `node`, no network in `busy.js` |
+| `test_t22_batch5.py`, `test_t22_batch5_extra.py` | 14 + 12 | dashboard summary data (latest poll, comment count, active job, latest session) on empty and filled databases, photo link after closing (D31), login page, `theme.js` auto / light / dark and storage-blocked edge cases (under `node`) |
+| `test_launcher.py` | 8 | `scripts/HereOrNot.command` (D39), with stubbed `cloudflared`, `ffmpeg`, `curl` and a throw-away mini repository, no real tunnel, no network: `--check` in the real repo, missing `cloudflared` / `ffmpeg` / `.env` / `.venv` each give a clear error, `--check` passes with stubs and prints no secret, "already running" exits 0 quickly, full start parses the tunnel URL, starts the app with `BASE_URL` and `PORT` and shuts down cleanly |
+
+The tests that execute JavaScript call `node` and are **skipped when `node` is not installed** (the other tests of the
+same files still run). Counts are the `def test_` functions of each file (`grep -c "def test_" tests/test_t22_*.py
+tests/test_launcher.py`).
+
+Manual (not automated): M13 below (phones, dark mode, Hebrew, projector from the back row, T22j).
+
 ## 3. Integration tests per use case
 
 Flask test client on an app built with fakes; `lecturer_client` holds the PIN; no request carries an address header (none is read, D33). Every message is checked
@@ -491,6 +513,7 @@ are added here. Results are written in `docs/results.md`.
 | M11 | F4 on a real lecture clip (local only), uploaded on `localhost`, `ffmpeg` installed, model cached (T18f) | status steps in order; four sections in the lecture language; `.md` and `.txt` download; work directory empty; database holds only the summary text; timings noted (244 s clip: about 70 s on the demo laptop, `docs/results.md`) | FR-4.1-FR-4.9, NFR-13, UC-12 |
 | M11b | F4 limits (D36), on the laptop: `ffprobe` measures the real 244 s clip as 244.4 s; a fake `.mp4` gives no duration and is accepted by the duration check; the Cancel button appears on an active job and stops it | duration 244.4 s (`ffprobe`); no duration for the fake file; job shows "Cancelled by the lecturer." | FR-4.1, FR-4.10, D36 |
 | M12 | Cleared cookies (D37), on a phone: check in, clear the browser cookies of the site only, scan the next QR | "You are already checked in for this class."; the same after clearing all site data is NOT blocked (stated limit) | FR-1.12, UC-2 (1d), D37 |
+| M13 | Look and feel (T22j, D38), on an iPhone and an Android phone, light and dark mode, and the projector seen from the back row | Menu, check-in, poll and comments readable, 56 px targets reachable with a thumb; a Hebrew nickname, comment and poll option display right-to-left; the QR and the 4-digit code are readable on the projector | NFR-15, D38 |
 
 ## 6. Coverage and exit criteria
 
@@ -523,6 +546,8 @@ are added here. Results are written in `docs/results.md`.
 | T18f | none (manual, M11) | real run recorded in the tools report and `docs/results.md` |
 | D36 | `test_d36.py` (22 tests) | `ffprobe` duration above / at / under 4 h and unknown (fake extractor, argument list without shell, unusable output gives none); upload above 4 h answers 400 and leaves nothing; cancel route (PIN, 404, finished job unchanged, slot freed, button only while active); cancel during transcription and between map parts makes no further LLM call; 3 attempts with waits 2 s then 8 s, no retry on empty answer, missing key or cancel; export cell shows date and time after midnight, DST repeat documented |
 | D37 | `test_d37_device_marker.py`, `test_concurrent_checkins.py` | cases listed in 2.8; 50 simultaneous devices give 50 rows, same device 10 threads gives 1 |
+| D38 | `test_t22_*.py` (see 2.9) | UI contract strings, states, node-run scripts; M13 manual |
+| D39 | `test_launcher.py` | see 2.9 |
 | hardening | `test_redteam_fixes.py` | `strip_invisible` and invisible-only nickname refused; XLSX export survives a control character; photo above 40 MP refused before decoding; 25 MB upload cap; werkzeug log silenced; `X-Frame-Options` / `nosniff` on every response; `SameSite=Lax` cookies; glued peer names masked, unrelated words not (T4, T7-T9, T11, T12, T17; design 2.1) |
 | T20 | `test_t20_no_network.py` | acceptance tests 1-12 of design section 7 pass (no IP read, allow-list gone, new schema, old database untouched) |
 | T21 | `test_t21_four_digit_code.py` | acceptance tests 1-8 of design section 7 pass (format, strict input, rotation, P1, P2) |

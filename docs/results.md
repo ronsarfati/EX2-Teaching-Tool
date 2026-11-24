@@ -19,10 +19,11 @@ filled in only after the demo; nothing below is estimated.
 | F3 Polls (one vote per device, signed device token mirrored on the phone, D37, live results, close) | Implemented, tested |
 | F5 Homework review with anonymised comparison (public GitHub URL, Claude) | Implemented, tested with fakes; live call needs an API key [to fill after the class demo] |
 | F4 Video summary (upload, ffmpeg, Whisper `small`, Claude, background job, status page, `.md`/`.txt` download; D34; 4 h cap, Cancel button, LLM retries, D36) | Implemented, tested with fakes; one real end-to-end trial (section 3) |
+| UI redesign (HereOrNot, D38: identity, dashboard, student, projector and lecturer pages, theme toggle) and one-click launcher (D39) | Implemented, tested (`tests/test_t22_*.py`, `tests/test_launcher.py`); check on real phones (M13) still to be recorded |
 
 ## 3. Measured figures
 
-Automated tests (24/11, after D37, `python -m pytest -q --cov=app`): 1211 passed, 1 skipped (the opt-in F4 integration test,
+Automated tests (24/11, after D39, `python -m pytest -q --cov=app`): 1364 passed, 1 skipped (the opt-in F4 integration test,
 `RUN_F4_INTEGRATION=1`); statement coverage of `app/` 99 %.
 
 Scripted local trial (23/11, after D33, real server on the laptop, QR decoded from the projector image): wrong code refused (400), right 4-digit code accepted, second check-in from the same phone refused (409), 3-digit input refused, second phone accepted, removed allow-list page answers 404, no client address in the server log. Earlier trial scope (before D33): (check-in with QR and code, repeated check-in refused, wrong code

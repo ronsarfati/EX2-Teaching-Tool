@@ -1,10 +1,12 @@
-# Web-based Teaching Tool
+# HereOrNot - a web-based teaching tool
 
-A KISS smartphone web app for teaching in class: attendance first, plus live comments, quick polls, ML video
+**HereOrNot** ("here or not") is a KISS smartphone web app for teaching in class: attendance first, plus live comments, quick polls, ML video
 summaries and LLM homework reviews.
 
 Course assignment: *Introduction to Software Engineering (OOP/OOD)*, Ex2 "Vibe Coding & Deep Designing:
-Web-based Teaching Tool". The assignment is a **design challenge**; the implementation is secondary and reuses
+Web-based Teaching Tool".
+
+Look and feel (D38): phone-first student pages, a lecturer dashboard split into "In class now" and "After class", a projector page with QR, code and three steps, light and dark themes (lecturer toggle), Hebrew and English text, system fonts and no external resource. The assignment is a **design challenge**; the implementation is secondary and reuses
 existing code where possible (R12, R17, R18).
 
 ## 1. Problem
@@ -93,10 +95,21 @@ F4 (video summary) was first deferred (D10) and is implemented since D34 (23/11)
 - **ML / LLM** (D7, D12, D34): local face detector OpenCV YuNet, threshold 0.4 (Ultralytics YOLO tested and
   rejected in the tools report), local audio extraction with `ffmpeg` and transcription with `faster-whisper` (`small`, one background thread), Anthropic Claude for summaries and
   reviews (model and API key from environment variables, never committed).
-- **Demo hosting** (D13): app on a laptop exposed with a Cloudflare quick tunnel (public HTTPS URL); plan B phone
+- **Demo hosting** (D13, D39): app on a laptop exposed with a Cloudflare quick tunnel (public HTTPS URL), started by a one-click launcher; plan B phone
   hotspot; plan C recorded rehearsal.
+- **Interface** (D38): server-rendered templates on the vendored Pico CSS plus `app/static/app.css` (design tokens, light and dark), system fonts, Lucide icons; no framework, no build step.
 
 ### How to run
+
+**One click (D39, macOS).** Once the setup below is done (virtual environment, `.env`, `cloudflared`, `ffmpeg`), create a Desktop alias and double-click it:
+
+```bash
+ln -s "$PWD/scripts/HereOrNot.command" ~/Desktop/HereOrNot.command
+```
+
+First launch: right-click the file, then **Open** (macOS asks once to confirm). The launcher starts the Cloudflare quick tunnel, reads its URL, starts the app with that `BASE_URL` (and `PORT`, default 5050) without editing `.env`, waits for `/ping`, opens Safari on the lecturer login and stops everything when its window is closed. If HereOrNot is already running it just opens Safari. `scripts/HereOrNot.command --check` only verifies the prerequisites. The Mac must stay on during class.
+
+**Manual commands (fallback).**
 
 Prerequisites: Python 3.11+ (tested with 3.13) and, optionally, `cloudflared` (to expose the app to phones) and `ffmpeg` (F4 only, for example `brew install ffmpeg`).
 
@@ -137,7 +150,7 @@ tests/test_t18b_integration.py` (needs `ffmpeg` and the cached model).
 
 First step for the lecturer: open the app and sign in with the PIN at `/lecturer/login`.
 
-Phones must reach the laptop. Either use a Cloudflare quick tunnel
+Phones must reach the laptop. Either use the launcher above, or a Cloudflare quick tunnel
 (`cloudflared tunnel --url http://localhost:5000`, then put the printed URL in `BASE_URL` and restart the app), or
 a phone hotspot. See
 [docs/demo_script.md](docs/demo_script.md).
@@ -152,7 +165,7 @@ Optional demo data (fictional nicknames only, no network, no API key; existing f
 | To Do | Deliverable | Location | Status |
 |---|---|---|---|
 | — | Requirements R1-R37 | [docs/requirements.md](docs/requirements.md) | Done |
-| — | Validated decisions D1-D37 | [docs/decisions.md](docs/decisions.md) | Done |
+| — | Validated decisions D1-D39 | [docs/decisions.md](docs/decisions.md) | Done |
 | 1 | Repository, problem and scope | this README | Done |
 | 2 | Repository link submitted via the course form | (by the student) | Done |
 | 3 | Tools report, every tool tested for real | [docs/tools_report.md](docs/tools_report.md) | Done |
@@ -180,4 +193,4 @@ Optional demo data (fictional nicknames only, no network, no API key; existing f
 This project was designed and built with the help of **Claude Code** (Anthropic) AI agents, working under the
 student's direction. The agents drafted the requirements, decisions, documents and code; the student defined the
 key design choices (e.g. the projector QR + 4-digit code check-in, D30, D33) and reviewed and validated every decision before it was
-applied. The F4 video-summary feature was tried on a public lecture clip that stays local and is not in the repository. Third-party libraries and services used by the app are listed in the tools report.
+applied. The icons are copied from **Lucide** (ISC licence; the app loads nothing from the network). The F4 video-summary feature was tried on a public lecture clip that stays local and is not in the repository. Third-party libraries and services used by the app are listed in the tools report.

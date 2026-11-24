@@ -1,6 +1,6 @@
 # Statement of Work (To Do 4)
 
-Covers R26. Requirements are cited as R1-R37 ([requirements.md](requirements.md)), validated decisions as D1-D37
+Covers R26. Requirements are cited as R1-R37 ([requirements.md](requirements.md)), validated decisions as D1-D39
 ([decisions.md](decisions.md); D5 and D26 are superseded by D30).
 
 ## 1. Purpose and background
@@ -59,7 +59,7 @@ head count (D7).
 
 ## 5. Approach
 
-- **Design first:** requirements (R1-R37) and validated decisions (D1-D37) precede SRS, use cases and design; code
+- **Design first:** requirements (R1-R37) and validated decisions (D1-D39) precede SRS, use cases and design; code
   only implements what is designed (R17).
 - **Compose existing tools:** Flask, `qrcode`, OpenCV YuNet, `ffmpeg`, faster-whisper, Anthropic SDK, `openpyxl`,
   `cloudflared`, each tested for real in the tools report before adoption (R18, R25, D15).

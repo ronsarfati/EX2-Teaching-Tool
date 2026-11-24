@@ -2,7 +2,7 @@
 
 Resolutions of the open questions (OQ1-OQ14 in `docs/requirements.md`) and of the technical choices left open by
 the statement. Proposed by the ambiguity analysis, **validated by the student on 2026-11-22** (D31: 2026-11-23;
-D32, D33, D34 and D35: 2026-11-23; D36 and D37: 2026-11-24).
+D32, D33, D34 and D35: 2026-11-23; D36, D37, D38 and D39: 2026-11-24).
 Requirements are cited as R<n>, statement locators as F/Req/G/TD/QA (see `docs/requirements.md`).
 
 Guiding rule: the **simplest option that fully satisfies the requirements** (KISS, Req2), that can really be
@@ -54,6 +54,8 @@ old text is kept below for history only and must not be used for design.
 | D35 | Display time zone | User-visible times in Israel local time (Asia/Jerusalem, DST); storage stays UTC | VALIDATED (23/11) |
 | D36 | F4 red-team follow-ups (amends D34, D35) | (a) recordings above 4 h refused (ffprobe) + Cancel button; (b) up to 3 attempts per LLM call in the F4 job, backoff 2 s then 8 s; (c) export column "Checked in at" shows date and time | VALIDATED (24/11) |
 | D37 | One check-in per phone even after clearing cookies (amends D6 and D31 / OI-4) | Server-signed random device token (HMAC-SHA256) mirrored on the phone in cookie, localStorage and IndexedDB; a valid older stored copy wins over a missing cookie; browser fingerprinting rejected | VALIDATED (24/11) |
+| D38 | UI redesign and visual identity (T22a-T22m) | App name **HereOrNot** ("here or not"), inline SVG logo, indigo `#3B4FD8` + orange `#FF8A3D` palette (light and dark), system fonts, Pico variables overridden in `app.css`; reorganised lecturer dashboard, phone-first student pages, forced-light projector page, `dir="auto"` on user text, busy feedback, manual theme toggle, Lucide icons (ISC); no framework change, no build step | VALIDATED (24/11) |
+| D39 | One-click launcher (plan A of D13, started by a double-click) | `scripts/HereOrNot.command`: starts the quick tunnel, reads its URL, starts the app, opens Safari on the lecturer login, cleans up on close; no fixed URL, no permanent hosting | VALIDATED (24/11) |
 
 "VALIDATED" = "VALIDATED by the student — 2026-11-22" unless stated otherwise. "DEFERRED" = "DEFERRED by the
 student — 2026-11-22".
@@ -812,6 +814,70 @@ remaining loopholes are stated openly.
 
 **Impact.** *SRS:* FR-1.12, NFR-7, glossary. *Design:* device component, OI-4, SD for the sync. *Use cases:* UC-2 exception.
 *Tests:* `tests/test_d37_device_marker.py`, `tests/test_concurrent_checkins.py`.
+
+**Status:** VALIDATED by the student — 2026-11-24
+
+---
+
+## D38 — UI redesign and visual identity (T22a-T22m; NFR-15)
+
+**Question.** The pages were plain Pico defaults: no name, no hierarchy, nine lecturer actions as text links, no
+projector link while a session was open. How far should the interface be redesigned for the class demo?
+
+**Options.** 1. *Keep the defaults* (no work, bland and confusing). 2. *Restyle only the demo-visible pages.*
+3. *Full redesign* of every page on top of the vendored Pico CSS. Names proposed: an earlier working name, HandUp, Roll & Poll,
+HereOrNot; **the student chose HereOrNot** ("here or not").
+
+**DECISION: option 3 (full version, T22a-T22m).**
+- **Identity.** Name HereOrNot, tagline "A web-based teaching tool"; inline SVG logo (check mark + orange "live" dot,
+  no `xmlns`, so the projector page stays free of any URL); palette indigo `#3B4FD8` and orange `#FF8A3D`, with a dark
+  variant that follows the phone or laptop setting; status is never colour-only (word + icon).
+- **Fonts and icons.** System fonts only (Hebrew-capable stack), no web font, no CDN. Ten icons copied from **Lucide**
+  (ISC licence) into one Jinja macro file.
+- **Style layer.** `app/static/app.css` loaded after `pico.min.css`: design tokens (`--cp-*`) mapped onto the Pico
+  variables, so Pico components follow the palette. No new framework, no build step (both rejected: not needed, more work).
+- **Lecturer.** Shared layout with a links-only nav; dashboard = session bar (Live / Closed, Open / Close, Projector),
+  section "In class now" (attendance tiles, live table, photo count, polls and comments), section "After class"
+  (export, video summary, homework review).
+- **Students.** Phone first: one column, 56 px tap targets, big 4-digit code input, bottom tab bar (not on the check-in
+  pages), option cards for polls.
+- **Projector.** Forced light theme, QR left, code right, steps 1-2-3, error shown apart from "No session is open."
+- **Accessibility and robustness.** Contrast WCAG AA for text tokens; `dir="auto"` on every text typed by a person or
+  produced by the LLM (Hebrew and English); busy feedback on long uploads and LLM calls (`busy.js`); manual
+  theme toggle auto / light / dark stored in `localStorage` (`theme.js`, lecturer pages only).
+- No route, form field name or JSON key changes: the behaviour and its tests stay as they were.
+
+**Justification.** The project is graded on design and the demo is live: a clear, named, readable interface (on a
+phone and on a projector) costs a few hours and no new dependency (KISS, R13, R14, R19).
+
+**Impact.** *SRS:* NFR-15. *Design:* section 2.2 (UI layer), tasks T22a-T22m. *Test strategy:* section 2.9.
+*README:* title, "Look and feel", Tools used (Lucide). *Tests:* `tests/test_t22_*.py`.
+
+**Status:** VALIDATED by the student — 2026-11-24
+
+---
+
+## D39 — One-click launcher (plan A of D13; FR-6.3, NFR-9)
+
+**Question.** Before each class the lecturer had to start `cloudflared`, copy its URL into `.env`, restart the app and
+open the browser. Can this be one action?
+
+**Options.** 1. *Manual commands* (works, error-prone before a live demo). 2. *Fixed public URL* (needs an account and
+a domain). 3. *Permanent hosting* (Whisper and YuNet are too heavy for free tiers; more work before the deadline).
+4. *A launcher script for the existing quick tunnel.*
+
+**DECISION: option 4.** `scripts/HereOrNot.command`, double-clicked in Finder (or through an alias on the Desktop):
+checks the prerequisites, starts the `cloudflared` quick tunnel and reads its URL, starts the app with `BASE_URL` and
+`PORT` in the process environment (`.env` is **not** edited), waits for `/ping`, opens Safari on the lecturer login,
+and stops the app and the tunnel when the window is closed. If the app already answers, it only opens Safari.
+`--check` verifies the prerequisites and exits.
+
+- **Rejected:** a fixed URL and permanent hosting (see above).
+- **Limit:** the Mac must stay on and connected during class; the tunnel URL still changes at each start (D31, OI-4).
+  The manual commands of the README stay as fallback.
+
+**Impact.** *Design:* section 1.2 (hosting, C11). *Demo script:* setup. *README:* "How to run".
+*Tests:* `tests/test_launcher.py` (stubs, no network).
 
 **Status:** VALIDATED by the student — 2026-11-24
 

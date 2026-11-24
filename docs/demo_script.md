@@ -8,7 +8,9 @@ class photo and watches the clock.
 
 ## 1. Setup checklist (before class, 20 min before)
 
-Run once on the demo laptop, from the repository root (`python -m app` loads `.env` itself; variables already set in the environment win).
+**Quick setup (D39):** double-click `HereOrNot` (the Desktop alias of `scripts/HereOrNot.command`, first time: right-click > Open). It starts the tunnel and the app with the public URL as `BASE_URL`, then opens Safari on `/lecturer/login`; keep its window open. Then continue at step 2 (the manual steps 1, 4 and 5 below are the **fallback** if the launcher fails; `scripts/HereOrNot.command --check` says what is missing). `.env` must exist once with `SECRET_KEY`, `LECTURER_PIN` and, optionally, `ANTHROPIC_API_KEY`.
+
+Manual fallback, from the repository root (`python -m app` loads `.env` itself; variables already set in the environment win).
 
 1. Environment: copy `.env.example` to `.env`, set a long random `SECRET_KEY`, a `LECTURER_PIN`, and `BASE_URL`
    (the public tunnel URL, or `http://<laptop IP>:<port>` for the hotspot plan B). Optional: `ANTHROPIC_API_KEY` (F5 and F4).

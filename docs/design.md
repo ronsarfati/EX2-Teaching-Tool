@@ -2,10 +2,10 @@
 
 Covers R29 (main software components), R30 (low-level class diagrams) and R31 (sequence diagrams). Built from the
 [SRS](srs.md) (FR-x.y, NFR-n, error table of section 5), the [use cases](use_cases.md) (UC-1 to UC-14), the
-requirements R1-R37 ([requirements.md](requirements.md)), the validated decisions D1-D37
+requirements R1-R37 ([requirements.md](requirements.md)), the validated decisions D1-D39
 ([decisions.md](decisions.md); **D5 and D26 are superseded by D30 and not used**; D10 (F4 deferred) is closed by
 **D34** (23/11): F4 summarises real recordings of any length in a background job; D31 records
-the open points of section 9, all validated on 23/11 (OI-4 amended by **D37**, 24/11: signed device token mirrored on the phone); **D32 is superseded by D33** (23/11): the app reads no client
+the open points of section 9, all validated on 23/11 (OI-4 amended by **D37**, 24/11: signed device token mirrored on the phone; **D38** (24/11): UI redesign and name HereOrNot, section 2.2; **D39**: one-click launcher, C11); **D32 is superseded by D33** (23/11): the app reads no client
 IP at all, the network check of D30 point 1 is removed, and the projected code has 4 digits) and the
 libraries tested in the [tools report](tools_report.md). All diagrams are Mermaid (D14).
 
@@ -133,7 +133,7 @@ limit and 100 s request limit, D34 risks).
 | C9 | Homework review (F5) | Fetch public repositories, cap text, LLM review with anonymised comparison | `HomeworkReviewer`, `RepoFetcher` / `GitHubRepoFetcher`, `LLMClient` / `ClaudeClient` | FR-5.1-FR-5.5 | UC-13 |
 | C10 | Video summary (F4, D34) | Accept one recording at a time, run extraction -> local transcription -> LLM summary in a background thread, expose the job status, keep only the summary | `VideoSummaryService`, `LectureSummariser`, `SummaryRepository`, `SummaryJob` / `JobStatus`, `Transcriber` / `FasterWhisperTranscriber`, `AudioExtractor` / `FfmpegAudioExtractor`, `JobRunner` / `ThreadJobRunner`, `LLMClient` | FR-4.1-FR-4.9 | UC-12 |
 | C13 | External tools for F4 (outside Python) | Decode any container and resample to mono 16 kHz; host the Whisper model files | `ffmpeg` command line (system package), Hugging Face model cache (`~/.cache/huggingface`) | FR-4.2, FR-4.3 | UC-12 |
-| C11 | Hosting (external process) | Public HTTPS URL to the laptop (plan A); plan B LAN needs only another base URL (but is unusable on the campus Wi-Fi, which isolates clients: D13 note) | `cloudflared tunnel --url http://127.0.0.1:<port>` | FR-6.3, NFR-9 | UC-1, UC-2 |
+| C11 | Hosting (external process) | Public HTTPS URL to the laptop (plan A, started by a double-click on `scripts/HereOrNot.command` since D39: quick tunnel, URL read from its output, app started with `BASE_URL` and `PORT` in the environment, Safari opened on the lecturer login, clean-up on close); plan B LAN needs only another base URL (but is unusable on the campus Wi-Fi, which isolates clients: D13 note) | `cloudflared tunnel --url http://127.0.0.1:<port>` | FR-6.3, NFR-9 | UC-1, UC-2 |
 | ~~C12~~ | ~~Relay range updater (D32)~~ | **Removed by D33** (no relay list, no script); the number is not reused | - | - | - |
 
 No queue or scheduler exists: every rule with time (10 s, 15 s, 5 s, 1 min) is evaluated lazily at request time
@@ -205,6 +205,43 @@ Helpers (functions, not classes, because they hold no state):
   gets its real implementation (`SystemClock`, `YuNetHeadCounter`, `ClaudeClient`, `GitHubRepoFetcher`,
   `FasterWhisperTranscriber`, `FfmpegAudioExtractor`, `ThreadJobRunner`). `**fakes` overrides any other entry of the
   services registry. At the end, `create_app` calls `VideoSummaryService.recover_interrupted()` (D34).
+
+### 2.2 User interface (D38; NFR-15)
+
+Server-rendered Jinja templates on top of the vendored Pico CSS; no framework, no build step, no CDN, no web font.
+Routes, form field names, element ids and JSON keys are unchanged by the redesign (the tests rely on them).
+
+| File (`app/`) | Role |
+|---|---|
+| `templates/base.html` | Shell of every page: `app.css` after `pico.min.css`, `color-scheme` and `theme-color` metas, favicon, header with the inline SVG logo (no `xmlns`, so no URL on the projector page) and the name HereOrNot; blocks `html_attrs`, `head_extra`, `nav`, `main_class`, `content`, `footer`, `tabbar`; no `<form>`, no inline script |
+| `templates/lecturer_base.html` | Extends `base.html` for every lecturer page: links-only nav (Dashboard, Projector with `target="projector"`, Polls, Comments, Video summary, Homework), loads `theme.js` in `<head>`, theme toggle button |
+| `templates/_icons.html` | Jinja macro `icon(name)`: 10 inline stroke icons copied from Lucide (ISC), `aria-hidden`, no `xmlns` |
+| `templates/_tabbar.html` | Bottom tab bar of the student pages (Home, Poll, Comments, Review), links only; not included on the check-in pages |
+| `static/app.css` | Tokens `--cp-*` (spacing, radius, type scale, light and dark palette: indigo `#3B4FD8`, orange `#FF8A3D`) mapped onto the Pico variables; components: buttons (48 px, 56 px on student pages), cards, stat tiles, chips, banners, option cards, tab bar, session bar, drop zone; focus ring; `prefers-reduced-motion` respected |
+| `static/favicon.svg` | Same logo as a file (the `xmlns` is required there) |
+| `static/theme.js` | Manual theme auto / light / dark, kept in `localStorage`, applied in `<head>` before the first paint; lecturer pages only (the projector page is forced light) |
+| `static/busy.js` | On submit of a `form[data-busy]` sets `aria-busy` and disables the button (photo count, review, upload, peers); undone on back/forward cache restore |
+| `static/device.js` | Device token mirror (D37), unchanged by D38 |
+| `static/poll_json.js`, `projector.js`, `video.js`, `video_job.js` | Polling and upload scripts; since D38 they set `data-state`, `dir="auto"` and a separate projector error element through DOM properties (no `innerHTML`) |
+
+Page structure (D38):
+
+```mermaid
+flowchart TB
+  B["base.html<br/>(shell, logo, app.css)"] --> LB["lecturer_base.html<br/>(nav, theme.js)"]
+  B --> S["student pages<br/>(menu, check-in, poll, comments, review, error)"]
+  B --> PR["projector.html<br/>(forced light, no nav)"]
+  LB --> L["dashboard, login, photo, polls,<br/>comments, video, video job, peers"]
+  S --> TB["_tabbar.html<br/>(not on check-in pages)"]
+  B -.-> IC["_icons.html (macro)"]
+```
+
+Dashboard (`lecturer.html`): a session bar (Live / Closed, Open session or Projector + Close session with a
+confirmation), section "In class now" (attendance tiles N / D / status, live table, photo count, polls and comments
+cards), section "After class" (export, video summary, homework review). The route also passes the latest poll, the
+comment count, the active video job and the latest session, so the cards summarise what is going on and the photo link
+works after closing (D31). Student pages are one column (max 34 rem) with 56 px tap targets; user text carries
+`dir="auto"` (Hebrew and English), URLs `dir="ltr"`.
 
 ## 3. Classes
 
@@ -1934,10 +1971,10 @@ database (e.g. the demo seed) simply has no such column.
 | SVG QR without Pillow | Not the tested path (the tools report tested PNG). |
 | Dropping the left-over `network_origin` column at start-up (D33) | A migration with its own failure modes for a column that does no harm; left untouched and unused instead. |
 
-## 7. Implementation tasks (T1-T21)
+## 7. Implementation tasks (T1-T22)
 
 Status: **T1-T17 done** (`pytest` green); **T18 (T18a-T18f, D34) done** (23/11; T18f is the manual real run, recorded in the tools report and results); **T19
-done then removed by D33** (23/11); **T4 and T9 removed by D33**; **T20 and T21 done** (D33, commit 728381d).
+done then removed by D33** (23/11); **T4 and T9 removed by D33**; **T20 and T21 done** (D33, commit 728381d); **T22a-T22i, T22k-T22m and the launcher (D38, D39) done** (24/11); **T22j** (check on real phones) is a manual step still to be recorded.
 
 Order: F1 first and complete (R4, D1), then F3 > F2 > F5 > F4 (D1). Every task ends with `pytest` green and a
 commit (D24). Tests use the Flask test client, a temporary SQLite file, `FakeClock` and fakes (D25). T1-T2 give a
@@ -1966,6 +2003,16 @@ runnable skeleton.
 | ~~**T19**~~ | ~~Network origin of each check-in (D32)~~ **Removed by D33** (done and tested on real phones on 23/11, then removed; T20 deletes its code and tests) | - | - | - | D32, D33 |
 | **T20** | Remove the IP filter and the relay classification (D33) | **Delete:** `app/services/network.py`, `app/adapters/relay_ranges.py`, `scripts/update_relay_ranges.py`, `app/templates/allow_list.html`, `tests/test_network.py`, `tests/test_network_extra.py`, `tests/test_relay_ranges.py`, `tests/test_update_relay_ranges.py`, `tests/test_t19_network_origin.py`, `tests/test_t19_update_script.py`, `tests/test_allow_list.py`, `tests/test_allow_list_extra.py`. **Modify:** `app/services/checkin.py`, `app/web/device.py`, `app/web/student_routes.py`, `app/web/lecturer_routes.py`, `app/web/api_routes.py`, `app/templates/lecturer.html`, `app/static/poll_json.js`, `app/repositories/checkins.py`, `app/repositories/settings.py` (docstring), `app/services/sessions.py`, `app/services/export.py`, `app/schema.sql`, `app/db.py`, `app/config.py`, `app/errors.py`, `app/__init__.py`, `.env.example`, `.gitignore` (relay line removed), `scripts/seed_demo.py` if it passes an origin, and every remaining test that seeds a `campus_range` or injects `REMOTE_ADDR` / `CF-Connecting-IP` (`conftest.py`, check-in, student routes, attendance API, export, repositories, core, db, red-team tests). **New:** `tests/test_t20_no_network.py` | `CheckInService(credentials, sessions, check_ins, windows, db, clock)`, `.start(qr_token, device_token) -> Optional[str]`, `.confirm(device_token, code, nickname) -> CheckIn`; `CheckInRepository.add(session_id, device_token, nickname, at) -> CheckIn`; `CheckIn(session_id, nickname, checked_in_at)`; `SessionSummary(session, check_ins, n, consistency)`; `Config` without `relay_ranges_path`; exporter headers of 3.4 | See the T20 acceptance list below | FR-1.6-FR-1.14, FR-1.18, NFR-7, NFR-8, D21, D30, D31, D33 |
 | **T21** | 4-digit projected code (D33 amendment, red-team F-02 option (b)) | `app/services/credentials.py` (`CODE_DIGITS = 4`), `app/templates/checkin.html` (code field), `app/templates/projector.html` / `app/static/projector.js` (display width only if needed), `tests/test_credentials*.py` and the check-in / projector tests that type or assert a 3-digit code; `tests/test_t21_four_digit_code.py` (new) | `RotatingCredentials.CODE_DIGITS`, `current_code(session_id) -> str` (4 chars), `is_valid_code(session_id, code) -> bool` (exactly 4 ASCII digits) | See the T21 acceptance list below | FR-1.7, FR-1.8, FR-1.9, NFR-1, D30 P1-P2, D33 |
+| **T22a** | Design tokens and shell (D38) | `static/app.css`, `static/favicon.svg`, `templates/base.html`, `templates/_icons.html` | Stylesheet, logo, icon macro | `/static/app.css` served; rendered base has no `http`, no `<form`, no `xmlns` | NFR-15, D38 |
+| **T22b** | Lecturer layout and login | `templates/lecturer_base.html`, `login.html`, lecturer templates | Links-only nav | Nav on `/lecturer`, absent on the projector; `name="pin"` and "Wrong PIN." kept | NFR-15, D38 |
+| **T22c** | Dashboard reorganisation | `templates/lecturer.html`, `static/poll_json.js` | Session bar, "In class now", "After class" | Link to the projector while open; "Open session" absent while open; `data-state` set by the script | NFR-15, D38 |
+| **T22d** | Projector layout | `templates/projector.html`, `static/projector.js` | QR left, code right, steps 1-2-3, `#projector-error` | After an error then a success with no session, `#waiting` reads "No session is open."; no `http`, `//`, "cdn" | NFR-15, D38 |
+| **T22e-T22g** | Student pages: check-in, menu, tab bar, error page, poll, comments | `checkin.html`, `checked_in.html`, `message.html`, `error.html`, `poll.html`, `comments.html`, `_tabbar.html` | 56 px targets, option cards, counter | Field order nickname, code, "Confirm" kept; contextual "Back"; escaping and polling shape kept | NFR-15, D37, D38 |
+| **T22h-T22i** | Lecturer sub-pages, job progress bar, busy feedback | `photo.html`, `lecturer_poll.html`, `lecturer_comments.html`, `peers.html`, `video.html`, `video_job.html`, `review.html`, `static/video_job.js`, `static/busy.js` | `form[data-busy]` | Contract strings kept; busy state set only when the submit is not prevented | NFR-15, D38 |
+| **T22j** | Real-device and accessibility check (manual, to record) | none in `app/` | Manual (M13) | Phones in light and dark, Hebrew text, projector from the back row | NFR-15, D38 |
+| **T22k-T22l** | Dashboard summary data; manual theme toggle | `app/web/lecturer_routes.py` (dashboard), `lecturer.html`, `static/theme.js` | Latest poll / comment count / active job / latest session; auto / light / dark | Route-level tests; `theme.js` run under node | NFR-15, D31, D38 |
+| **T22m** | Documents of the redesign | `README.md`, `docs/*.md` | D38, D39, NFR-15 | Cross-references checked | D38, D39 |
+| **T23** | One-click launcher (D39) | `scripts/HereOrNot.command` | `HereOrNot.command [--check]` | `tests/test_launcher.py` (8 tests, stubs, no network) | FR-6.3, NFR-9, D39 |
 
 **T20 acceptance tests** (all offline; IP literals only from the documentation ranges `192.0.2.0/24`,
 `198.51.100.0/24`, `2001:db8::/32`):

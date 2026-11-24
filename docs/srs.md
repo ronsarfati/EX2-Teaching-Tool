@@ -1,7 +1,7 @@
 # Software Requirements Specification (To Do 5)
 
 Covers R27. IEEE-830-inspired, kept short. Requirements are cited as R1-R37
-([requirements.md](requirements.md)), validated decisions as D1-D37 ([decisions.md](decisions.md); D5 and D26
+([requirements.md](requirements.md)), validated decisions as D1-D39 ([decisions.md](decisions.md); D5 and D26
 are superseded by D30; D31 records the design-level choices validated on 23/11; D32 is superseded by D33 (23/11), D37 (24/11) signs and mirrors the device token,
 which removes every network / IP check and makes the projected code 4 digits; D34 (23/11) closes D10 and specifies
 F4 for real recordings of any length), measured figures as sections of the [tools report](tools_report.md). Scope and schedule: [sow.md](sow.md).
@@ -444,12 +444,13 @@ P: MUST. Trace: R13, D13, D30. AC: see FR-1.5.
 | NFR-6 | Measured, not assumed | The whole-class check-in duration and the number of refusals (expired QR or window, wrong code) are measured live during the class demo and reported in `docs/results.md`; no target figure is claimed beforehand. | R1, R19, D17, D30 | Live measurement |
 | NFR-7 | Privacy | No field asks for a name, ID or e-mail; photos are never stored; recordings and their audio are deleted right after transcription and transcripts are never stored (FR-4.5, D34); no client IP is read for attendance, and no table or export has an IP column (D33; no location is ever asked); the device token is random, carries no personal data and is readable by page JavaScript (D37; the lecturer pages rely on the PIN, not on it); only text (transcripts, public code) is sent to the LLM API; no photo or participant list leaves the laptop; the repository contains fictitious data only. | R16, D6, D7, D12, D21, D30, D33, D37 | Code review, schema/export test (no IP column), test FR-1.17, history check before commit (D24) |
 | NFR-8 | Security | QR tokens are HMAC-signed with a secret key from the environment; tampered or expired tokens are rejected; the projected code has 4 digits (D33); at most 5 code attempts per window; lecturer pages need the PIN; API key, PIN and signing key live in the git-ignored `.env` (`.env.example` committed); Flask debug off in the demo. | D12, D22, D23, D30, D33, tools report 2.2 | Unit tests (tampered / expired token, 4-digit code format, attempt limit, PIN), repo check |
-| NFR-9 | Reliability (demo) | The app runs on plan A (tunnel, HTTPS) and plan B (hotspot / LAN, plain HTTP) by changing only the base URL; plan C is a recorded rehearsal. F1-F3 work without an LLM key. | R13, R19, D12, D13, D30 | Rehearsal on both plans; test with no key |
+| NFR-9 | Reliability (demo) | The app runs on plan A (tunnel, HTTPS) and plan B (hotspot / LAN, plain HTTP) by changing only the base URL; plan A starts with one double-click on `scripts/HereOrNot.command` (D39); plan C is a recorded rehearsal. F1-F3 work without an LLM key. | R13, R19, D12, D13, D30, D39 | Rehearsal on both plans; test with no key; `tests/test_launcher.py` |
 | NFR-10 | Error messages | User-facing errors are short, plain English and actionable; they never show database IDs, tokens, stack traces, file paths or exception names; details go to the server log only. | D23 | One test per row of section 5 |
 | NFR-11 | Portability | Student pages work on iOS Safari and Android Chrome (responsive, mobile-first) and open from the native camera QR link. | R14, D2, D30 | Manual tests 1-2 and 9 (tools report section 3) |
 | NFR-12 | Maintainability / testability | pytest + Flask test client; injectable clock for the 10 s / 15 s / 5 s / 1 min rules; `LLMClient`, `Transcriber`, `AudioExtractor` and the F4 job runner replaceable by fakes; `HeadCounter` behind an interface with configurable threshold; consistency rule a pure function; SQL isolated in repository classes. | R11, R32, D3, D7, D12, D25, D30, D34 | Test suite runs offline with no key, no ffmpeg and no Whisper model |
 | NFR-13 | Performance (F4 processing time) | No fixed time is promised. Measured real-time factors of faster-whisper on the demo laptop (Apple M3, CPU, int8): **0.06 with `base`, 0.17 with `small`** (tools report 2.6), (real-time factor about 0.17-0.22 for `small` in the T18f run). Measured in T18f: a 244 s Hebrew clip took about 70 s in total (extraction 2 s, transcription about 54 s, summary 14 s) on a MacBook M3. Extrapolation, not measured: a 90-minute lecture takes roughly 15-20 minutes with `small`, plus the LLM call(s). The first use adds a one-time model download (~460 MB). The status page shows progress so a long job is visibly alive. | R7, D34 | End-to-end timing of the 4-minute demo clip and, if available, of a full recording (task T18f), reported in the tools report and `docs/results.md` |
 | NFR-14 | Time display | Every user-visible time (export, lecturer and projector pages, F4 summary date) is shown in Israel local time (`Asia/Jerusalem`, daylight saving applied); storage stays UTC; the export header names the zone ("Jerusalem time"). | R3, R14, D35 | Conversion tests for a winter and a summer instant; export header test; stored values stay UTC |
+| NFR-15 | Usability and accessibility (UI) | Student pages are phone-first: one column, tap targets of at least 56 px, a large numeric field for the 4-digit code; body, muted and button text tokens meet WCAG AA contrast (4.5:1) in the light and the dark palette (WCAG 2 formula applied to the tokens of `app/static/app.css`; every token meets 4.5:1, including the success green `#1B7748` on its light tint, 4.87:1); status is never conveyed by colour alone; text typed by a person or produced by the LLM is laid out with `dir="auto"` (Hebrew and English); long operations show a busy state; no web font, no CDN, no external URL on any page; the interface is named HereOrNot. | R13, R14, D38 | Template and CSS tests (`tests/test_t22_*.py`), contrast computed from the palette tokens, manual test M13 |
 
 ## 5. Error handling
 
@@ -510,8 +511,8 @@ messages are removed with the network check (D33).
 | R10 | FR-5.4, FR-5.5 |
 | R11 | FR-4.4, FR-5.3, NFR-12 (`LLMClient` interface) |
 | R12 | Sections 2-3 (end-to-end, phone to lecturer output, every feature) |
-| R13 | FR-1.5, FR-6.3, NFR-5, NFR-9, C5, C7 |
-| R14 | FR-1.5, FR-1.7, FR-6.2, NFR-1, NFR-11, C3 |
+| R13 | FR-1.5, FR-6.3, NFR-5, NFR-9, NFR-15, C5, C7 |
+| R14 | FR-1.5, FR-1.7, FR-6.2, NFR-1, NFR-11, NFR-15, C3 |
 | R15 | FR-4.1 (file upload, no platform API), C2 |
 | R16 | FR-1.10, FR-1.17, FR-2.1, FR-4.3, FR-4.4, FR-4.5, FR-5.4, FR-6.1, NFR-7, C1 |
 | R17 | C4 (every FR maps to a tested tool), FR-4.6 (one background thread, no job queue, D34) |
