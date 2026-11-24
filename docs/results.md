@@ -16,13 +16,13 @@ filled in only after the demo; nothing below is estimated.
 |---|---|
 | F1 Attendance: projector QR (10 s) + 4-digit code (5 s), live table, photo head count with consistent/anomaly alert, CSV/XLSX export | Implemented, tested |
 | F2 Comments (real-time and later) | Implemented, tested |
-| F3 Polls (one vote per device, live results, close) | Implemented, tested |
+| F3 Polls (one vote per device, signed device token mirrored on the phone, D37, live results, close) | Implemented, tested |
 | F5 Homework review with anonymised comparison (public GitHub URL, Claude) | Implemented, tested with fakes; live call needs an API key [to fill after the class demo] |
-| F4 Video summary (upload, ffmpeg, Whisper `small`, Claude, background job, status page, `.md`/`.txt` download; D34) | Implemented, tested with fakes; one real end-to-end trial (section 3) |
+| F4 Video summary (upload, ffmpeg, Whisper `small`, Claude, background job, status page, `.md`/`.txt` download; D34; 4 h cap, Cancel button, LLM retries, D36) | Implemented, tested with fakes; one real end-to-end trial (section 3) |
 
 ## 3. Measured figures
 
-Automated tests (23/11, after D34, `python -m pytest -q --cov=app`): 1136 passed, 1 skipped (the opt-in F4 integration test,
+Automated tests (24/11, after D37, `python -m pytest -q --cov=app`): 1211 passed, 1 skipped (the opt-in F4 integration test,
 `RUN_F4_INTEGRATION=1`); statement coverage of `app/` 99 %.
 
 Scripted local trial (23/11, after D33, real server on the laptop, QR decoded from the projector image): wrong code refused (400), right 4-digit code accepted, second check-in from the same phone refused (409), 3-digit input refused, second phone accepted, removed allow-list page answers 404, no client address in the server log. Earlier trial scope (before D33): (check-in with QR and code, repeated check-in refused, wrong code
@@ -36,7 +36,7 @@ F4 real trial (T18f, 23/11/2026, MacBook M3, full HTTP stack, upload on localhos
 university lecture, kept local only, not in the repository) was summarised in about 70 s: audio extraction 2 s,
 transcription with Whisper `small` about 54 s, Claude summary 14 s. The summary was faithful to the lecture, in four
 sections with headings in the lecture language (Hebrew); the `.md` and `.txt` downloads worked; the work directory was
-empty afterwards and the database kept only the summary text (FR-4.5). Earlier measure (tools report 2.6): real-time
+empty afterwards and the database kept only the summary text (FR-4.5). D36 check (24/11): `ffprobe` measured 244.4 s for this clip, well under the 4 h cap; a fake `.mp4` gives no duration. Earlier measure (tools report 2.6): real-time
 factor of `small` about 0.17-0.22, so a 90-minute lecture takes roughly 15-20 minutes (NFR-13); this 90-minute
 figure is an extrapolation, not a measured run.
 
@@ -73,7 +73,7 @@ Live class demo:
 - Presence is a device that scanned the projector QR and typed the code shown in the room; nothing proves the device
   is in the room (D33). A remote student with a live accomplice can check in; only the head count alert reveals a
   gap globally. Guessing the 4-digit code by rescanning needs about 5,000 tries on average.
-- Nicknames and device tokens are not verified; clearing cookies gives a new device.
+- Nicknames are not verified. The device token is signed and mirrored in cookie, localStorage and IndexedDB (D37): clearing the cookies alone does not give a second check-in; clearing all site data, private browsing, a second browser or disabling JavaScript still does.
 - The head count is an estimate with a tolerance, not an exact count; the photo is discarded and D cannot be edited.
 - The homework review page has no PIN in the demo; peers are anonymised in the prompt and the output.
 - Real time is polling (1-3 s); there is no offline-first mode.

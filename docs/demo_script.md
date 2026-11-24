@@ -44,7 +44,7 @@ Run once on the demo laptop, from the repository root (`python -m app` loads `.e
 | 3:45-5:00 | Helper + Presenter | Helper takes a photo of the room; Presenter uploads it in **Count heads on a class photo**. | "Checked in N / detected D / consistent or anomaly" |
 | 5:00-5:30 | Presenter | Say: the photo is counted then discarded, only D is kept (D7). If anomaly: say it is an alert, not an accusation. Click **Close session**. | Result page, then QR disappears |
 | 5:30-6:00 | Presenter | Dashboard: **Download XLSX**; open it. | Sheets "Check-ins" and "Summary" (past sessions if seeded) |
-| 6:00-7:30 | Presenter + classmates | **F4 start (about 20 s):** in a second tab open `http://localhost:<port>/lecturer/video` (**localhost, not the tunnel**: the free Cloudflare plan limits a request to about 100 MB per its documentation), upload the clip; the job runs in the background (about 70 s measured for a 244 s clip, T18f). Then **Polls**: create "Which topic next?" with 2-3 options; classmates open the menu page of the app, tap **Poll**, vote; watch the bars rise, then **Close**. | Live counts, closed poll; the video page shows the step |
+| 6:00-7:30 | Presenter + classmates | **F4 start (about 20 s):** in a second tab open `http://localhost:<port>/lecturer/video` (**localhost, not the tunnel**: the free Cloudflare plan limits a request to about 100 MB per its documentation), upload the clip; the job runs in the background (about 70 s measured for a 244 s clip, T18f). Then **Polls**: create "Which topic next?" with 2-3 options; classmates open the menu page of the app, tap **Poll**, vote; watch the bars rise, then **Close**. | Live counts, closed poll; the video page shows the step (a **Cancel** button is available while the job is active, D36) |
 | 7:30-8:30 | Classmates + Presenter | Classmates open **Comments** and post a suggestion; Presenter opens `/lecturer/comments`; comments appear within a few seconds. | Newest comments first, no names |
 | 8:30-9:30 | Presenter | **F5 Homework review**: with a key, paste one public repository URL **(pending: which repository)** and show the review with anonymised "Submission B/C" comparison. Without a key, submit anyway and show the clear message "The review service is unavailable right now. Please try again later." | Review text and metrics, or the unavailable message |
 | 9:30-10:00 | Presenter | Wrap-up: what was measured today (N, D, duration), open the finished **Video summary** page (four sections, `.md`/`.txt` download; no recording or transcript is kept, D34), known limits (section 4). | Dashboard |
@@ -66,14 +66,17 @@ If time runs short, cut in this order: F5, comments, poll, F4 display. Never cut
 | App crashes or laptop freezes | Page unreachable | Restart `python -m app` (data persists in SQLite); worst case plan C video. |
 | QR too small / unreadable on projector | Students cannot scan | Zoom the browser (Ctrl +) on the projector page. |
 
+Optional step (D37, 30 s, only if time allows): a classmate who has just checked in clears the cookies of the site in the phone browser and scans the next QR; the page answers "You are already checked in for this class." Say that clearing all site data or a private tab would not be blocked.
+
 ## 4. What to say about known residual risks (neutral wording)
 
 - The check-in proves "a device scanned the projector QR and typed the code shown in the room", not that a person is
   physically present (D33). A remote student with a live accomplice relaying the QR and the code can check in. The
   rotating QR (10 s), the 4-digit code (5 s), the 1-minute window, 5 attempts, one check-in per device and the photo
   head count alert reduce this; they do not remove it. Guessing the code by rescanning needs about 5,000 tries on average.
-- The identity is a nickname and a random device token in a cookie: clearing cookies or using a private tab gives a
-  new device, and nicknames are not verified or unique.
+- The identity is a nickname and a random signed device token mirrored in cookie, localStorage and IndexedDB (D37): clearing
+  the cookies alone does not give a second check-in, but clearing all site data, a private tab or a second browser gives a
+  new device (identifying the student is forbidden, D5); nicknames are not verified or unique.
 - The head count is an estimate (about 94 % recall and 96 % precision on the test photos, tools report); the alert
   has a tolerance and is meant to prompt a look, not to decide.
 - The homework review page has no PIN in the demo (decision D31/OI-10); the cost is limited by the account limit.

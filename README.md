@@ -55,10 +55,11 @@ F4 (video summary) was first deferred (D10) and is implemented since D34 (23/11)
   covered, key notions, definitions and examples, what to review) in the language of the lecture. A status page
   shows the step; the result is shown and downloadable as `.md` and `.txt` (R7, R8). The recording and its audio
   are deleted right after transcription, the transcript is never stored, only the summary text is kept (R16, D21).
-  No pre-computed output (D1).
+  No pre-computed output (D1). Limits and controls of D36: recordings above 4 hours are refused, a Cancel button stops an
+  active job, LLM calls are retried up to 3 times.
 - **F5 Homework review** (D11): public repository URL, capped text extract, LLM review against a short rubric,
   comparison with 1-2 other submissions shown **anonymised** ("Submission B, C"); runs live, no pre-computed output.
-- Student identity = self-chosen **nickname** entered once, remembered by a random device token (D6). Lecturer pages
+- Student identity = self-chosen **nickname** entered once, remembered by a random device token (D6), signed by the server and mirrored on the phone (cookie, localStorage, IndexedDB) so that clearing cookies does not give a second check-in (D37). Still possible: clearing all site data, private browsing, a second browser; the head-count alert is the safety net. Lecturer pages
   protected by a single PIN (D22).
 
 ### Out of scope
@@ -70,6 +71,7 @@ F4 (video summary) was first deferred (D10) and is implemented since D34 (23/11)
 - Late-arrival handling: check-in happens at the end of class (D5; timing unchanged by D30).
 - In-app check-in fallback for a phone that cannot scan (the lecturer adds the student after class, D30) and
   manual correction of the head count (D7).
+- A 100 % guarantee of one check-in per person: it would need identifying the student (D5, D37).
 - Network-offline mode (PWA / local queue): "offline" means downloadable spreadsheet and asynchronous comments (D8).
 - Google Sheets synchronisation (listed as a possible extension, D8).
 
@@ -117,7 +119,7 @@ In `.env` set:
 
 `python -m app` loads `.env` with a small standard-library loader; variables already set in the environment win.
 
-Times (D35): every shown time (export, lecturer and projector pages, F4 "Generated on" line) is Israel time (`Asia/Jerusalem`, daylight saving applied); the database and the JSON API stay UTC. This is a constant in `app/timezone.py`, not a setting; `tzdata` is in `requirements.txt`.
+Times (D35, D36-c; the export shows the check-in as date and time `YYYY-MM-DD HH:MM:SS`): every shown time (export, lecturer and projector pages, F4 "Generated on" line) is Israel time (`Asia/Jerusalem`, daylight saving applied); the database and the JSON API stay UTC. This is a constant in `app/timezone.py`, not a setting; `tzdata` is in `requirements.txt`.
 
 Optional face model: for the photo head count, download the YuNet model `face_detection_yunet_2023mar.onnx` from
 the official OpenCV `opencv_zoo` repository and place it in `models/` (or set `YUNET_MODEL_PATH`). The model file
@@ -130,7 +132,7 @@ Cloudflare plan limits a request body to about 100 MB (per its documentation). M
 23/11/2026): a 244 s Hebrew lecture clip took about 70 s (audio 2 s, Whisper `small` about 54 s, Claude 14 s); at the
 measured real-time factor of 0.17-0.22 a 90-minute lecture takes roughly 15-20 minutes. Do not start a long
 recording during a check-in (shared CPU). The upload needs about twice the file size in free disk space
-(Werkzeug spools it before the copy), and only one `python -m app` can run at a time (lock file `instance/app.lock`). Optional integration test: `RUN_F4_INTEGRATION=1 python -m pytest -q
+(Werkzeug spools it before the copy). Recordings above 4 hours are refused (measured with `ffprobe`), a **Cancel** button stops an active job, each Claude call of the job is tried up to 3 times (waits of 2 s then 8 s) (D36). Only one `python -m app` can run at a time (lock file `instance/app.lock`). Optional integration test: `RUN_F4_INTEGRATION=1 python -m pytest -q
 tests/test_t18b_integration.py` (needs `ffmpeg` and the cached model).
 
 First step for the lecturer: open the app and sign in with the PIN at `/lecturer/login`.
@@ -150,7 +152,7 @@ Optional demo data (fictional nicknames only, no network, no API key; existing f
 | To Do | Deliverable | Location | Status |
 |---|---|---|---|
 | — | Requirements R1-R37 | [docs/requirements.md](docs/requirements.md) | Done |
-| — | Validated decisions D1-D35 | [docs/decisions.md](docs/decisions.md) | Done |
+| — | Validated decisions D1-D37 | [docs/decisions.md](docs/decisions.md) | Done |
 | 1 | Repository, problem and scope | this README | Done |
 | 2 | Repository link submitted via the course form | (by the student) | Done |
 | 3 | Tools report, every tool tested for real | [docs/tools_report.md](docs/tools_report.md) | Done |

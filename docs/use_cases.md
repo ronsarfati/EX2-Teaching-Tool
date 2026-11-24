@@ -2,7 +2,7 @@
 
 Covers R28 ("Define the main use cases (client stories)"). Built from the [SRS](srs.md) (FR-x.y, NFR-n, error
 messages of section 5), the requirements R1-R37 ([requirements.md](requirements.md)) and the validated decisions
-D1-D35 ([decisions.md](decisions.md); D31 = design-level choices validated on 23/11). The attendance check-in follows **D30**; D5 and D26 are superseded and not
+D1-D37 ([decisions.md](decisions.md); D31 = design-level choices validated on 23/11). The attendance check-in follows **D30**; D5 and D26 are superseded and not
 used here. F1 Attendance is the main feature (R4) and comes first.
 
 ## 1. Actors
@@ -168,8 +168,13 @@ name, so that my attendance is recorded.
   - 5f. After 5a or 5c the student scans again: a new 1-minute window opens with 0 attempts (FR-1.9, D31).
   - 1b. The student opens `/checkin` directly (e.g. from the menu) while a session is open: "Scan the QR code on the
     projector." (D31).
-  - 1c. The quick tunnel was restarted (new host name): the device cookie is lost, so the device is treated as
-    first-time and the nickname is typed again (A7, D31).
+  - 1c. The quick tunnel was restarted (new host name): the cookie and the other copies of the device token are lost
+    (they are per host name), so the device is treated as first-time and the nickname is typed again (A7, D31, D37).
+  - 1d. The student already checked in, clears the browser cookies and scans again: the page script sends the copy kept
+    in `localStorage` / `IndexedDB` (`POST /device/sync`), the older token is restored and the page shows "You are
+    already checked in for this class." No second check-in (FR-1.12, D37; design SD-2b). Not prevented: clearing all
+    site data, private browsing, a second browser, JavaScript disabled (identifying the student is forbidden, D5);
+    the D7 photo alert remains the safety net.
   - 1a. The phone's camera cannot scan the QR: no in-app fallback; the lecturer adds the student after class in the
     exported spreadsheet (UC-5, D30 P3).
 Student-side order of actions (validated by the student, 23/11):
@@ -186,7 +191,7 @@ flowchart LR
 - **Postconditions:** success: one check-in exists for (session, device token), N increases by 1; failure: no
   record; a scan never completed leaves no record (FR-1.11). No IP address is read or stored (D33, NFR-7).
 - **Trace:** FR-1.5-FR-1.12, FR-1.14, NFR-1, NFR-2, NFR-4, NFR-7; R1, R14, R16; D6, D21, D30
-  (points 2-4, P1-P3), D33.
+  (points 2-4, P1-P3), D33, D37.
 - **Known limit (D33):** nothing proves that the phone is in the room. A remote student helped by an accomplice who
   relays the QR and the code live can check in; this is caught globally by the photo consistency alert (UC-4, D7).
   Guessing the 4-digit code by rescanning needs about 5,000 tries on average (5 attempts per window).

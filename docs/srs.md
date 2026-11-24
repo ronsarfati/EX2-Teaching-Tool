@@ -1,8 +1,8 @@
 # Software Requirements Specification (To Do 5)
 
 Covers R27. IEEE-830-inspired, kept short. Requirements are cited as R1-R37
-([requirements.md](requirements.md)), validated decisions as D1-D35 ([decisions.md](decisions.md); D5 and D26
-are superseded by D30; D31 records the design-level choices validated on 23/11; D32 is superseded by D33 (23/11),
+([requirements.md](requirements.md)), validated decisions as D1-D37 ([decisions.md](decisions.md); D5 and D26
+are superseded by D30; D31 records the design-level choices validated on 23/11; D32 is superseded by D33 (23/11), D37 (24/11) signs and mirrors the device token,
 which removes every network / IP check and makes the projected code 4 digits; D34 (23/11) closes D10 and specifies
 F4 for real recordings of any length), measured figures as sections of the [tools report](tools_report.md). Scope and schedule: [sow.md](sow.md).
 
@@ -45,7 +45,7 @@ rejected (D30); a campus-network IP check was built, tested on real phones and r
 | N | Number of check-ins in the session (D7). |
 | Consistency alert | Automatic status "consistent" or "anomaly" computed from N and D (D7). |
 | Nickname | Self-chosen display name entered once per device; never a real name or ID (D6). |
-| Device token | Random value stored in a server-set browser cookie only (D31, OI-4) that identifies a device without personal data; binds the check-in window and limits check-in to one per device per session (D6, D30). |
+| Device token | Random value, signed by the server (HMAC-SHA256) and mirrored on the phone in a server-set cookie, `localStorage` and `IndexedDB` (D37, amending D31 OI-4), that identifies a device without personal data; binds the check-in window and limits check-in to one per device per session (D6, D30). |
 | Lecturer PIN | Single secret from an environment variable that unlocks lecturer pages (D22). |
 | Base URL | The public URL reachable by the phones (tunnel or LAN), encoded in the projector QR (D13, D30). |
 
@@ -120,8 +120,8 @@ IP address: a check-in works the same on the campus Wi-Fi and on mobile data (D3
 - A9 For F4 (D34): the `ffmpeg` command is installed on the laptop; the Whisper model (`small`, ~460 MB) is
   downloaded once, at its first real use, before class; large recordings are uploaded from the laptop itself
   (`http://localhost`), because the tunnel limits request size and duration.
-- A7 Restarting the quick tunnel changes its host name, so the device-token cookie is lost and phones are treated as
-  first-time (nickname typed again) (D31, OI-4).
+- A7 Restarting the quick tunnel changes its host name, so every copy of the device token (cookie, `localStorage`, `IndexedDB` are per host name) is lost and phones are treated as
+  first-time (nickname typed again) (D31, OI-4, D37).
 
 ## 3. Functional requirements
 
@@ -198,8 +198,14 @@ never completed creates no record.
 
 **FR-1.12 One check-in per device per session.** The system shall reject a scan or code submission from a device
 token that is already checked in for the session.
-P: MUST-MAIN. Trace: R1, D30. AC: a second scan by a checked-in device returns "You are already checked in" and
-creates no record and no window.
+Since D37 the device token is signed and mirrored on the phone (cookie, `localStorage`, `IndexedDB`; `POST /device/sync`);
+if the cookie is gone but a valid stored copy returns, the older token is used for scan, confirm and vote and the cookie
+is set again. A forged or badly signed token is ignored; an old unsigned cookie is accepted and re-issued signed.
+Not prevented (stated limits): clearing all site data, private browsing, a second browser, JavaScript disabled (a full
+guarantee would need identifying the student, forbidden by D5); the D7 photo consistency alert is the safety net.
+P: MUST-MAIN. Trace: R1, D30, D37. AC: a second scan by a checked-in device returns "You are already checked in" and
+creates no record and no window; the same after "check in, clear the cookies, scan again"; a forged stored token is
+ignored; 50 simultaneous distinct devices give 50 rows and the same device from 10 threads gives 1 row.
 
 **FR-1.13 Close session.** The lecturer shall close the session; afterwards every scan and code submission for it
 shall be rejected and the projector shows no QR or code.
@@ -436,7 +442,7 @@ P: MUST. Trace: R13, D13, D30. AC: see FR-1.5.
 | NFR-4 | Performance (check-in) | Each scan / code submission is handled by the server in < 1 s on the demo laptop, so that network delay dominates the 15 s QR window and the 5 s code rotation. | R1, D30 | Timed test with the Flask test client; manual test 3 (tools report section 3) |
 | NFR-5 | Capacity | One class (up to 52 faces detected on a provided class photo, tools report 2.5.2) with polling every 2-3 s stays under the quick tunnel limit of 200 in-flight requests (tools report 2.9). | R13, D13, D30 | Rehearsal with several tabs and phones |
 | NFR-6 | Measured, not assumed | The whole-class check-in duration and the number of refusals (expired QR or window, wrong code) are measured live during the class demo and reported in `docs/results.md`; no target figure is claimed beforehand. | R1, R19, D17, D30 | Live measurement |
-| NFR-7 | Privacy | No field asks for a name, ID or e-mail; photos are never stored; recordings and their audio are deleted right after transcription and transcripts are never stored (FR-4.5, D34); no client IP is read for attendance, and no table or export has an IP column (D33; no location is ever asked); only text (transcripts, public code) is sent to the LLM API; no photo or participant list leaves the laptop; the repository contains fictitious data only. | R16, D6, D7, D12, D21, D30, D33 | Code review, schema/export test (no IP column), test FR-1.17, history check before commit (D24) |
+| NFR-7 | Privacy | No field asks for a name, ID or e-mail; photos are never stored; recordings and their audio are deleted right after transcription and transcripts are never stored (FR-4.5, D34); no client IP is read for attendance, and no table or export has an IP column (D33; no location is ever asked); the device token is random, carries no personal data and is readable by page JavaScript (D37; the lecturer pages rely on the PIN, not on it); only text (transcripts, public code) is sent to the LLM API; no photo or participant list leaves the laptop; the repository contains fictitious data only. | R16, D6, D7, D12, D21, D30, D33, D37 | Code review, schema/export test (no IP column), test FR-1.17, history check before commit (D24) |
 | NFR-8 | Security | QR tokens are HMAC-signed with a secret key from the environment; tampered or expired tokens are rejected; the projected code has 4 digits (D33); at most 5 code attempts per window; lecturer pages need the PIN; API key, PIN and signing key live in the git-ignored `.env` (`.env.example` committed); Flask debug off in the demo. | D12, D22, D23, D30, D33, tools report 2.2 | Unit tests (tampered / expired token, 4-digit code format, attempt limit, PIN), repo check |
 | NFR-9 | Reliability (demo) | The app runs on plan A (tunnel, HTTPS) and plan B (hotspot / LAN, plain HTTP) by changing only the base URL; plan C is a recorded rehearsal. F1-F3 work without an LLM key. | R13, R19, D12, D13, D30 | Rehearsal on both plans; test with no key |
 | NFR-10 | Error messages | User-facing errors are short, plain English and actionable; they never show database IDs, tokens, stack traces, file paths or exception names; details go to the server log only. | D23 | One test per row of section 5 |

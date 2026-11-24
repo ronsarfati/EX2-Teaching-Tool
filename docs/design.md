@@ -2,10 +2,10 @@
 
 Covers R29 (main software components), R30 (low-level class diagrams) and R31 (sequence diagrams). Built from the
 [SRS](srs.md) (FR-x.y, NFR-n, error table of section 5), the [use cases](use_cases.md) (UC-1 to UC-14), the
-requirements R1-R37 ([requirements.md](requirements.md)), the validated decisions D1-D35
+requirements R1-R37 ([requirements.md](requirements.md)), the validated decisions D1-D37
 ([decisions.md](decisions.md); **D5 and D26 are superseded by D30 and not used**; D10 (F4 deferred) is closed by
 **D34** (23/11): F4 summarises real recordings of any length in a background job; D31 records
-the open points of section 9, all validated on 23/11; **D32 is superseded by D33** (23/11): the app reads no client
+the open points of section 9, all validated on 23/11 (OI-4 amended by **D37**, 24/11: signed device token mirrored on the phone); **D32 is superseded by D33** (23/11): the app reads no client
 IP at all, the network check of D30 point 1 is removed, and the projected code has 4 digits) and the
 libraries tested in the [tools report](tools_report.md). All diagrams are Mermaid (D14).
 
@@ -109,7 +109,7 @@ limit and 100 s request limit, D34 risks).
 
 | From -> To | Interface | Data |
 |---|---|---|
-| Phone -> Web | HTTP(S) HTML forms; cookie `dt` (random device token, D6 amended by D31: cookie only) | QR token in URL path, nickname, 4-digit code (D33), comment text, vote, repository URL |
+| Phone -> Web | HTTP(S) HTML forms; cookie `dt` (random signed device token, D37) mirrored in `localStorage` / `IndexedDB` by `static/device.js`; `POST /device/sync` (JSON) | QR token in URL path, nickname, 4-digit code (D33), comment text, vote, repository URL |
 | Projector / lecturer browser -> Web | HTML + JSON polling (`fetch` every 1 s for the projector, 2.5 s otherwise, D4 amended by D31) | QR image (PNG data URI) + code; live table; comments; poll results |
 | Web -> Services | Python method calls with plain types (`str`, `int`, `bytes`); results are frozen dataclasses | See section 3 |
 | Services -> Repositories | Python method calls; repositories return dataclasses, never `sqlite3.Row` | Entities of section 5 |
@@ -177,8 +177,17 @@ poll reads it; nothing else is shared between the thread and the requests.
 
 Helpers (functions, not classes, because they hold no state):
 
-- `device_token() -> str`: returns the `dt` cookie or creates `secrets.token_urlsafe(16)` and sets it
-  (HttpOnly, SameSite=Lax, 1 year). Server-set cookies are not shortened by Safari's tracking prevention.
+- `device_token() -> str` (`app/web/device.py`, D37): the identity of the phone. Order: a validly signed mirrored copy
+  (the `dt_stored` form field or the sync body) wins; else the `dt` cookie (signed, or a legacy bare token); else a new
+  `secrets.token_urlsafe(16)`. `sign` / `verify_signed` use HMAC-SHA256 with `SECRET_KEY` (16-byte signature, constant-time
+  compare); a forged or badly signed value is ignored. `attach_device_cookie` (after-request hook) sets the signed cookie
+  when it is missing, legacy or different (HttpOnly, SameSite=Lax, 1 year; server-set cookies are not shortened by
+  Safari's tracking prevention). The database stores only the random part, so there is no migration.
+- `POST /device/sync` (`student_routes`, no PIN): body `{"stored": [...]}`, answer `{"token": <signed>, "changed": bool}`.
+  `static/device.js` reads `localStorage` and `IndexedDB`, calls it on each student page, rewrites the copies with the
+  answer and fills the hidden `dt_stored` field of the check-in and vote forms (fallback if a form is sent before the
+  answer). If `changed`, the page reloads once (`sessionStorage` guard) so that a scan window opened under the new
+  cookie is reopened under the restored identity.
 - ~~`client_ip()`~~: removed by D33; no route reads `request.remote_addr` or an address header.
 - `lecturer_required`: decorator; redirects to `/lecturer/login` if `session["lecturer"]` is not set (FR-6.1).
 - Error handler: `AppError` -> page (or JSON `{"error": message}` under `/api/`) with `user_message` and its
@@ -1272,6 +1281,30 @@ sequenceDiagram
   end
 ```
 
+### SD-2b Device token sync after the cookies were cleared (D37; FR-1.12)
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant P as Phone browser (device.js)
+  participant SR as student_routes
+  participant DV as device.py
+  Note over P: cookie dt deleted; localStorage / IndexedDB still hold the signed token T1
+  P->>SR: GET /c/qr_token (no cookie)
+  SR->>DV: device_token() -> new random T2, cookie set
+  SR-->>P: page + device.js
+  P->>SR: POST /device/sync {"stored": [T1]}
+  SR->>DV: stored_identity([T1]) (signature checked)
+  DV-->>SR: T1 (older identity wins), cookie reset to T1
+  SR-->>P: {token: T1, changed: true}
+  P->>P: sessionStorage guard, reload once
+  P->>SR: GET /c/qr_token (cookie T1)
+  SR-->>P: "You are already checked in for this class." (409)
+```
+
+A forged value in `stored` fails the signature check and is ignored (T2 stays). Same rule for `POST /checkin` and the vote
+(hidden field `dt_stored`). Residual cases are listed in D37.
+
 ### SD-3 Returning student check-in (UC-2 alternative 4a; FR-1.10)
 
 ```mermaid
@@ -2172,7 +2205,7 @@ Demo data (fictitious nicknames) and the demo script belong to Phase 6, not to t
 | OI-1 | Source of the 1-2 submissions used for the F5 comparison (D11) | **VALIDATED (23/11).** The lecturer pastes public repository URLs on `/lecturer/peers` (PIN); stored in the local, git-ignored database (`setting_item`, kind `peer_repo`); the first 2 of the list, excluding the reviewed repository, are used | `HomeworkReviewer`, one page |
 | OI-2 | Nickname rules (D6) | **VALIDATED (23/11).** 1-30 characters after trimming; **not unique** (the device token is the identity; duplicates are visible to the lecturer in the table) | `CheckInService` validation |
 | OI-3 | Campus IP ranges (D30) | ~~Runtime data entered with UC-6~~ **Obsolete since D33** (23/11): no allow-list any more | None |
-| OI-4 | Device token storage (D6 said cookie + localStorage) | **VALIDATED (23/11).** Cookie only (server-set, HttpOnly, 1 year). Known limit: the quick-tunnel host name changes at each start, so after a tunnel restart phones look "new" (nickname typed again) | `device_token()` helper only |
+| OI-4 | Device token storage (D6 said cookie + localStorage) | **Amended by D37 (24/11): signed token mirrored in cookie, `localStorage` and `IndexedDB`, so clearing cookies no longer allows a second check-in; the tunnel-restart limit below remains.** Earlier choice, VALIDATED (23/11): cookie only (server-set, HttpOnly, 1 year). Known limit: the quick-tunnel host name changes at each start, so after a tunnel restart phones look "new" (nickname typed again) | `device_token()` helper; since D37 also `device.js` and `/device/sync` |
 | OI-5 | Second photo for the same session | **VALIDATED (23/11).** The last photo replaces D (re-shooting is not a manual correction) | `SessionService.record_head_count` |
 | OI-6 | Export format details (FR-1.18) | **VALIDATED (23/11).** All sessions in one export; XLSX with sheets "Check-ins" and "Summary"; CSV as two files (`checkins.csv`, `summary.csv`) | `AttendanceExporter`, 3 routes |
 | OI-7 | Attempt counter after a new scan | **VALIDATED (23/11).** A new scan opens a new 1-minute window with 0 attempts (kept by D33). Guessing needs a QR at most 15 s old, but since D33 from anywhere: residual risk (red-team F-02) mitigated only by the 4-digit code (about 5,000 expected guesses) | `CheckInWindowRepository.open` |

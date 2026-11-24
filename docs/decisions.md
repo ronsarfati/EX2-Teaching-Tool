@@ -2,7 +2,7 @@
 
 Resolutions of the open questions (OQ1-OQ14 in `docs/requirements.md`) and of the technical choices left open by
 the statement. Proposed by the ambiguity analysis, **validated by the student on 2026-11-22** (D31: 2026-11-23;
-D32, D33, D34 and D35: 2026-11-23; D36: 2026-11-24).
+D32, D33, D34 and D35: 2026-11-23; D36 and D37: 2026-11-24).
 Requirements are cited as R<n>, statement locators as F/Req/G/TD/QA (see `docs/requirements.md`).
 
 Guiding rule: the **simplest option that fully satisfies the requirements** (KISS, Req2), that can really be
@@ -22,7 +22,7 @@ old text is kept below for history only and must not be used for design.
 | D3 | Storage | SQLite (stdlib `sqlite3`), one local file, git-ignored | VALIDATED |
 | D4 | Real time | Short polling (2-3 s; projector 1 s, D31); no websockets | VALIDATED (amended by D31) |
 | D5 | Attendance mechanism (OQ2) | ~~Chain-of-trust check-in (root QR, sponsors, sponsor tree, lecturer phone QR)~~ | SUPERSEDED by D30 (22/11) |
-| D6 | Student identity (OQ4) | Nickname entered once, remembered by a random device token (cookie only, D31); automatic recognition afterwards; nickname 1-30 chars, not unique (D31) | VALIDATED (amended by D31) |
+| D6 | Student identity (OQ4) | Nickname entered once, remembered by a random device token (cookie only, D31); automatic recognition afterwards; nickname 1-30 chars, not unique (D31); token signed and mirrored on the phone (D37) | VALIDATED (amended by D31, D37) |
 | D7 | Photo head count (OQ3) | YuNet, whole image, score threshold 0.4 (recall ~94 %, precision ~96 %); no manual correction; automatic consistency alert (asymmetric tolerance); photo discarded after counting; a new photo replaces D (D31) | VALIDATED (amended by D31) |
 | D8 | Spreadsheet online/offline; offline comments (OQ5) | Live in-app table + CSV/XLSX download (format: D31); F2 offline = asynchronous | VALIDATED (amended by D31) |
 | D9 | Polls (F3) | One question, 2-4 options, one vote per token, live results | VALIDATED |
@@ -53,6 +53,7 @@ old text is kept below for history only and must not be used for design.
 | D34 | Video summary F4 for real recordings (closes D10) | PIN page, upload up to 2 GB (configurable, this route only) streamed to a temp file; ffmpeg -> mono 16 kHz audio; faster-whisper `small` (CPU int8, VAD, language auto unless `WHISPER_LANGUAGE`) in **one background thread, one job at a time**; Claude structured summary (map-reduce above a safe size, transcript treated as untrusted); status page polled; video and audio deleted right after transcription (also on failure), transcript never stored, only the summary text + timestamps kept in SQLite; demo on a local-only 4-min Hebrew clip | VALIDATED (23/11) |
 | D35 | Display time zone | User-visible times in Israel local time (Asia/Jerusalem, DST); storage stays UTC | VALIDATED (23/11) |
 | D36 | F4 red-team follow-ups (amends D34, D35) | (a) recordings above 4 h refused (ffprobe) + Cancel button; (b) up to 3 attempts per LLM call in the F4 job, backoff 2 s then 8 s; (c) export column "Checked in at" shows date and time | VALIDATED (24/11) |
+| D37 | One check-in per phone even after clearing cookies (amends D6 and D31 / OI-4) | Server-signed random device token (HMAC-SHA256) mirrored on the phone in cookie, localStorage and IndexedDB; a valid older stored copy wins over a missing cookie; browser fingerprinting rejected | VALIDATED (24/11) |
 
 "VALIDATED" = "VALIDATED by the student — 2026-11-22" unless stated otherwise. "DEFERRED" = "DEFERRED by the
 student — 2026-11-22".
@@ -179,6 +180,8 @@ Identity of each node = the nickname and device token of D6 (no personal data). 
 **Impact.** Data model; README scope; tests for first-use and returning-device flows.
 
 **Amended by D31 (23/11):** the device token is kept in a server-set cookie only, no localStorage copy (OI-4); nickname 1-30 characters after trimming, not unique (OI-2); stored at the first successful check-in.
+
+**Amended by D37 (24/11):** the token is signed by the server and mirrored on the phone in cookie, localStorage and IndexedDB, so that clearing the cookies no longer gives a second check-in (this reverses the cookie-only choice of D31, OI-4).
 
 **Status:** VALIDATED by the student — 2026-11-22 (spreadsheet "sponsor" column superseded by D30, 22/11)
 
@@ -483,7 +486,7 @@ relay / off campus labels), then was removed entirely. Points 2-5 and P1-P3 are 
 | OI-1 | F5 comparison source: list of public repo URLs pasted by the lecturer on `/lecturer/peers` (PIN), stored in local SQLite; first 2, excluding the reviewed repo | D11 |
 | OI-2 | Nickname 1-30 characters after trimming; not unique (the device token is the identity) | D6 |
 | OI-3 | Campus IP ranges = data entered by the lecturer via UC-6; no code change; value pending the on-site measurement | D30 |
-| OI-4 | Device token in a server-set cookie only (HttpOnly, 1 year), no localStorage. Known limit: restarting the quick tunnel changes the host name, so phones are treated as first-time (nickname typed again) | D6 |
+| OI-4 | (Amended by D37, 24/11: cookie + localStorage + IndexedDB, signed.) Device token in a server-set cookie only (HttpOnly, 1 year), no localStorage. Known limit: restarting the quick tunnel changes the host name, so phones are treated as first-time (nickname typed again) | D6 |
 | OI-5 | A new photo replaces D for the session | D7 |
 | OI-6 | Export covers all sessions; XLSX with sheets "Check-ins" and "Summary"; CSV as `checkins.csv` + `summary.csv` | D8 |
 | OI-7 | A new scan opens a new 1-minute window and resets attempts to 0 | D30 P2 |
@@ -776,6 +779,41 @@ an ambiguous time cell. Simplest option for each (one constant, one route, one l
 *Tests:* `tests/test_d36.py`.
 
 **Status:** VALIDATED by the student — 2026-11-24 (three parts)
+
+---
+
+## D37 — One check-in per phone even after clearing cookies (amends D6 and D31 / OI-4; FR-1.12, NFR-7)
+
+**Question.** With a cookie-only token (D31, OI-4), a student who checks in, clears the browser cookies and scans again
+is a "new device" and checks in twice. Can this be closed without identifying the student (D5, D6, R16)?
+
+**Options.** 1. *Keep cookie only* (simplest; the loophole stays). 2. *Browser fingerprinting* (screen, model, language):
+**rejected**, identical phone models give identical fingerprints, so two real students would collide and one would be
+blocked wrongly. 3. *Signed random token mirrored in several browser stores.*
+
+**DECISION: option 3.**
+- The device token stays random and carries no personal data. The server signs it (HMAC-SHA256 with `SECRET_KEY`,
+  `<random>.<signature>`); a forged or badly signed token is ignored. The phone mirrors it in the cookie `dt`, in
+  `localStorage` and in `IndexedDB` (`app/static/device.js`, `app/web/device.py`).
+- On each student page the script calls `POST /device/sync {"stored": [...]}` and gets `{token, changed}`. When `changed`
+  is true the page reloads once (a `sessionStorage` flag prevents a loop). The check-in and vote forms also carry a hidden
+  field `dt_stored` as a fallback if the form is sent before the sync answers.
+- If the cookie is gone but a valid stored copy comes back, **the older token wins** for scan, confirm and vote, and the
+  cookie is set again. Result: "check in, clear cookies, scan again" gives "You are already checked in for this class." (409).
+- **Blocked:** clearing the cookies only, or the cookies plus one of the two other copies.
+- **Not blocked:** clearing all site data, private browsing, a second browser, JavaScript disabled. A 100 % guarantee
+  would require identifying the student, which D5 forbids. Safety net: the D7 photo consistency alert.
+- Cookies issued before D37 (unsigned) are accepted and re-issued signed; no database migration.
+- **Trade-off:** the token is now readable by page JavaScript (the cookie itself stays HttpOnly). It is random and
+  carries no right: the lecturer pages are protected by the PIN (D22), not by this token.
+
+**Justification.** Closes the most obvious double check-in with a few lines of script and no new data (KISS, R16); the
+remaining loopholes are stated openly.
+
+**Impact.** *SRS:* FR-1.12, NFR-7, glossary. *Design:* device component, OI-4, SD for the sync. *Use cases:* UC-2 exception.
+*Tests:* `tests/test_d37_device_marker.py`, `tests/test_concurrent_checkins.py`.
+
+**Status:** VALIDATED by the student — 2026-11-24
 
 ---
 

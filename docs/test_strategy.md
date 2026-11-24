@@ -2,8 +2,8 @@
 
 Covers R32 ("a testing strategy that addresses the classes of To Do 7"). Built from the [design](design.md)
 (classes of section 3, exceptions of 3.8, tasks T1-T21 of section 7 (T18 = T18a-T18f)), the [SRS](srs.md) (FR-x.y, NFR-n, error table
-of section 5), the [use cases](use_cases.md) (UC-1 to UC-14), the validated decisions D1-D35
-([decisions.md](decisions.md); D25 = test tooling, D7 = consistency rule, D30 / D31 = check-in rules, D33 = no network filter, 4-digit code, D34 = F4 video summary) and the
+of section 5), the [use cases](use_cases.md) (UC-1 to UC-14), the validated decisions D1-D37
+([decisions.md](decisions.md); D25 = test tooling, D7 = consistency rule, D30 / D31 = check-in rules, D33 = no network filter, 4-digit code, D34 = F4 video summary, D36 = F4 duration cap / cancel / retries / export date, D37 = signed device token) and the
 [tools report](tools_report.md). Class, port, method and exception names are exactly those of `design.md`.
 
 ## 1. Approach
@@ -387,7 +387,7 @@ All automated cases are offline: `FakeAudioExtractor`, `FakeTranscriber`, `FakeL
   a job is queued is refused and writes nothing; every failure path (unreadable, no speech, transcriber down, LLM down,
   runner error) ends `failed` with the exact SRS section 5 message and a clean work directory.
 - **Privacy:** a marker word of the transcript appears in no table, file or log record (FR-4.5).
-- **Trace:** FR-4.1-FR-4.9, D34; T18d.
+- **Trace:** FR-4.1-FR-4.9, D34; D36 (FR-4.1 duration, FR-4.10 cancel, FR-4.11 retries: `tests/test_d36.py`); T18d.
 
 #### F4 routes (T18e: `test_t18e_video_routes.py`)
 - **Type:** integration with the Flask test client. **Doubles:** the fakes, deferred or inline runner.
@@ -400,9 +400,23 @@ All automated cases are offline: `FakeAudioExtractor`, `FakeTranscriber`, `FakeL
 
 ### 2.8 Web helpers (T5, T8)
 
+`tests/test_d37_device_marker.py` (14 tests, D37; `device.py`, `/device/sync`): sign / verify round trip; forged, malformed and
+other-key tokens rejected; the cookie is signed and keeps HttpOnly, SameSite=Lax and one year; sync returns the token and
+`changed` false without stored copies; **check in, clear cookies, scan again** is refused (409); confirm with `dt_stored` after
+a cookie clear is refused; a forged stored token is ignored; a new phone without stored copy checks in as before; a legacy
+unsigned cookie is accepted and re-issued signed; a forged cookie is replaced; a poll vote after a cookie clear, with or without
+the `dt_stored` field, is refused; the pages load `device.js`. The JavaScript itself (localStorage / IndexedDB, one reload)
+is not unit-tested: it is exercised by the manual step M12 below.
+
+`tests/test_concurrent_checkins.py` (4 tests, FR-1.6-FR-1.12, D3): on a temp-file SQLite database with real services and a
+fake clock, 50 distinct devices confirming at the same instant give 50 rows and no error; 50 devices scanning and confirming in
+parallel give 50 rows; the same device confirming from 10 threads gives exactly 1 row (others `AlreadyCheckedInError`); the same
+device scanning and confirming from 10 threads gives 1 row. A run against the real server with 50 simultaneous requests gave
+50 x HTTP 200 (manual run, not a pytest test).
+
 | Helper | Key cases | Trace |
 |---|---|---|
-| `device_token()` | first request -> cookie `dt` set, `HttpOnly`, `SameSite=Lax`, `Max-Age` of one year; second request with the cookie -> same value, no new cookie; two clients -> two different values | D6, D31 (OI-4) |
+| `device_token()` | first request -> cookie `dt` set, `HttpOnly`, `SameSite=Lax`, `Max-Age` of one year; second request with the cookie -> same value, no new cookie; two clients -> two different values | D6, D31 (OI-4), D37 |
 | `lecturer_required` | every PIN route of design 2.1 (parametrised list) without the PIN -> redirect to `/lecturer/login`; with the PIN -> not redirected | FR-6.1 |
 
 `tests/test_huge_ids.py`: ids beyond the SQLite 64-bit range (10**30) on the attendance API, photo page and upload, and poll routes answer a clean 404/400, never a 500 (NFR-10, D23).
@@ -475,6 +489,8 @@ are added here. Results are written in `docs/results.md`.
 | M9 | Rehearsal with several browser tabs and 2-3 phones: comment, poll, review | comment and vote visible on the lecturer page within 5 s; review shown | NFR-2, NFR-5, D25 |
 | M10 | One real LLM call and one real GitHub download (T15, T16) | answer received; download recorded in the tools report | D12, OI-13 |
 | M11 | F4 on a real lecture clip (local only), uploaded on `localhost`, `ffmpeg` installed, model cached (T18f) | status steps in order; four sections in the lecture language; `.md` and `.txt` download; work directory empty; database holds only the summary text; timings noted (244 s clip: about 70 s on the demo laptop, `docs/results.md`) | FR-4.1-FR-4.9, NFR-13, UC-12 |
+| M11b | F4 limits (D36), on the laptop: `ffprobe` measures the real 244 s clip as 244.4 s; a fake `.mp4` gives no duration and is accepted by the duration check; the Cancel button appears on an active job and stops it | duration 244.4 s (`ffprobe`); no duration for the fake file; job shows "Cancelled by the lecturer." | FR-4.1, FR-4.10, D36 |
+| M12 | Cleared cookies (D37), on a phone: check in, clear the browser cookies of the site only, scan the next QR | "You are already checked in for this class."; the same after clearing all site data is NOT blocked (stated limit) | FR-1.12, UC-2 (1d), D37 |
 
 ## 6. Coverage and exit criteria
 
@@ -505,6 +521,8 @@ are added here. Results are written in `docs/results.md`.
 | T17 | `test_review.py`, `test_review_extra.py` | redaction, peer rules, no storage, UC-13 row pass |
 | T18a-e | `test_t18a_summary_storage.py`, `test_t18b_adapters.py`, `test_t18b_integration.py` (opt-in), `test_t18c_summariser.py`, `test_t18d_video_service.py`, `test_t18e_video_routes.py`, `test_t18_extra.py` | cases of design 7.1 pass; UC-12 row passes |
 | T18f | none (manual, M11) | real run recorded in the tools report and `docs/results.md` |
+| D36 | `test_d36.py` (22 tests) | `ffprobe` duration above / at / under 4 h and unknown (fake extractor, argument list without shell, unusable output gives none); upload above 4 h answers 400 and leaves nothing; cancel route (PIN, 404, finished job unchanged, slot freed, button only while active); cancel during transcription and between map parts makes no further LLM call; 3 attempts with waits 2 s then 8 s, no retry on empty answer, missing key or cancel; export cell shows date and time after midnight, DST repeat documented |
+| D37 | `test_d37_device_marker.py`, `test_concurrent_checkins.py` | cases listed in 2.8; 50 simultaneous devices give 50 rows, same device 10 threads gives 1 |
 | hardening | `test_redteam_fixes.py` | `strip_invisible` and invisible-only nickname refused; XLSX export survives a control character; photo above 40 MP refused before decoding; 25 MB upload cap; werkzeug log silenced; `X-Frame-Options` / `nosniff` on every response; `SameSite=Lax` cookies; glued peer names masked, unrelated words not (T4, T7-T9, T11, T12, T17; design 2.1) |
 | T20 | `test_t20_no_network.py` | acceptance tests 1-12 of design section 7 pass (no IP read, allow-list gone, new schema, old database untouched) |
 | T21 | `test_t21_four_digit_code.py` | acceptance tests 1-8 of design section 7 pass (format, strict input, rotation, P1, P2) |
@@ -525,7 +543,7 @@ Before the demo: full suite green, coverage report taken, M1-M10 done (or the fa
 | FR-1.9 | `CheckInService` attempts, `CheckInWindowRepository.increment_attempts` | UC-2 |
 | FR-1.10 | `CheckInService` nickname, `CheckInRepository` | UC-2; M1 |
 | FR-1.11 | `CheckInService` success / abandoned scan | UC-2, UC-5 |
-| FR-1.12 | `CheckInService` one per device, `CheckInRepository` `UNIQUE` | UC-2 |
+| FR-1.12 | `CheckInService` one per device, `CheckInRepository` `UNIQUE`; D37: `test_d37_device_marker.py`, `test_concurrent_checkins.py` | UC-2 (1d); M12 |
 | FR-1.13 | `SessionService.close_session`, `CheckInService` closed session | UC-3 |
 | FR-1.14 | `SessionService.summary` | UC-5 |
 | FR-1.15 | `YuNetHeadCounter`, `SessionService.record_head_count` | UC-4; M7 |
@@ -534,7 +552,7 @@ Before the demo: full suite green, coverage report taken, M1-M10 done (or the fa
 | FR-1.18 | `AttendanceExporter` | UC-5; M8 |
 | FR-2.1-FR-2.4 | `CommentService`, `CommentRepository` | UC-7, UC-8; M9 |
 | FR-3.1-FR-3.4 | `PollService`, `PollRepository` | UC-9, UC-10, UC-11; M9 |
-| FR-4.1, FR-4.6-FR-4.8 | `VideoSummaryService`, F4 routes | UC-12; M11 |
+| FR-4.1, FR-4.6-FR-4.8, FR-4.10, FR-4.11 | `VideoSummaryService`, F4 routes; D36: `test_d36.py` | UC-12; M11, M11b |
 | FR-4.2, FR-4.3 | `FfmpegAudioExtractor`, `FasterWhisperTranscriber`, `ThreadJobRunner` | UC-12; M11 |
 | FR-4.4 | `LectureSummariser` | UC-12 |
 | FR-4.5, FR-4.9 | `SummaryRepository`, `JobStatus`, `VideoSummaryService` | UC-12 |
