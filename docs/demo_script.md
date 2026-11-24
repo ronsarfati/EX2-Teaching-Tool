@@ -1,5 +1,8 @@
 # Live demo script (To Do 11) - 10 minutes
 
+**Date:** the live class demo is scheduled for **8 December 2026** (date chosen by the student among those offered by
+the course assistant).
+
 Goal: show the main feature (F1 attendance) working with the real class on their own phones, then F3, F2 and F5,
 in 10 minutes. Items marked **(pending)** depend on a choice not yet made. F4 (video summary, D34) runs as a background job during the polls.
 

@@ -1,6 +1,6 @@
 # Results (To Do 12) - draft
 
-Status: written from the code and tests as of 2026-11-23. Figures from the live class are placeholders and are
+Status: written from the code and tests as of 2026-11-24. Figures from the live class are placeholders and are
 filled in only after the demo; nothing below is estimated.
 
 ## 1. Setup

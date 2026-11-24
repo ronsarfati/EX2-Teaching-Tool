@@ -6,7 +6,9 @@ summaries and LLM homework reviews.
 Course assignment: *Introduction to Software Engineering (OOP/OOD)*, Ex2 "Vibe Coding & Deep Designing:
 Web-based Teaching Tool".
 
-Look and feel (D38): phone-first student pages, a lecturer dashboard split into "In class now" and "After class", a projector page with QR, code and three steps, light and dark themes (lecturer toggle), Hebrew and English text, system fonts and no external resource. The assignment is a **design challenge**; the implementation is secondary and reuses
+Look and feel (D38): phone-first student pages, a lecturer dashboard split into "In class now" and "After class", a projector page with QR, code and three steps, light and dark themes (lecturer toggle), Hebrew and English text, system fonts and no external resource.
+
+The assignment is a **design challenge**; the implementation is secondary and reuses
 existing code where possible (R12, R17, R18).
 
 ## 1. Problem
@@ -151,7 +153,8 @@ tests/test_t18b_integration.py` (needs `ffmpeg` and the cached model).
 First step for the lecturer: open the app and sign in with the PIN at `/lecturer/login`.
 
 Phones must reach the laptop. Either use the launcher above, or a Cloudflare quick tunnel
-(`cloudflared tunnel --url http://localhost:5000`, then put the printed URL in `BASE_URL` and restart the app), or
+(`cloudflared tunnel --url http://localhost:<port>`, with the app's `PORT`, i.e. 5050 on a Mac, then put the printed
+URL in `BASE_URL` and restart the app), or
 a phone hotspot. See
 [docs/demo_script.md](docs/demo_script.md).
 
@@ -193,4 +196,4 @@ Optional demo data (fictional nicknames only, no network, no API key; existing f
 This project was designed and built with the help of **Claude Code** (Anthropic) AI agents, working under the
 student's direction. The agents drafted the requirements, decisions, documents and code; the student defined the
 key design choices (e.g. the projector QR + 4-digit code check-in, D30, D33) and reviewed and validated every decision before it was
-applied. The icons are copied from **Lucide** (ISC licence; the app loads nothing from the network). The F4 video-summary feature was tried on a public lecture clip that stays local and is not in the repository. Third-party libraries and services used by the app are listed in the tools report.
+applied. The icons are copied from **Lucide** (ISC licence; the app loads nothing from the network) and the stylesheet is the vendored **Pico CSS** (MIT); their licence texts are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). The F4 video-summary feature was tried on a public lecture clip that stays local and is not in the repository. Third-party libraries and services used by the app are listed in the tools report.

@@ -349,7 +349,7 @@ Command: `python tools_tests/head_count.py <yunet.onnx> <yolo11n.pt|yolov8n.pt|n
   with 2-3 s polling), no Server-Sent Events (polling is fine), hostname changes at each start.
 - **Verdict:** ADOPT. Plan B (D13): phone hotspot + LAN URL over plain HTTP. Since the app has no in-page scanner
   (2.4), the missing HTTPS does not block attendance: the native camera app opens the `http://<laptop-ip>:<port>/...`
-  URL encoded in the QR. Still to confirm on real phones (Section 3, test 9). Plan C: recorded run (D13).
+  URL encoded in the QR. Still to confirm on real phones (Section 3, test 6). Plan C: recorded run (D13).
 
 ### 2.10 Testing (R32, D25)
 

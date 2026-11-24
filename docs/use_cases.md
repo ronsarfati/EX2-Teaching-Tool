@@ -329,24 +329,32 @@ class.
 what was taught and give students a study sheet, whatever the platform used to record.
 
 - **Main steps:** 1. On the "Video summary" page (PIN) the lecturer chooses one video or audio file and optionally the
-  summary language; no Zoom/Meet/Classroom API (FR-4.1, R15). The upload returns at once (FR-4.6). 2. The system
+  summary language; no Zoom/Meet/Classroom API (FR-4.1, R15). The duration is measured with `ffprobe` before the job
+  is queued (FR-4.1, D36-a). The upload returns at once (FR-4.6). 2. The system
   extracts the audio with `ffmpeg` and transcribes it on the laptop with faster-whisper; the recording never leaves
   the laptop (FR-4.2, FR-4.3). 3. It sends only the transcript text to the Anthropic API (map-reduce when long) and
-  receives four sections: topics covered, key notions, definitions and examples, what to review (FR-4.4, D12).
+  receives four sections: topics covered, key notions, definitions and examples, what to review (FR-4.4, D12);
+  each LLM call is tried up to 3 times on a transient failure, waiting 2 s then 8 s (FR-4.11, D36-b).
   4. The status page, polled every 3 s, shows each step; the lecturer may leave and come back (FR-4.7). 5. The
   finished summary is shown and downloaded as `.md` or `.txt` (FR-4.8). 6. The recording, its audio and the
   transcript are gone; only the summary text is kept (FR-4.5).
 - **Exceptions:** no file or wrong extension: "Please choose a video or audio recording (for example MP4, MOV, MKV,
-  WebM or M4A)."; file above the limit: "This file is too large. The maximum is 2 GB."; a job already running: "A video
+  WebM or M4A)."; file above the limit: "This file is too large. The maximum is 2 GB."; recording longer than 4 hours
+  (measured before queueing; the copied file is deleted, no job stays active): "This recording is longer than 4 hours.
+  Please upload a shorter recording." (FR-4.1, D36-a); a job already running: "A video
   is already being summarised. Please wait until it is finished."; unreadable file or no audio track: "We could not
   read this video file."; no speech: "No speech was found in this recording."; model or `ffmpeg` missing: "The
   transcription service is unavailable right now. Please try again later."; no LLM key or API failure: "The summary
-  service is unavailable right now. Please try again later."; app restarted during the job: the interrupted message
+  service is unavailable right now. Please try again later." (after the 3 attempts of FR-4.11); the lecturer presses
+  **Cancel** while the job is active: the job ends with "Cancelled by the lecturer.", the slot is freed, no LLM call is
+  made afterwards and the work files are removed (FR-4.10, D36-a); app restarted during the job: the interrupted message
   (SRS section 5). No pre-computed summary is ever shown (FR-4.9, D1).
 - **Acceptance criteria:** a recording of each accepted type yields a four-section summary in the lecture language;
   the job passes through the listed steps in order; both downloads work; the work directory is empty afterwards
-  and the database holds no transcript or file name.
-- **Trace:** FR-4.1-FR-4.9, FR-6.1, NFR-7, NFR-13; R7, R8, R15, R16; D1, D12, D34.
+  and the database holds no transcript or file name; a recording above 4 hours is refused with its message; Cancel
+  on an active job ends it with "Cancelled by the lecturer." and leaves no file; an LLM failing twice then succeeding
+  still yields the summary.
+- **Trace:** FR-4.1-FR-4.11, FR-6.1, NFR-7, NFR-13; R7, R8, R15, R16; D1, D12, D34, D36.
 
 ### UC-13 Review a homework with comparison (F5)
 

@@ -97,8 +97,8 @@ IP address: a check-in works the same on the campus Wi-Fi and on mobile data (D3
 - C2 No Moodle, Zoom, Meet or Classroom integration; videos are uploaded files (R15).
 - C3 KISS: phone web app, few taps, no installation, no accounts (R14, D6, D22).
 - C4 Only implementable, reused components (Flask, `qrcode`, OpenCV YuNet, faster-whisper, `ffmpeg`, Anthropic SDK,
-  `openpyxl`, `cloudflared`), each tested in the tools report (R17, R18, R25; `ffmpeg` to be recorded in task T18f,
-  D34).
+  `openpyxl`, `cloudflared`), each tested in the tools report (R17, R18, R25). `ffmpeg` and `ffprobe` must be installed on the
+  laptop for F4; both were checked in the real trial of task T18f (tools report 2.13, `docs/results.md`) (D34, D36-a).
 - C5 Live 10-minute demo in this class (R13, R19).
 - C6 Secrets (API key, PIN, signing key) only in environment variables / git-ignored `.env` (D12, D22).
 - C7 No network check (D33): presence rests on the rotating QR, the projected 4-digit code and the photo check
