@@ -1,19 +1,23 @@
 {% extends "base.html" %}
+{% block main_class %} cp-narrow{% endblock %}
 {% block title %}Check in{% endblock %}
 {% block content %}
 <h1>Check in</h1>
+<p class="cp-muted">You are almost there.</p>
 <form method="post" action="/checkin">
   <input type="hidden" name="dt_stored" value="">
   {% if needs_nickname %}
   <label>Nickname
-    <input type="text" name="nickname" maxlength="30" required autocomplete="off">
+    <input type="text" name="nickname" maxlength="30" required autocomplete="off" autofocus dir="auto">
   </label>
   <small>Choose any nickname - do not use your real name or ID.</small>
   {% endif %}
   <label>4-digit code shown under the QR
-    <input type="text" name="code" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" required autocomplete="off">
+    <input class="cp-code" type="text" name="code" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" required autocomplete="off" enterkeyhint="go"{% if not needs_nickname %} autofocus{% endif %}>
   </label>
   <button type="submit">Confirm</button>
 </form>
+{# After the button on purpose: the first "Confirm" of the page must be the submit button. #}
+<p class="cp-muted"><small>The code changes every few seconds: type the one on the screen now.</small></p>
 <script src="{{ url_for('static', filename='device.js') }}" defer></script>
 {% endblock %}

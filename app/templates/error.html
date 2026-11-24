@@ -1,8 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Error{% endblock %}
+{% block main_class %} cp-narrow{% endblock %}
+{% block title %}Something went wrong{% endblock %}
 {% block content %}
+{# The way back depends on who is looking: lecturer pages go back to the dashboard. #}
+{% set lecturer_side = request.path.startswith("/lecturer") %}
 <article>
   <p role="alert">{{ message }}</p>
-  <a href="/">Back to the menu</a>
+  <a href="{{ '/lecturer' if lecturer_side else '/' }}">{{ 'Back to the dashboard' if lecturer_side else 'Back to the menu' }}</a>
 </article>
 {% endblock %}

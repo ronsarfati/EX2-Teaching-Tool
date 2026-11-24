@@ -1,5 +1,5 @@
 <!doctype html>
-{# Shell shared by every page. Blocks: html_attrs, title, head_extra, nav, content, footer.
+{# Shell shared by every page. Blocks: html_attrs, title, head_extra, nav, content, footer, tabbar.
    No inline script and no form here: pages and tests rely on a link-only shell. #}
 <html lang="en"{% block html_attrs %}{% endblock %}>
 <head>
@@ -28,9 +28,10 @@
       {% block nav %}{% endblock %}
     </div>
   </header>
-  <main class="container">
+  <main class="container{% block main_class %}{% endblock %}">
     {% block content %}{% endblock %}
   </main>
   {% block footer %}{% endblock %}
+  {% block tabbar %}{% endblock %}
 </body>
 </html>

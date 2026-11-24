@@ -1,7 +1,16 @@
 {% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% block main_class %} cp-narrow{% endblock %}
 {% block title %}{{ heading }}{% endblock %}
 {% block content %}
 <h1>{{ heading }}</h1>
 <p>{{ text }}</p>
-{% for url, label in links or [] %}<p><a role="button" href="{{ url }}">{{ label }}</a></p>{% endfor %}
+{% for url, label, hint, glyph in links or [] %}
+<a class="cp-tile" role="button" href="{{ url }}">
+  {{ icon(glyph) }}
+  <span><strong>{{ label }}</strong><small>{{ hint }}</small></span>
+</a>
+{% endfor %}
+<p class="cp-muted"><small>No account, no real name.</small></p>
 {% endblock %}
+{% block tabbar %}{% include "_tabbar.html" %}{% endblock %}

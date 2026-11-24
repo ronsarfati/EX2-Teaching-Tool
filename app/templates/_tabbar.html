@@ -1,0 +1,9 @@
+{# Bottom tab bar of the student pages (links only: no form, no inline script).
+   Not included on the check-in pages, so that the form is the only thing to do there. #}
+{% from "_icons.html" import icon %}
+<nav class="cp-tabbar" aria-label="Student pages">
+  <a href="/">{{ icon("check") }}<span>Home</span></a>
+  <a href="/poll">{{ icon("bar-chart") }}<span>Poll</span></a>
+  <a href="/comments">{{ icon("message") }}<span>Comments</span></a>
+  <a href="/review">{{ icon("git-branch") }}<span>Review</span></a>
+</nav>

@@ -1,13 +1,22 @@
 {% extends "base.html" %}
+{% block main_class %} cp-narrow{% endblock %}
 {% block title %}Comments{% endblock %}
 {% block content %}
 <h1>Comment or suggestion</h1>
-{% if sent %}<p><strong>Thanks, sent anonymously.</strong></p>{% endif %}
+<p class="cp-muted">Anonymous: no name is attached.</p>
+{% if sent %}<p class="cp-banner"><strong>Thanks, sent anonymously.</strong></p>{% endif %}
 <form method="post" action="{{ url_for('student.comments') }}">
   <label>Your comment (anonymous, 500 characters at most)
-    <textarea name="text" maxlength="500" rows="5" required></textarea>
+    <textarea id="comment-text" name="text" maxlength="500" rows="6" required dir="auto"></textarea>
   </label>
+  <p class="cp-counter" id="comment-count" aria-live="off">0 / 500</p>
   <button type="submit">Send</button>
 </form>
-<p><a href="{{ url_for('student.menu') }}">Back</a></p>
+<script>
+// Live character counter; textContent only, nothing typed is ever parsed as HTML.
+const box = document.getElementById("comment-text");
+const counter = document.getElementById("comment-count");
+box.addEventListener("input", () => { counter.textContent = box.value.length + " / 500"; });
+</script>
 {% endblock %}
+{% block tabbar %}{% include "_tabbar.html" %}{% endblock %}

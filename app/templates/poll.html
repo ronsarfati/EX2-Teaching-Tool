@@ -1,22 +1,24 @@
 {% extends "base.html" %}
+{% block main_class %} cp-narrow{% endblock %}
 {% block title %}Poll{% endblock %}
 {% block content %}
 <h1>Poll</h1>
-{% if voted %}<p><strong>Thanks, your vote is counted.</strong></p>{% endif %}
+{% if voted %}<p class="cp-banner"><strong>Thanks, your vote is counted.</strong></p>{% endif %}
 {% if poll %}
-<h2>{{ poll.question }}</h2>
+<h2 dir="auto">{{ poll.question }}</h2>
 {% if not voted %}
 <form method="post" action="{{ url_for('student.vote') }}">
   <input type="hidden" name="poll_id" value="{{ poll.id }}">
   <input type="hidden" name="dt_stored" value="">
   {% for option in poll.options %}
-  <label><input type="radio" name="option_id" value="{{ option.id }}" required> {{ option.label }}</label>
+  <label class="cp-option"><input type="radio" name="option_id" value="{{ option.id }}" required> <span dir="auto">{{ option.label }}</span></label>
   {% endfor %}
   <button type="submit">Vote</button>
 </form>
 {% endif %}
 {% else %}
-<p>No poll is open right now. This page checks again by itself.</p>
+<article class="cp-empty"><span class="cp-dot" aria-hidden="true"></span>
+  <p>No poll is open right now. This page checks again by itself.</p></article>
 {% endif %}
 <script src="{{ url_for('static', filename='device.js') }}" defer></script>
 <script>
@@ -30,3 +32,4 @@ setInterval(async () => {
 }, 3000);
 </script>
 {% endblock %}
+{% block tabbar %}{% include "_tabbar.html" %}{% endblock %}

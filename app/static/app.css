@@ -136,3 +136,29 @@ article { background: var(--cp-surface); border: 1px solid var(--cp-border); bor
 .cp-row { display: flex; flex-direction: column; padding: var(--cp-s3) 0; border-bottom: 1px solid var(--cp-border); text-decoration: none; }
 .cp-row:last-child { border-bottom: 0; }
 .cp-muted, .cp-row small { color: var(--cp-muted); }
+
+/* Student pages (T22e-T22g): tiles, big code field, success check, poll empty state, counter. */
+main.cp-narrow { max-width: 34rem; } /* one column on student pages */
+body:has(.cp-tabbar) main { padding-bottom: calc(64px + var(--cp-s5)); } /* keep content above the fixed bar */
+.cp-tabbar a { display: flex; flex-direction: column; align-items: center; gap: 2px; color: var(--cp-muted); }
+.cp-tabbar a:hover { color: var(--cp-primary); }
+.cp-tile { display: flex; align-items: center; justify-content: flex-start; gap: var(--cp-s4); min-height: 56px;
+  margin-bottom: var(--cp-s3); text-align: start; }
+.cp-tile span { display: flex; flex-direction: column; }
+.cp-tile small { font-weight: 400; opacity: .85; }
+main input, main textarea, main button, main [role=button] { font-size: var(--cp-fs-md); }
+form button[type=submit], .cp-center [role=button] { min-height: 56px; width: 100%; }
+input[name=nickname] { min-height: 56px; }
+.cp-code { min-height: 64px; font: 700 var(--cp-fs-2xl) var(--cp-mono); text-align: center; letter-spacing: .5em; }
+.cp-center { text-align: center; }
+.cp-bigcheck { display: grid; place-items: center; width: 96px; height: 96px; margin: 0 auto var(--cp-s4);
+  border-radius: 50%; background: var(--cp-success); color: #fff; }
+.cp-bigcheck .icon { width: 56px; height: 56px; stroke-width: 3; }
+.cp-empty { display: flex; align-items: center; gap: var(--cp-s3); }
+.cp-empty p { margin: 0; }
+.cp-dot { flex: none; width: .75rem; height: .75rem; border-radius: 50%; background: var(--cp-accent);
+  animation: cp-pulse 1.6s ease-in-out infinite; }
+.cp-option input { margin: 0; flex: none; }
+.cp-option span { flex: 1; }
+.cp-counter { text-align: end; color: var(--cp-muted); font-size: var(--cp-fs-sm); margin-top: calc(-1 * var(--cp-s2)); }
+@media (prefers-reduced-motion: reduce) { .cp-dot { animation: none; } }

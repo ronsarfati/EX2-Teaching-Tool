@@ -24,9 +24,14 @@ def _services() -> dict:
 def menu():
     return render_template(
         "message.html",
-        heading="Teaching tool",
+        heading="HereOrNot",
         text="To check in, scan the QR code on the projector.",
-        links=[("/checkin", "Check in"), ("/poll", "Poll"), ("/comments", "Comments"), ("/review", "Homework review")],
+        links=[
+            ("/checkin", "Check in", "Scan the QR code on the screen", "qr"),
+            ("/poll", "Poll", "Vote in the live poll", "bar-chart"),
+            ("/comments", "Comments", "Send an anonymous suggestion", "message"),
+            ("/review", "Homework review", "Compare two submissions", "git-branch"),
+        ],
     )
 
 

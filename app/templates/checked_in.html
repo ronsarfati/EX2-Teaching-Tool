@@ -1,9 +1,15 @@
 {% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% block main_class %} cp-narrow{% endblock %}
 {% block title %}Checked in{% endblock %}
 {% block content %}
-<article>
+<article class="cp-center">
+  <div class="cp-bigcheck">{{ icon("check") }}</div>
   <h1>You are checked in</h1>
-  <p>Welcome, {{ nickname }}.</p>
+  <p>Welcome, <bdi dir="auto">{{ nickname }}</bdi>.</p>
+  <p class="cp-muted">You can close this page.</p>
+  <a role="button" class="secondary" href="/poll">Poll</a>
+  <a role="button" class="secondary" href="/comments">Comments</a>
 </article>
 <script src="{{ url_for('static', filename='device.js') }}" defer></script>
 {% endblock %}
