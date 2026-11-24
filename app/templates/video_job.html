@@ -3,22 +3,29 @@
 {% block content %}
 <h1>Video summary</h1>
 {% if job.status == JobStatus.DONE %}
-<p>{{ job.status.label() }}.</p>
+<p><span class="cp-chip" data-state="done">{{ job.status.label() }}</span></p>
 <article>
   {# Auto-escaped on purpose: the text comes from an LLM and may contain HTML (never use |safe). #}
-  <div dir="auto" style="white-space: pre-wrap">{{ job.summary_text }}</div>
+  <div dir="auto" class="cp-summary">{{ job.summary_text }}</div>
 </article>
-<p><a href="{{ url_for('lecturer.video_summary_md', job_id=job.id) }}">Download .md</a> |
-<a href="{{ url_for('lecturer.video_summary_txt', job_id=job.id) }}">Download .txt</a></p>
+<div class="cp-actions">
+  <a role="button" href="{{ url_for('lecturer.video_summary_md', job_id=job.id) }}">Download .md</a>
+  <a role="button" class="secondary" href="{{ url_for('lecturer.video_summary_txt', job_id=job.id) }}">Download .txt</a>
+</div>
 {% elif job.status == JobStatus.FAILED %}
-<p role="alert">{{ job.error_message }}</p>
-<p><a href="{{ url_for('lecturer.video') }}">Upload another recording</a></p>
+<p class="cp-banner" data-kind="error" role="alert">{{ job.error_message }}</p>
+<a role="button" href="{{ url_for('lecturer.video') }}">Upload another recording</a>
 {% else %}
-<p><strong id="job-label">{{ job.status.label() }}</strong> <span id="job-progress"></span></p>
-<p id="job-error" hidden>Connection problem, retrying...</p>
-<form method="post" action="{{ url_for('lecturer.video_job_cancel', job_id=job.id) }}">
-  <button type="submit" class="secondary">Cancel</button>
-</form>
+<article>
+  <p><strong id="job-label">{{ job.status.label() }}</strong></p>
+  {# No value attribute = indeterminate bar; video_job.js sets it while transcribing. #}
+  <progress id="job-progress"></progress>
+  <p id="job-error" class="cp-banner" data-kind="warning" hidden>Connection problem, retrying...</p>
+  {# Cancel only exists while the job is active (D36-a); the failed and done pages have none. #}
+  <form method="post" action="{{ url_for('lecturer.video_job_cancel', job_id=job.id) }}">
+    <button type="submit" class="secondary">Cancel</button>
+  </form>
+</article>
 <script>document.body.dataset.api = "{{ url_for('api.video_job', job_id=job.id) }}";</script>
 <script src="{{ url_for('static', filename='video_job.js') }}"></script>
 {% endif %}

@@ -1,38 +1,44 @@
 {% extends "lecturer_base.html" %}
+{% from "_icons.html" import icon %}
 {% block title %}Video summary{% endblock %}
 {% block content %}
 <h1>Video summary</h1>
+<article>
 {% if active %}
-<p>A recording is being processed.
-  <a href="{{ url_for('lecturer.video_job', job_id=active.id) }}">See its progress</a></p>
+  <p>A recording is being processed.
+    <a href="{{ url_for('lecturer.video_job', job_id=active.id) }}">See its progress</a></p>
 {% else %}
-<form method="post" enctype="multipart/form-data" id="video-form"
-      data-max-bytes="{{ max_bytes }}" data-too-large="{{ too_large_message }}">
-  <label>Recording (video or audio)
-    <input type="file" name="video" accept="{{ extensions | join(',') }}" required>
-  </label>
-  <label>Summary language
-    <select name="language">
-      <option value="auto" selected>Same as the lecture</option>
-      <option value="en">English</option>
-      <option value="he">Hebrew</option>
-    </select>
-  </label>
-  <p><small>Large recordings: open this page on the laptop (localhost), not through the tunnel.</small></p>
-  <p id="video-error" role="alert" hidden></p>
-  <button type="submit">Summarise</button>
-</form>
-<script src="{{ url_for('static', filename='video.js') }}"></script>
+  <form method="post" enctype="multipart/form-data" id="video-form" data-busy
+        data-max-bytes="{{ max_bytes }}" data-too-large="{{ too_large_message }}">
+    <label class="cp-drop">{{ icon("film") }} Recording (video or audio)
+      <input type="file" name="video" accept="{{ extensions | join(',') }}" required>
+    </label>
+    <label>Summary language
+      <select name="language">
+        <option value="auto" selected>Same as the lecture</option>
+        <option value="en">English</option>
+        <option value="he">Hebrew</option>
+      </select>
+    </label>
+    <p class="cp-muted"><small>Large recordings: open this page on the laptop (localhost), not through the tunnel.</small></p>
+    <p id="video-error" class="cp-banner" data-kind="error" role="alert" hidden></p>
+    <button type="submit">Summarise</button>
+  </form>
+  {# video.js first: its preventDefault must be seen by busy.js. #}
+  <script src="{{ url_for('static', filename='video.js') }}"></script>
+  <script src="{{ url_for('static', filename='busy.js') }}"></script>
 {% endif %}
+</article>
 <h2>Recent summaries</h2>
 {% if recent %}
-<ul>
+<ul class="cp-list">
   {% for job in recent %}
-  <li><a href="{{ url_for('lecturer.video_job', job_id=job.id) }}">Summary {{ job.id }}</a>: {{ job.status.label() }}</li>
+  <li><a href="{{ url_for('lecturer.video_job', job_id=job.id) }}">Summary {{ job.id }}</a>
+    <span class="cp-chip" data-state="{{ job.status.value }}">{{ job.status.label() }}</span></li>
   {% endfor %}
 </ul>
 {% else %}
-<p>No summary yet.</p>
+<p class="cp-muted">No summary yet.</p>
 {% endif %}
-<p><a href="{{ url_for('lecturer.dashboard') }}">Back to the lecturer page</a></p>
+<a role="button" class="secondary" href="{{ url_for('lecturer.dashboard') }}">Back to the lecturer page</a>
 {% endblock %}

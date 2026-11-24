@@ -2,28 +2,41 @@
 {% block title %}Polls{% endblock %}
 {% block content %}
 <h1>Polls</h1>
+<div class="cp-cols-eq">
 {% if not poll or not poll.is_open %}
-<h2>New poll</h2>
-<form method="post" action="{{ url_for('lecturer.polls') }}">
-  <input name="question" placeholder="Question" maxlength="200" required>
-  {% for i in range(4) %}
-  <input name="option" placeholder="Option {{ i + 1 }}{{ '' if i > 1 else ' (required)' }}" maxlength="100">
-  {% endfor %}
-  <button type="submit">Open poll</button>
-</form>
+<article>
+  <h2>New poll</h2>
+  <form method="post" action="{{ url_for('lecturer.polls') }}">
+    <label>Question
+      <input name="question" placeholder="Question" maxlength="200" required dir="auto">
+    </label>
+    {% for i in range(4) %}
+    <label>Option {{ i + 1 }}{{ '' if i > 1 else ' (required)' }}
+      <input name="option" placeholder="Option {{ i + 1 }}{{ '' if i > 1 else ' (required)' }}" maxlength="100" dir="auto">
+    </label>
+    {% endfor %}
+    <button type="submit">Open poll</button>
+  </form>
+</article>
 {% endif %}
 {% if poll %}
-<h2>{{ poll.question }} {% if not poll.is_open %}(closed){% endif %}</h2>
-<p id="poll-error" hidden>Connection problem, retrying...</p>
-<div id="poll-options">
-  {% for option in poll.options %}
-  <p>{{ option.label }}: <strong>{{ option.votes }}</strong><progress value="{{ option.votes }}" max="{{ poll.total_votes() or 1 }}"></progress></p>
-  {% endfor %}
+<article>
+  <h2 dir="auto">{{ poll.question }} {% if not poll.is_open %}<span class="cp-chip" data-state="closed">(closed)</span>{% endif %}</h2>
+  <p id="poll-error" class="cp-banner" data-kind="warning" hidden>Connection problem, retrying...</p>
+  <div id="poll-options" class="cp-big">
+    {% for option in poll.options %}
+    <p dir="auto">{{ option.label }}: <strong>{{ option.votes }}</strong><progress value="{{ option.votes }}" max="{{ poll.total_votes() or 1 }}"></progress></p>
+    {% endfor %}
+  </div>
+  {% if poll.is_open %}
+  <form method="post" action="{{ url_for('lecturer.close_poll', poll_id=poll.id) }}">
+    <button type="submit">Close poll</button>
+  </form>
+  {% endif %}
+</article>
+{% endif %}
 </div>
-{% if poll.is_open %}
-<form method="post" action="{{ url_for('lecturer.close_poll', poll_id=poll.id) }}">
-  <button type="submit">Close poll</button>
-</form>
+{% if poll and poll.is_open %}
 <script>
 // Counts are redrawn every 2.5 s (D4); labels go through textContent because the lecturer types them.
 const box = document.getElementById("poll-options");
@@ -34,6 +47,7 @@ setInterval(async () => {
     const data = await r.json();
     box.replaceChildren(...data.options.map((o) => {
       const p = document.createElement("p");
+      p.dir = "auto"; // Hebrew and English labels each align correctly
       const bar = document.createElement("progress");
       bar.value = o.votes; bar.max = data.total || 1;
       const count = document.createElement("strong");
@@ -46,6 +60,5 @@ setInterval(async () => {
 }, 2500);
 </script>
 {% endif %}
-{% endif %}
-<p><a href="{{ url_for('lecturer.dashboard') }}">Back</a></p>
+<a role="button" class="secondary" href="{{ url_for('lecturer.dashboard') }}">Back to the dashboard</a>
 {% endblock %}

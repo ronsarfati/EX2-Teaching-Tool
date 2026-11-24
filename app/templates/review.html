@@ -1,9 +1,11 @@
 {% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% block main_class %} cp-narrow{% endblock %}
 {% block title %}Homework review{% endblock %}
 {% block content %}
 <h1>Homework review</h1>
-<form method="post">
-  <input type="url" name="url" placeholder="https://github.com/owner/repository" required>
+<form method="post" data-busy>
+  <input type="url" name="url" placeholder="https://github.com/owner/repository" required dir="ltr">
   <button type="submit">Review</button>
 </form>
 {% if result %}
@@ -18,8 +20,10 @@
   {% else %}
   <p>{{ no_peer }}</p>
   {% endif %}
-  <div style="white-space: pre-wrap">{{ result.review_text }}</div>
+  <div dir="auto" class="cp-summary">{{ result.review_text }}</div>
 </article>
 {% endif %}
-<p><a href="/">Back to the menu</a></p>
+<a role="button" class="secondary" href="/">Back to the menu</a>
+<script src="{{ url_for('static', filename='busy.js') }}"></script>
 {% endblock %}
+{% block tabbar %}{% include "_tabbar.html" %}{% endblock %}

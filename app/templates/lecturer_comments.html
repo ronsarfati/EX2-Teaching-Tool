@@ -2,10 +2,10 @@
 {% block title %}Comments{% endblock %}
 {% block content %}
 <h1>Comments</h1>
-<p id="comments-error" hidden>Connection problem, retrying...</p>
-<p id="comments-empty">No comments yet.</p>
-<ul id="comments-list"></ul>
-<p><a href="{{ url_for('lecturer.dashboard') }}">Back</a></p>
+<p id="comments-error" class="cp-banner" data-kind="warning" hidden>Connection problem, retrying...</p>
+<p id="comments-empty" class="cp-muted">No comments yet.</p>
+<ul id="comments-list" class="cp-wall"></ul>
+<a role="button" class="secondary" href="{{ url_for('lecturer.dashboard') }}">Back to the dashboard</a>
 <script>
 // Short polling (D4). Comments are typed by students: textContent only, never innerHTML.
 const list = document.getElementById("comments-list");
@@ -16,6 +16,7 @@ async function refresh() {
     const data = await response.json();
     list.replaceChildren(...data.comments.map((c) => {
       const li = document.createElement("li");
+      li.dir = "auto"; // Hebrew comments read right to left
       li.textContent = new Date(c.created_at * 1000).toLocaleTimeString("en-GB", { timeZone: "Asia/Jerusalem" }) + " - " + c.text;
       return li;
     }));

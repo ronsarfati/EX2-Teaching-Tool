@@ -162,3 +162,22 @@ input[name=nickname] { min-height: 56px; }
 .cp-option span { flex: 1; }
 .cp-counter { text-align: end; color: var(--cp-muted); font-size: var(--cp-fs-sm); margin-top: calc(-1 * var(--cp-s2)); }
 @media (prefers-reduced-motion: reduce) { .cp-dot { animation: none; } }
+
+/* Lecturer sub-pages (T22h): drop zone, projectable lists, summary block, equal columns. */
+.cp-drop { display: flex; align-items: center; justify-content: center; gap: var(--cp-s3); min-height: 7rem; padding: var(--cp-s4);
+  border: 2px dashed var(--cp-border); border-radius: var(--cp-r); background: var(--cp-bg); cursor: pointer; font-weight: 600; flex-wrap: wrap; }
+.cp-drop input { max-width: 100%; margin: 0; }
+.cp-cols-eq { display: grid; gap: var(--cp-s4); grid-template-columns: 1fr; margin-bottom: var(--cp-s4); }
+@media (min-width: 1024px) { .cp-cols-eq { grid-template-columns: 1fr 1fr; } }
+.cp-cols-eq article { margin: 0; }
+.cp-big p { font-size: var(--cp-fs-lg); }
+progress { height: 12px; }
+.cp-wall { padding: 0; }
+.cp-wall li { list-style: none; margin-bottom: var(--cp-s3); padding: var(--cp-s4); font-size: var(--cp-fs-lg);
+  background: var(--cp-surface); border: 1px solid var(--cp-border); border-radius: var(--cp-r); }
+.cp-list { padding: 0; }
+.cp-list li { list-style: none; display: flex; align-items: center; gap: var(--cp-s3); padding: var(--cp-s2) 0; }
+.cp-chip[data-state=done] { background: var(--cp-success-bg); color: var(--cp-success); }
+.cp-chip[data-state=failed] { background: var(--cp-error-bg); color: var(--cp-error); }
+.cp-summary { max-width: 70ch; font-size: 1.0625rem; white-space: pre-wrap; }
+.cp-mono { font-family: var(--cp-mono); }

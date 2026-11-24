@@ -1,15 +1,28 @@
 {% extends "lecturer_base.html" %}
+{% from "_icons.html" import icon %}
 {% block title %}Class photo{% endblock %}
 {% block content %}
 <h1>Class photo</h1>
-<p>Take the photo when students look up, with everyone in the frame. The photo is counted and then discarded; only the number is kept.</p>
+<article>
+  <p>Take the photo when students look up, with everyone in the frame. The photo is counted and then discarded; only the number is kept.</p>
+  <form method="post" enctype="multipart/form-data" data-busy>
+    <label class="cp-drop">{{ icon("camera") }} Take or choose a photo
+      <input type="file" name="photo" accept="image/*" capture="environment" required>
+    </label>
+    <button type="submit">Count heads</button>
+  </form>
+</article>
 {% if summary %}
-<p role="status">Checked in <strong>{{ summary.n }}</strong> / detected <strong>{{ summary.session.head_count }}</strong> /
-<strong>{{ summary.consistency }}</strong></p>
+<article>
+  <div class="cp-stats">
+    <div class="cp-stat"><strong>{{ summary.n }}</strong><span>Checked in</span></div>
+    <div class="cp-stat"><strong>{{ summary.session.head_count }}</strong><span>Heads detected</span></div>
+    <div class="cp-stat"><span class="cp-chip" data-state="{{ summary.consistency }}">{{ summary.consistency }}</span></div>
+  </div>
+  <p role="status">Checked in <strong>{{ summary.n }}</strong> / detected <strong>{{ summary.session.head_count }}</strong> /
+  <strong>{{ summary.consistency }}</strong></p>
+</article>
 {% endif %}
-<form method="post" enctype="multipart/form-data">
-  <input type="file" name="photo" accept="image/*" capture="environment" required>
-  <button type="submit">Count heads</button>
-</form>
-<p><a href="{{ url_for('lecturer.dashboard') }}">Back</a></p>
+<a role="button" class="secondary" href="{{ url_for('lecturer.dashboard') }}">Back to the dashboard</a>
+<script src="{{ url_for('static', filename='busy.js') }}"></script>
 {% endblock %}

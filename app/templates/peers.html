@@ -3,10 +3,13 @@
 {% block content %}
 <h1>Comparison repositories</h1>
 {% if error %}<p role="alert">{{ error }}</p>{% endif %}
-<p>One public GitHub repository link per line. The first two (other than the reviewed one) are used, anonymised.</p>
-<form method="post">
-  <textarea name="urls" rows="8" cols="60">{{ text }}</textarea>
-  <button type="submit">Save</button>
-</form>
-<p><a href="{{ url_for('lecturer.dashboard') }}">Back</a></p>
+<article>
+  <p>One public GitHub repository link per line. The first two (other than the reviewed one) are used, anonymised.</p>
+  <form method="post" data-busy>
+    <textarea name="urls" rows="8" cols="60" dir="ltr" class="cp-mono">{{ text }}</textarea>
+    <button type="submit">Save</button>
+  </form>
+</article>
+<a role="button" class="secondary" href="{{ url_for('lecturer.dashboard') }}">Back to the dashboard</a>
+<script src="{{ url_for('static', filename='busy.js') }}"></script>
 {% endblock %}

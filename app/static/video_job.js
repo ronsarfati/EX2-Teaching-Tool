@@ -1,8 +1,17 @@
 // Polls the job status every 3 s (D4) and reloads the page once the job has ended.
 const POLL_MS = 3000;
 const labelEl = document.getElementById("job-label");
-const progressEl = document.getElementById("job-progress");
+const progressEl = document.getElementById("job-progress"); // a <progress> element
 const errorEl = document.getElementById("job-error");
+
+function showProgress(data) {
+  if (data.status === "transcribing") {
+    progressEl.max = 100;
+    progressEl.value = data.progress;
+  } else {
+    progressEl.removeAttribute("value"); // no value = indeterminate animation
+  }
+}
 
 async function poll() {
   try {
@@ -14,7 +23,7 @@ async function poll() {
       return;
     }
     labelEl.textContent = data.label;
-    progressEl.textContent = data.status === "transcribing" ? data.progress + " %" : "";
+    showProgress(data);
     errorEl.hidden = true;
   } catch (error) {
     errorEl.hidden = false; // keep the last status, tell the lecturer
