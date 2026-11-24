@@ -48,12 +48,17 @@
     <script src="{{ url_for('static', filename='poll_json.js') }}"></script>
 {% else %}
     <p class="cp-muted">Open a session to start the check-in.</p>
+{% if last_session %}
+    <a role="button" class="secondary" href="{{ url_for('lecturer.photo', session_id=last_session.id) }}">{{ icon("camera") }} Count heads on the last session's photo</a>
+{% endif %}
 {% endif %}
   </article>
   <article>
     <h3>{{ icon("message") }} Live feedback</h3>
-    <a class="cp-row" href="{{ url_for('lecturer.polls') }}"><strong>Polls</strong><small>Ask a question, see votes live</small></a>
-    <a class="cp-row" href="{{ url_for('lecturer.comments') }}"><strong>Comments</strong><small>Anonymous suggestions, live</small></a>
+    <a class="cp-row" href="{{ url_for('lecturer.polls') }}"><strong>Polls</strong><small>Ask a question, see votes live</small>
+{% if poll %}<small dir="auto">Latest ({{ "open" if poll.is_open else "closed" }}): {{ poll.question }}</small>{% endif %}</a>
+    <a class="cp-row" href="{{ url_for('lecturer.comments') }}"><strong>Comments</strong><small>Anonymous suggestions, live</small>
+<small>{{ comment_count }} received</small></a>
   </article>
 </div>
 
@@ -69,6 +74,9 @@
   <article>
     <h3>{{ icon("film") }} Video summary</h3>
     <p>Upload a recording, get a summary (.md / .txt).</p>
+{% if video_job %}
+    <p class="cp-banner" data-kind="warning">{{ video_job.status.label() }}. <a href="{{ url_for('lecturer.video_job', job_id=video_job.id) }}">See progress</a></p>
+{% endif %}
     <a role="button" class="secondary" href="{{ url_for('lecturer.video') }}">Video summary</a>
   </article>
   <article>

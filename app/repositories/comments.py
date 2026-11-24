@@ -21,6 +21,9 @@ class CommentRepository:
         cursor = self._db.conn().execute("INSERT INTO comment(text, created_at) VALUES (?, ?)", (text, at))
         return Comment(cursor.lastrowid, text, at)
 
+    def count(self) -> int:
+        return self._db.conn().execute("SELECT COUNT(*) FROM comment").fetchone()[0]
+
     def list_recent(self, limit: int) -> list[Comment]:
         """Newest first; the id breaks ties between comments posted in the same instant."""
         rows = self._db.conn().execute(

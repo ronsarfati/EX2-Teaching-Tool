@@ -21,5 +21,9 @@ class CommentService:
             raise CommentTooLongError()
         return self._comments.add(text, self._clock.now())
 
+    def count(self) -> int:
+        """Number of comments received so far, for the dashboard summary."""
+        return self._comments.count()
+
     def recent(self, limit: int = 100) -> list[Comment]:
         return self._comments.list_recent(limit)

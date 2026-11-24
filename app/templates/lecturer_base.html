@@ -2,6 +2,7 @@
 {% from "_icons.html" import icon %}
 {# Layout of every lecturer page: link-only navigation (no form, so pages that assert on forms stay exact).
    The Projector link always targets the same named tab, so the projector window is reused. #}
+{% block head_extra %}<script src="{{ url_for('static', filename='theme.js') }}"></script>{% endblock %}
 {% block nav %}
 <nav class="cp-nav" aria-label="Lecturer">
   <span class="cp-role">Lecturer</span>
@@ -13,5 +14,6 @@
     <li><a href="{{ url_for('lecturer.video') }}">{{ icon("film") }}Video summary</a></li>
     <li><a href="/review">{{ icon("git-branch") }}Homework</a></li>
   </ul>
+  <button type="button" id="theme-toggle" class="cp-theme secondary outline" aria-label="Colour theme: auto">Auto</button>
 </nav>
 {% endblock %}

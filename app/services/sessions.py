@@ -53,6 +53,10 @@ class SessionService:
         """The open session, or None."""
         return self._sessions.find_open()
 
+    def latest(self) -> Optional[AttendanceSession]:
+        """The last session, open or closed: the photo count stays reachable after closing (D31)."""
+        return self._sessions.latest()
+
     def open_session(self) -> AttendanceSession:
         """Open a session; only one may be open at a time (D27)."""
         if self._sessions.find_open() is not None:

@@ -181,3 +181,6 @@ progress { height: 12px; }
 .cp-chip[data-state=failed] { background: var(--cp-error-bg); color: var(--cp-error); }
 .cp-summary { max-width: 70ch; font-size: 1.0625rem; white-space: pre-wrap; }
 .cp-mono { font-family: var(--cp-mono); }
+
+/* Theme toggle (T22l): small button at the end of the lecturer nav. */
+.cp-theme { width: auto; min-height: 36px; margin: 0; padding: 0 var(--cp-s3); font-size: var(--cp-fs-sm); }

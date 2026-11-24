@@ -32,7 +32,14 @@ def login():
 @bp.get("")
 @lecturer_required
 def dashboard():
-    return render_template("lecturer.html", current=_services()["session_service"].current())
+    """Session state plus one-line summaries of the other tools, so the cards show what is going on."""
+    services = _services()
+    sessions = services["session_service"]
+    return render_template(
+        "lecturer.html", current=sessions.current(), last_session=sessions.latest(),
+        poll=services["poll_service"].latest(), comment_count=services["comment_service"].count(),
+        video_job=services["video_service"].active(),
+    )
 
 
 @bp.get("/projector")

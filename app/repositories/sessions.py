@@ -55,6 +55,11 @@ class SessionRepository:
             "UPDATE attendance_session SET head_count = ?, head_count_at = ? WHERE id = ?", (count, at, session_id)
         )
 
+    def latest(self) -> Optional[AttendanceSession]:
+        """The most recent session, open or closed."""
+        row = self._db.conn().execute("SELECT * FROM attendance_session ORDER BY id DESC LIMIT 1").fetchone()
+        return _to_session(row) if row else None
+
     def list_all(self) -> list[AttendanceSession]:
         rows = self._db.conn().execute("SELECT * FROM attendance_session ORDER BY id").fetchall()
         return [_to_session(row) for row in rows]
